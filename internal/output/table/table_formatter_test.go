@@ -1,0 +1,151 @@
+package table
+
+import (
+	"bytes"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/cemililik/leakwatch/pkg/finding"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestFormatter_Format_EmptyFindings_WritesHeaderAndZeroSummary(t *testing.T) {
+	f := &Formatter{}
+	var buf bytes.Buffer
+
+	err := f.Format(&buf, []finding.Finding{})
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "SEVERITY")
+	assert.Contains(t, output, "DETECTOR")
+	assert.Contains(t, output, "Found 0 secrets.")
+}
+
+func TestFormatter_Format_SingleFinding_WritesCorrectRow(t *testing.T) {
+	f := &Formatter{}
+	var buf bytes.Buffer
+
+	findings := []finding.Finding{
+		{
+			ID:         "abc123",
+			DetectorID: "aws-access-key-id",
+			Severity:   finding.SeverityCritical,
+			Redacted:   "AKIA****MPLE",
+			SourceMetadata: finding.SourceMetadata{
+				FilePath: "config.yaml",
+			},
+			Verification: finding.VerificationResult{
+				Status: finding.StatusVerifiedActive,
+			},
+			DetectedAt: time.Now(),
+		},
+	}
+
+	err := f.Format(&buf, findings)
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "CRITICAL")
+	assert.Contains(t, output, "aws-access-key-id")
+	assert.Contains(t, output, "config.yaml")
+	assert.Contains(t, output, "AKIA****MPLE")
+	assert.Contains(t, output, "verified_active")
+	assert.Contains(t, output, "Found 1 secrets (1 critical).")
+}
+
+func TestFormatter_Format_MultipleFindings_WritesSummaryWithCounts(t *testing.T) {
+	f := &Formatter{}
+	var buf bytes.Buffer
+
+	findings := []finding.Finding{
+		{DetectorID: "det-a", Severity: finding.SeverityCritical, Redacted: "****"},
+		{DetectorID: "det-b", Severity: finding.SeverityHigh, Redacted: "****"},
+		{DetectorID: "det-c", Severity: finding.SeverityHigh, Redacted: "****"},
+		{DetectorID: "det-d", Severity: finding.SeverityLow, Redacted: "****"},
+	}
+
+	err := f.Format(&buf, findings)
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "Found 4 secrets (1 critical, 2 high, 1 low).")
+}
+
+func TestFormatter_Format_ShowRawFalse_RawNotInOutput(t *testing.T) {
+	f := &Formatter{ShowRaw: false}
+	var buf bytes.Buffer
+
+	findings := []finding.Finding{
+		{
+			ID:         "test-1",
+			DetectorID: "generic-secret",
+			Redacted:   "sk_****abcd",
+			Raw:        "sk_live_supersecretvalue",
+		},
+	}
+
+	err := f.Format(&buf, findings)
+	require.NoError(t, err)
+
+	assert.NotContains(t, buf.String(), "sk_live_supersecretvalue",
+		"ShowRaw=false must strip raw secret from table output")
+}
+
+func TestFormatter_Format_ShowRawFalse_DoesNotMutateOriginal(t *testing.T) {
+	f := &Formatter{ShowRaw: false}
+	var buf bytes.Buffer
+
+	findings := []finding.Finding{
+		{
+			ID:  "test-1",
+			Raw: "AKIAIOSFODNN7EXAMPLE",
+		},
+	}
+
+	err := f.Format(&buf, findings)
+	require.NoError(t, err)
+
+	assert.Equal(t, "AKIAIOSFODNN7EXAMPLE", findings[0].Raw,
+		"Format must not mutate the original slice")
+}
+
+func TestFormatter_Format_ColumnsAligned_TabwriterProducesAlignedOutput(t *testing.T) {
+	f := &Formatter{}
+	var buf bytes.Buffer
+
+	findings := []finding.Finding{
+		{DetectorID: "short", Severity: finding.SeverityLow, Redacted: "a"},
+		{DetectorID: "a-very-long-detector-name", Severity: finding.SeverityCritical, Redacted: "b"},
+	}
+
+	err := f.Format(&buf, findings)
+	require.NoError(t, err)
+
+	lines := strings.Split(buf.String(), "\n")
+	// Header and separator should exist.
+	require.GreaterOrEqual(t, len(lines), 4)
+}
+
+func TestFormatter_FileExtension_ReturnsTXT(t *testing.T) {
+	f := &Formatter{}
+	assert.Equal(t, ".txt", f.FileExtension())
+}
+
+// errWriter simulates a write error.
+type errWriter struct{}
+
+func (w *errWriter) Write(_ []byte) (int, error) {
+	return 0, errors.New("write error")
+}
+
+func TestFormatter_Format_WriterError_ReturnsError(t *testing.T) {
+	f := &Formatter{}
+	findings := []finding.Finding{{ID: "test"}}
+
+	err := f.Format(&errWriter{}, findings)
+	assert.Error(t, err)
+}

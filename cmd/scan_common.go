@@ -17,9 +17,14 @@ import (
 	"github.com/cemililik/leakwatch/internal/config"
 	"github.com/cemililik/leakwatch/internal/detector"
 	"github.com/cemililik/leakwatch/internal/engine"
+	"github.com/cemililik/leakwatch/internal/output"
+	csvout "github.com/cemililik/leakwatch/internal/output/csv"
 	jsonout "github.com/cemililik/leakwatch/internal/output/json"
+	sarifout "github.com/cemililik/leakwatch/internal/output/sarif"
+	tableout "github.com/cemililik/leakwatch/internal/output/table"
 	"github.com/cemililik/leakwatch/internal/source"
 	"github.com/cemililik/leakwatch/internal/verifier"
+	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
 // closeable is implemented by sources that hold resources (e.g. cloned repos).
@@ -39,6 +44,7 @@ type scanConfig struct {
 	format           string
 	noVerify         bool
 	onlyVerified     bool
+	minSeverity      finding.Severity
 }
 
 // bindScanFlags binds common scan flags to Viper.
@@ -54,6 +60,7 @@ func bindScanFlags(flags *pflag.FlagSet) {
 func addVerifyFlags(flags *pflag.FlagSet) {
 	flags.Bool("no-verify", false, "disable secret verification")
 	flags.Bool("only-verified", false, "only show verified active findings")
+	flags.String("min-severity", "low", "minimum severity to report (low, medium, high, critical)")
 }
 
 // loadScanConfig loads and validates configuration from Viper.
@@ -65,6 +72,19 @@ func loadScanConfig(cmd *cobra.Command) (*scanConfig, error) {
 
 	noVerify, _ := cmd.Flags().GetBool("no-verify")
 	onlyVerified, _ := cmd.Flags().GetBool("only-verified")
+	minSevStr, _ := cmd.Flags().GetString("min-severity")
+	minSev := parseSeverity(minSevStr)
+
+	// Read format and output directly from flags (overrides config file).
+	format, _ := cmd.Flags().GetString("format")
+	if format == "" {
+		format = cfg.Output.Format
+	}
+	outputFile, _ := cmd.Flags().GetString("output")
+	if outputFile == "" {
+		outputFile = cfg.Output.File
+	}
+	showRaw, _ := cmd.Flags().GetBool("show-raw")
 
 	return &scanConfig{
 		concurrency:      cfg.Scan.Concurrency,
@@ -72,15 +92,30 @@ func loadScanConfig(cmd *cobra.Command) (*scanConfig, error) {
 		excludePaths:     cfg.Filter.ExcludePaths,
 		enableEntropy:    cfg.Detection.Entropy.Enabled,
 		entropyThreshold: cfg.Detection.Entropy.Threshold,
-		showRaw:          cfg.Output.ShowRaw,
-		outputFile:       cfg.Output.File,
-		format:           cfg.Output.Format,
+		showRaw:          showRaw || cfg.Output.ShowRaw,
+		outputFile:       outputFile,
+		format:           format,
 		noVerify:         noVerify,
 		onlyVerified:     onlyVerified,
+		minSeverity:      minSev,
 	}, nil
 }
 
-// executeScan runs the scan pipeline: detect, verify, format, output.
+// selectFormatter returns the appropriate formatter based on the format string.
+func selectFormatter(format string, showRaw bool) output.Formatter {
+	switch format {
+	case "sarif":
+		return &sarifout.Formatter{ShowRaw: showRaw}
+	case "csv":
+		return &csvout.Formatter{ShowRaw: showRaw}
+	case "table":
+		return &tableout.Formatter{ShowRaw: showRaw}
+	default:
+		return &jsonout.Formatter{ShowRaw: showRaw}
+	}
+}
+
+// executeScan runs the scan pipeline: detect, verify, filter, format, output.
 // If cl is non-nil, Close() is called when the scan completes.
 func executeScan(parent context.Context, cfg *scanConfig, src source.Source, cl closeable) error {
 	if cl != nil {
@@ -122,8 +157,19 @@ func executeScan(parent context.Context, cfg *scanConfig, src source.Source, cl 
 		return fmt.Errorf("scan failed: %w", err)
 	}
 
+	// Apply severity filter.
+	if cfg.minSeverity > finding.SeverityLow {
+		var filtered []finding.Finding
+		for _, f := range result.Findings {
+			if f.Severity >= cfg.minSeverity {
+				filtered = append(filtered, f)
+			}
+		}
+		result.Findings = filtered
+	}
+
 	// Write output.
-	formatter := &jsonout.Formatter{ShowRaw: cfg.showRaw}
+	formatter := selectFormatter(cfg.format, cfg.showRaw)
 
 	var w io.WriteCloser
 	if cfg.outputFile != "" {
@@ -147,4 +193,17 @@ func executeScan(parent context.Context, cfg *scanConfig, src source.Source, cl 
 	}
 
 	return nil
+}
+
+func parseSeverity(s string) finding.Severity {
+	switch s {
+	case "critical":
+		return finding.SeverityCritical
+	case "high":
+		return finding.SeverityHigh
+	case "medium":
+		return finding.SeverityMedium
+	default:
+		return finding.SeverityLow
+	}
 }

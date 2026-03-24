@@ -1,0 +1,6 @@
+- id: leakwatch
+  name: Leakwatch Secret Scanner
+  entry: leakwatch scan fs
+  language: golang
+  types: [file]
+  pass_filenames: false

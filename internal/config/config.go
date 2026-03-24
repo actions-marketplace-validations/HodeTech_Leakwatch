@@ -10,7 +10,10 @@ import (
 
 // Supported output formats.
 var validFormats = map[string]bool{
-	"json": true,
+	"json":  true,
+	"sarif": true,
+	"csv":   true,
+	"table": true,
 }
 
 // Config represents the complete application configuration.
