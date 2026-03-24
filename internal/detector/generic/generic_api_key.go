@@ -15,8 +15,9 @@ var apiKeyPattern = regexp.MustCompile(`(?i)(api[_\-]?key|api[_\-]?secret|secret
 // APIKeyDetector detects generic API key assignments.
 type APIKeyDetector struct{}
 
-func (d *APIKeyDetector) ID() string          { return "generic-api-key" }
-func (d *APIKeyDetector) Description() string  { return "Generic API Key" }
+func (d *APIKeyDetector) ID() string { return "generic-api-key" }
+
+func (d *APIKeyDetector) Description() string { return "Generic API Key" }
 func (d *APIKeyDetector) Keywords() []string {
 	return []string{
 		"api_key", "api-key", "apikey",

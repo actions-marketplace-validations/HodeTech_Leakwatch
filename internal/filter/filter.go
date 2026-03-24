@@ -31,7 +31,7 @@ func IsExcludedExtension(path string, extraExts []string) bool {
 		return true
 	}
 	for _, e := range extraExts {
-		if ext == strings.ToLower(e) {
+		if strings.EqualFold(ext, e) {
 			return true
 		}
 	}

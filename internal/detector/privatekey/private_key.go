@@ -14,8 +14,9 @@ var privateKeyPattern = regexp.MustCompile(`-----BEGIN\s+(RSA |OPENSSH |DSA |EC 
 // Detector detects PEM-encoded private keys.
 type Detector struct{}
 
-func (d *Detector) ID() string          { return "private-key" }
-func (d *Detector) Description() string  { return "Private Key (RSA, SSH, DSA, EC, PGP)" }
+func (d *Detector) ID() string { return "private-key" }
+
+func (d *Detector) Description() string { return "Private Key (RSA, SSH, DSA, EC, PGP)" }
 func (d *Detector) Keywords() []string {
 	return []string{
 		"-----BEGIN RSA PRIVATE",

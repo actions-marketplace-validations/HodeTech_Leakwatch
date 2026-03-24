@@ -142,7 +142,7 @@ func runScanRepos(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
-		defer w.Close()
+		defer func() { _ = w.Close() }()
 	} else {
 		w = os.Stdout
 	}

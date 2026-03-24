@@ -69,7 +69,7 @@ func (s *Severity) UnmarshalJSON(data []byte) error {
 type VerificationStatus int
 
 const (
-	StatusUnverified      VerificationStatus = iota // Not verified
+	StatusUnverified       VerificationStatus = iota // Not verified
 	StatusVerifiedActive                             // Verified: secret is active
 	StatusVerifiedInactive                           // Verified: secret is inactive
 	StatusVerifyError                                // Verification error
@@ -77,10 +77,10 @@ const (
 
 // verificationStatusToString maps VerificationStatus values to strings.
 var verificationStatusToString = map[VerificationStatus]string{
-	StatusUnverified:      "unverified",
-	StatusVerifiedActive:  "verified_active",
+	StatusUnverified:       "unverified",
+	StatusVerifiedActive:   "verified_active",
 	StatusVerifiedInactive: "verified_inactive",
-	StatusVerifyError:     "verify_error",
+	StatusVerifyError:      "verify_error",
 }
 
 // stringToVerificationStatus maps strings to VerificationStatus values.

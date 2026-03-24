@@ -68,9 +68,11 @@ type realBucketHandle struct {
 func (h *realBucketHandle) Attrs(ctx context.Context) (*gcsstorage.BucketAttrs, error) {
 	return h.b.Attrs(ctx)
 }
+
 func (h *realBucketHandle) Objects(ctx context.Context, q *gcsstorage.Query) objectIterator {
 	return h.b.Objects(ctx, q)
 }
+
 func (h *realBucketHandle) Object(name string) objectHandle {
 	return &realObjectHandle{o: h.b.Object(name)}
 }
@@ -245,7 +247,7 @@ func (s *GCSSource) downloadObject(ctx context.Context, key string) ([]byte, err
 	if err != nil {
 		return nil, fmt.Errorf("open object %q: %w", key, err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	data, err := io.ReadAll(reader)
 	if err != nil {

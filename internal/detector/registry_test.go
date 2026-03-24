@@ -13,11 +13,15 @@ type mockDetector struct {
 	id string
 }
 
-func (m *mockDetector) ID() string                                       { return m.id }
-func (m *mockDetector) Description() string                              { return "mock" }
-func (m *mockDetector) Keywords() []string                               { return nil }
-func (m *mockDetector) Scan(_ context.Context, _ []byte) []RawFinding    { return nil }
-func (m *mockDetector) Severity() finding.Severity                       { return finding.SeverityLow }
+func (m *mockDetector) ID() string { return m.id }
+
+func (m *mockDetector) Description() string { return "mock" }
+
+func (m *mockDetector) Keywords() []string { return nil }
+
+func (m *mockDetector) Scan(_ context.Context, _ []byte) []RawFinding { return nil }
+
+func (m *mockDetector) Severity() finding.Severity { return finding.SeverityLow }
 
 func TestRegister_AndAll_ReturnsAllDetectors(t *testing.T) {
 	Reset()

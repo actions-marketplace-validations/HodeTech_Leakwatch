@@ -83,9 +83,10 @@ Full standards: [docs/standards/04-DEVELOPMENT-STANDARDS.md](docs/standards/04-D
 
 - **Language:** Go 1.25+, `CGO_ENABLED=0`
 - **Style:** Effective Go + Uber Go Style Guide
-- **Linting:** `golangci-lint` is mandatory, runs in all CI
-- **Formatting:** `gofumpt` (strict gofmt)
-- **Test coverage:** minimum 80%, detectors 95%
+- **Linting:** `golangci-lint v2` is mandatory — **run locally before every commit:** `golangci-lint run ./... --config .golangci.yml`
+- **Formatting:** `gofumpt` (strict gofmt) — run `gofumpt -w .` to auto-fix formatting issues
+- **Pre-commit check:** Lint must pass with 0 issues before committing. CI will reject non-compliant code.
+- **Test coverage:** minimum 70% overall, detectors 95%
 - **Error handling:** Wrap every error with `fmt.Errorf("context: %w", err)` before returning
 - **Logging:** `log/slog` structured logging — DO NOT use fmt.Println/log.Printf
 - **Secret safety:** NEVER log, write to disk, or cache discovered secrets

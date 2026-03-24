@@ -115,7 +115,7 @@ func (s *GitSource) cloneRemote() error {
 
 	repo, err := git.PlainClone(tmpDir, false, cloneOpts)
 	if err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		return fmt.Errorf("failed to clone git repository %s: %w", sanitizeURL(s.target), err)
 	}
 	s.repo = repo

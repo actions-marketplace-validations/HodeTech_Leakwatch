@@ -103,7 +103,7 @@ func (s *ContainerSource) Chunks(ctx context.Context) <-chan source.Chunk {
 			}
 
 			func() {
-				defer reader.Close()
+				defer func() { _ = reader.Close() }()
 				s.scanTarLayer(ctx, ch, tar.NewReader(reader), idx, layerID)
 			}()
 		}

@@ -98,7 +98,7 @@ func buildTarArchive(t *testing.T, entries []tarEntry) *bytes.Buffer {
 			Name:     e.name,
 			Size:     int64(len(e.data)),
 			Typeflag: e.typeflag,
-			Mode:     0644,
+			Mode:     0o644,
 		}
 		require.NoError(t, tw.WriteHeader(hdr))
 		if len(e.data) > 0 {

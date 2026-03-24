@@ -218,7 +218,7 @@ func (s *S3Source) downloadObject(ctx context.Context, key string) ([]byte, erro
 	if err != nil {
 		return nil, fmt.Errorf("get object %q: %w", key, err)
 	}
-	defer output.Body.Close()
+	defer func() { _ = output.Body.Close() }()
 
 	data, err := io.ReadAll(output.Body)
 	if err != nil {

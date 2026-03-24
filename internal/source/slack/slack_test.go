@@ -13,11 +13,11 @@ import (
 
 // mockSlackClient is a minimal mock for the slackClient interface.
 type mockSlackClient struct {
-	channels    []slack.Channel
-	messages    map[string][]slack.Message
-	authErr     error
-	listErr     error
-	historyErr  error
+	channels   []slack.Channel
+	messages   map[string][]slack.Message
+	authErr    error
+	listErr    error
+	historyErr error
 }
 
 func (m *mockSlackClient) AuthTestContext(_ context.Context) (*slack.AuthTestResponse, error) {
@@ -274,7 +274,7 @@ func TestSlackSource_Chunks_SourceMetadata_Format(t *testing.T) {
 					Text:            "leaked secret here",
 					User:            "U123",
 					Timestamp:       "1700000001.000100",
-					ThreadTimestamp:  "1700000000.000000",
+					ThreadTimestamp: "1700000000.000000",
 				}},
 			},
 		},

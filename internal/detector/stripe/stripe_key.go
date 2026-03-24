@@ -10,8 +10,10 @@ import (
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
-var liveKeyPattern = regexp.MustCompile(`(sk|rk)_live_[a-zA-Z0-9]{24,99}`)
-var testKeyPattern = regexp.MustCompile(`(sk|rk)_test_[a-zA-Z0-9]{24,99}`)
+var (
+	liveKeyPattern = regexp.MustCompile(`(sk|rk)_live_[a-zA-Z0-9]{24,99}`)
+	testKeyPattern = regexp.MustCompile(`(sk|rk)_test_[a-zA-Z0-9]{24,99}`)
+)
 
 // LiveKey detects Stripe live API keys (secret and restricted).
 type LiveKey struct{}

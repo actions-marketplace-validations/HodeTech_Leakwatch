@@ -26,8 +26,8 @@ func initTestRepo(t *testing.T, files map[string]string) (string, *gogit.Reposit
 
 	for name, content := range files {
 		path := filepath.Join(dir, name)
-		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0755))
-		require.NoError(t, os.WriteFile(path, []byte(content), 0644))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 		_, err := wt.Add(name)
 		require.NoError(t, err)
 	}
@@ -52,8 +52,8 @@ func addCommit(t *testing.T, dir string, repo *gogit.Repository, files map[strin
 
 	for name, content := range files {
 		path := filepath.Join(dir, name)
-		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0755))
-		require.NoError(t, os.WriteFile(path, []byte(content), 0644))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 		_, err := wt.Add(name)
 		require.NoError(t, err)
 	}
@@ -204,7 +204,7 @@ func TestGitSource_Chunks_WithSince(t *testing.T) {
 
 	// Old commit with a past date.
 	oldTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "old.txt"), []byte("old content"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "old.txt"), []byte("old content"), 0o644))
 	_, err = wt.Add("old.txt")
 	require.NoError(t, err)
 	_, err = wt.Commit("old commit", &gogit.CommitOptions{
@@ -218,7 +218,7 @@ func TestGitSource_Chunks_WithSince(t *testing.T) {
 
 	// New commit after cutoff.
 	newTime := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "new.txt"), []byte("new content"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "new.txt"), []byte("new content"), 0o644))
 	_, err = wt.Add("new.txt")
 	require.NoError(t, err)
 	_, err = wt.Commit("new commit", &gogit.CommitOptions{
@@ -309,7 +309,7 @@ func TestGitSource_Close_RemovesTmpDir(t *testing.T) {
 
 	// Create a marker file to verify cleanup.
 	marker := filepath.Join(tmpDir, "marker.txt")
-	require.NoError(t, os.WriteFile(marker, []byte("test"), 0644))
+	require.NoError(t, os.WriteFile(marker, []byte("test"), 0o644))
 
 	s := &GitSource{
 		tmpDir: tmpDir,

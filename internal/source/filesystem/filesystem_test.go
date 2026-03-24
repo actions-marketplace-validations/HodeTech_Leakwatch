@@ -18,9 +18,9 @@ func TestFilesystemSource_Type(t *testing.T) {
 
 func TestFilesystemSource_New_CleansPath(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		wantAbs  bool
+		name      string
+		input     string
+		wantAbs   bool
 		wantClean bool
 	}{
 		{
@@ -79,8 +79,8 @@ func TestFilesystemSource_Validate_FileNotDir(t *testing.T) {
 func TestFilesystemSource_Chunks_ReadsFiles(t *testing.T) {
 	dir := t.TempDir()
 
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "secret.txt"), []byte("AKIAIOSFODNN7EXAMPLE"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("api_key: test123"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "secret.txt"), []byte("AKIAIOSFODNN7EXAMPLE"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("api_key: test123"), 0o644))
 
 	s := New(dir)
 	ctx := context.Background()
@@ -96,8 +96,8 @@ func TestFilesystemSource_Chunks_ReadsFiles(t *testing.T) {
 func TestFilesystemSource_Chunks_SkipsBinaryFiles(t *testing.T) {
 	dir := t.TempDir()
 
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "text.txt"), []byte("hello world"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "binary.dat"), []byte("hello\x00world"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "text.txt"), []byte("hello world"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "binary.dat"), []byte("hello\x00world"), 0o644))
 
 	s := New(dir)
 	ctx := context.Background()
@@ -114,8 +114,8 @@ func TestFilesystemSource_Chunks_SkipsBinaryFiles(t *testing.T) {
 func TestFilesystemSource_Chunks_SkipsBinaryExtensions(t *testing.T) {
 	dir := t.TempDir()
 
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "code.go"), []byte("package main"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "image.png"), []byte("fakepng"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "code.go"), []byte("package main"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "image.png"), []byte("fakepng"), 0o644))
 
 	s := New(dir)
 	ctx := context.Background()
@@ -132,13 +132,13 @@ func TestFilesystemSource_Chunks_SkipsBinaryExtensions(t *testing.T) {
 func TestFilesystemSource_Chunks_RespectsMaxFileSize(t *testing.T) {
 	dir := t.TempDir()
 
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "small.txt"), []byte("small"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "small.txt"), []byte("small"), 0o644))
 
 	bigData := make([]byte, 1024)
 	for i := range bigData {
 		bigData[i] = 'A'
 	}
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "big.txt"), bigData, 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "big.txt"), bigData, 0o644))
 
 	s := New(dir, WithMaxFileSize(512))
 	ctx := context.Background()
@@ -157,7 +157,7 @@ func TestFilesystemSource_Chunks_ContextCancellation(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		name := filepath.Join(dir, "file"+string(rune('a'+i%26))+".txt")
-		_ = os.WriteFile(name, []byte("content"), 0644)
+		_ = os.WriteFile(name, []byte("content"), 0o644)
 	}
 
 	s := New(dir, WithBufferSize(1))
@@ -195,8 +195,8 @@ func TestFilesystemSource_Chunks_EmptyDir(t *testing.T) {
 func TestFilesystemSource_Chunks_ExcludePaths(t *testing.T) {
 	dir := t.TempDir()
 
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.sum"), []byte("checksum"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.sum"), []byte("checksum"), 0o644))
 
 	s := New(dir, WithExcludePaths([]string{"go.sum"}))
 	ctx := context.Background()
@@ -219,7 +219,7 @@ func TestFilesystemSource_Chunks_SkipsSymlinks(t *testing.T) {
 
 	// Create a real file.
 	realFile := filepath.Join(dir, "real.txt")
-	require.NoError(t, os.WriteFile(realFile, []byte("real content"), 0644))
+	require.NoError(t, os.WriteFile(realFile, []byte("real content"), 0o644))
 
 	// Create a symlink pointing to the real file.
 	symlinkFile := filepath.Join(dir, "link.txt")

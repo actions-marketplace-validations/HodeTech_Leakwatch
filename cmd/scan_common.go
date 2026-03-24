@@ -36,19 +36,19 @@ type closeable interface {
 
 // scanConfig holds the resolved configuration for a scan command.
 type scanConfig struct {
-	concurrency      int
-	maxFileSize      int64
-	excludePaths     []string
-	enableEntropy    bool
-	entropyThreshold float64
-	showRaw          bool
-	outputFile       string
-	format           string
-	noVerify         bool
-	onlyVerified     bool
-	minSeverity      finding.Severity
+	concurrency       int
+	maxFileSize       int64
+	excludePaths      []string
+	enableEntropy     bool
+	entropyThreshold  float64
+	showRaw           bool
+	outputFile        string
+	format            string
+	noVerify          bool
+	onlyVerified      bool
+	minSeverity       finding.Severity
 	enableRemediation bool
-	scanRoot         string // root path for .leakwatchignore resolution
+	scanRoot          string // root path for .leakwatchignore resolution
 }
 
 // bindScanFlags binds common scan flags to Viper.
@@ -117,17 +117,17 @@ func loadScanConfig(cmd *cobra.Command) (*scanConfig, error) {
 	}
 
 	return &scanConfig{
-		concurrency:      cfg.Scan.Concurrency,
-		maxFileSize:      cfg.Scan.MaxFileSize,
-		excludePaths:     cfg.Filter.ExcludePaths,
-		enableEntropy:    cfg.Detection.Entropy.Enabled,
-		entropyThreshold: cfg.Detection.Entropy.Threshold,
-		showRaw:          showRaw || cfg.Output.ShowRaw,
-		outputFile:       outputFile,
-		format:           format,
-		noVerify:         noVerify,
-		onlyVerified:     onlyVerified,
-		minSeverity:      minSev,
+		concurrency:       cfg.Scan.Concurrency,
+		maxFileSize:       cfg.Scan.MaxFileSize,
+		excludePaths:      cfg.Filter.ExcludePaths,
+		enableEntropy:     cfg.Detection.Entropy.Enabled,
+		entropyThreshold:  cfg.Detection.Entropy.Threshold,
+		showRaw:           showRaw || cfg.Output.ShowRaw,
+		outputFile:        outputFile,
+		format:            format,
+		noVerify:          noVerify,
+		onlyVerified:      onlyVerified,
+		minSeverity:       minSev,
 		enableRemediation: enableRemediation,
 	}, nil
 }
@@ -224,7 +224,7 @@ func executeScan(parent context.Context, cfg *scanConfig, src source.Source, cl 
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
-		defer w.Close()
+		defer func() { _ = w.Close() }()
 	} else {
 		w = os.Stdout
 	}

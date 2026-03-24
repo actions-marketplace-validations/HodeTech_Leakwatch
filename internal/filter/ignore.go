@@ -29,7 +29,7 @@ func LoadIgnoreFile(path string) (*IgnoreRules, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening ignore file %q: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	rules := &IgnoreRules{}
 	scanner := bufio.NewScanner(f)

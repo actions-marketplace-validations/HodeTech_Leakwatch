@@ -42,11 +42,11 @@ type sarifDriver struct {
 
 // sarifRule represents a SARIF reporting descriptor (rule).
 type sarifRule struct {
-	ID               string              `json:"id"`
-	ShortDescription sarifMessage        `json:"shortDescription"`
-	DefaultConfig    sarifDefaultConfig  `json:"defaultConfiguration"`
-	Help             *sarifHelp          `json:"help,omitempty"`
-	HelpURI          string              `json:"helpUri,omitempty"`
+	ID               string             `json:"id"`
+	ShortDescription sarifMessage       `json:"shortDescription"`
+	DefaultConfig    sarifDefaultConfig `json:"defaultConfiguration"`
+	Help             *sarifHelp         `json:"help,omitempty"`
+	HelpURI          string             `json:"helpUri,omitempty"`
 }
 
 // sarifHelp represents the help text for a SARIF rule.
@@ -67,11 +67,11 @@ type sarifMessage struct {
 
 // sarifResult represents a single SARIF result.
 type sarifResult struct {
-	RuleID    string           `json:"ruleId"`
-	RuleIndex int              `json:"ruleIndex"`
-	Level     string           `json:"level"`
-	Message   sarifMessage     `json:"message"`
-	Locations []sarifLocation  `json:"locations,omitempty"`
+	RuleID    string          `json:"ruleId"`
+	RuleIndex int             `json:"ruleIndex"`
+	Level     string          `json:"level"`
+	Message   sarifMessage    `json:"message"`
+	Locations []sarifLocation `json:"locations,omitempty"`
 }
 
 // sarifLocation represents a SARIF physical location.

@@ -17,7 +17,7 @@ func Calculate(data []byte) float64 {
 
 	length := float64(len(data))
 	entropy := 0.0
-	for _, count := range freq {
+	for _, count := range &freq {
 		if count == 0 {
 			continue
 		}
