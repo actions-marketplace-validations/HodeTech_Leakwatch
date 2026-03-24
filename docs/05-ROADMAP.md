@@ -15,18 +15,20 @@
 | Faz 2 — Git | ✅ Tamamlandı | `v0.2.0` | 2026-03-24 |
 | Faz 3 — Tespit & Doğrulama | ✅ Tamamlandı | `v0.3.0` | 2026-03-24 |
 | Faz 4 — Kurumsal | ✅ Tamamlandı | `v0.4.0` | 2026-03-24 |
-| Faz 5 — Genişleme | 🔲 Planlanıyor | `v1.x.x` | — |
+| Faz 5 — Genişleme (Kısa Vadeli) | ✅ Tamamlandı | `v1.0.0` | 2026-03-24 |
+| Faz 5 — Genişleme (Orta/Uzun Vadeli) | 🔲 Planlanıyor | `v1.x.x` | — |
 
 ### Mevcut Yetenekler
 
-- **3 tarama kaynağı:** Dosya sistemi, Git geçmişi, Container imaj
+- **5 tarama kaynağı:** Dosya sistemi, Git geçmişi, Container imaj, AWS S3, Google Cloud Storage
 - **10 dedektör:** AWS, GitHub Token, Slack Token/Webhook, Stripe (live/test), JWT, DB Connection String, Private Key, Generic API Key
 - **YAML özel kural desteği**
 - **4 çıktı formatı:** JSON, SARIF, CSV, Table
 - **Aho-Corasick ön-filtreleme motoru**
-- **Verifier altyapısı** (rate-limited, concurrent)
+- **Verifier altyapısı:** AWS STS ve GitHub API doğrulayıcıları (rate-limited, concurrent)
 - **`.leakwatchignore`** ve satır içi yoksayma (`# leakwatch:ignore`)
-- **Pre-commit hook**
+- **Pre-commit hook**, **GitHub Action**, **Docker imajı**, **Homebrew formula**
+- **Parallel repo tarama** (`scan repos` komutu)
 - **`--min-severity`, `--only-verified`, `--no-verify` flag'leri**
 
 ---
