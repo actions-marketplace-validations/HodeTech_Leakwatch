@@ -1,0 +1,114 @@
+// Package azure provides verifiers for Azure secrets.
+// The storage verifier performs format validation on Azure Storage connection strings.
+package azure
+
+import (
+	"context"
+	"encoding/base64"
+	"log/slog"
+	"strings"
+
+	"github.com/cemililik/leakwatch/internal/detector"
+	"github.com/cemililik/leakwatch/internal/verifier"
+	"github.com/cemililik/leakwatch/pkg/finding"
+)
+
+const storageDetectorID = "azure-storage-key"
+
+// StorageVerifier validates Azure Storage connection strings by checking
+// that the required fields (AccountName, AccountKey) are present and
+// the AccountKey is valid base64. It NEVER logs or persists raw key values.
+//
+// Note: This is a format-check verifier. Live verification would require
+// the Azure SDK to perform HMAC-SHA256 signed requests.
+type StorageVerifier struct{}
+
+func init() {
+	verifier.Register(&StorageVerifier{})
+}
+
+// Type returns the detector ID this verifier handles.
+func (v *StorageVerifier) Type() string {
+	return storageDetectorID
+}
+
+// Verify checks if the detected Azure Storage connection string has valid format.
+// Raw contains the full connection string.
+func (v *StorageVerifier) Verify(ctx context.Context, raw detector.RawFinding) finding.VerificationResult {
+	connStr := string(raw.Raw)
+	if connStr == "" {
+		return finding.VerificationResult{
+			Status:  finding.StatusUnverified,
+			Message: "empty connection string",
+		}
+	}
+
+	accountName, accountKey := parseConnectionString(connStr)
+
+	if accountName == "" {
+		slog.DebugContext(ctx, "azure storage verifier: AccountName not found in connection string")
+		return finding.VerificationResult{
+			Status:  finding.StatusVerifiedInactive,
+			Message: "AccountName not found in connection string",
+		}
+	}
+
+	if accountKey == "" {
+		slog.DebugContext(ctx, "azure storage verifier: AccountKey not found in connection string")
+		return finding.VerificationResult{
+			Status:  finding.StatusVerifiedInactive,
+			Message: "AccountKey not found in connection string",
+		}
+	}
+
+	// Validate that AccountKey is valid base64.
+	if _, err := base64.StdEncoding.DecodeString(accountKey); err != nil {
+		slog.DebugContext(ctx, "azure storage verifier: AccountKey is not valid base64",
+			slog.String("error", err.Error()),
+		)
+		return finding.VerificationResult{
+			Status:  finding.StatusVerifiedInactive,
+			Message: "AccountKey is not valid base64",
+		}
+	}
+
+	extra := map[string]string{
+		"account_name": accountName,
+	}
+
+	slog.InfoContext(ctx, "azure storage verifier: connection string format is valid",
+		slog.String("account_name", accountName),
+	)
+
+	return finding.VerificationResult{
+		Status:    finding.StatusVerifiedActive,
+		Message:   "Format validated (live verification requires Azure SDK)",
+		ExtraData: extra,
+	}
+}
+
+// parseConnectionString extracts AccountName and AccountKey from an Azure
+// Storage connection string of the form "Key1=Value1;Key2=Value2;...".
+func parseConnectionString(connStr string) (accountName, accountKey string) {
+	for _, part := range strings.Split(connStr, ";") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		k, v, ok := strings.Cut(part, "=")
+		if !ok {
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(k)) {
+		case "accountname":
+			accountName = strings.TrimSpace(v)
+		case "accountkey":
+			// AccountKey values may contain '=' (base64 padding), so rejoin
+			// any remaining parts. Since we split on ';' first and then Cut
+			// on first '=', the value already includes everything after the
+			// first '='.
+			accountKey = strings.TrimSpace(v)
+		}
+	}
+	return accountName, accountKey
+}
