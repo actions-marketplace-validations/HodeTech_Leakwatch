@@ -1,0 +1,95 @@
+{
+  "name": "leakwatch",
+  "displayName": "Leakwatch",
+  "description": "Detect leaked secrets in your code with Leakwatch",
+  "version": "0.1.0",
+  "publisher": "cemililik",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cemililik/Leakwatch"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "security",
+    "secrets",
+    "leak",
+    "scanner",
+    "api-keys"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "leakwatch.scanWorkspace",
+        "title": "Leakwatch: Scan Workspace"
+      },
+      {
+        "command": "leakwatch.scanCurrentFile",
+        "title": "Leakwatch: Scan Current File"
+      },
+      {
+        "command": "leakwatch.clearDiagnostics",
+        "title": "Leakwatch: Clear Diagnostics"
+      }
+    ],
+    "configuration": {
+      "title": "Leakwatch",
+      "properties": {
+        "leakwatch.executablePath": {
+          "type": "string",
+          "default": "leakwatch",
+          "description": "Path to the leakwatch binary"
+        },
+        "leakwatch.scanOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically scan files on save"
+        },
+        "leakwatch.minSeverity": {
+          "type": "string",
+          "default": "low",
+          "enum": ["low", "medium", "high", "critical"],
+          "description": "Minimum severity level to report"
+        },
+        "leakwatch.showInlineHints": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline hints for detected secrets"
+        },
+        "leakwatch.customRulesPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to custom rules YAML file"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "webpack --mode production",
+    "watch": "webpack --mode development --watch",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.56.0",
+    "ts-loader": "^9.5.0",
+    "typescript": "^5.3.0",
+    "webpack": "^5.90.0",
+    "webpack-cli": "^5.1.0"
+  }
+}

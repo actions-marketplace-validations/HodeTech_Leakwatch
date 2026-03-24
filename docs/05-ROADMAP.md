@@ -15,7 +15,7 @@
 | Phase 2 — Git Integration | Completed | `v0.2.0` | 2026-03-24 |
 | Phase 3 — Detection & Verification | Completed | `v0.3.0` | 2026-03-24 |
 | Phase 4 — Enterprise Capabilities | Completed | `v0.4.0` | 2026-03-24 |
-| Phase 5 — Platform Expansion | Completed (7/8) | `v1.0.0` | 2026-03-24 |
+| Phase 5 — Platform Expansion | Completed (8/8) | `v1.0.0` | 2026-03-24 |
 | Future — Mid/Long Term | Planned | `v1.x.x` | — |
 
 ### v1.0.0 Highlights
@@ -220,11 +220,11 @@ GitHub Release published with `v0.4.0` tag.
 
 ---
 
-## Phase 5: Platform Expansion — COMPLETED (7/8)
+## Phase 5: Platform Expansion — COMPLETED
 
-**Goal:** New scan sources, distribution channels, verifier implementations.
+**Goal:** New scan sources, distribution channels, verifier implementations, IDE integration.
 
-**Duration:** Continuous | **Status:** Completed (VS Code extension planned)
+**Duration:** Continuous | **Status:** Completed
 
 ### Deliverables
 
@@ -237,7 +237,7 @@ GitHub Release published with `v0.4.0` tag.
 | GitHub Action | [x] Completed | `action/action.yml` with SARIF upload |
 | AWS & GitHub verifiers | [x] Completed | AWS STS GetCallerIdentity, GitHub /user API |
 | Parallel repo scanning | [x] Completed | `scan repos` with `--parallel` flag |
-| VS Code extension | [ ] Planned | IDE integration |
+| VS Code extension | [x] Completed | Diagnostics, scan-on-save, status bar, workspace/file scan |
 
 ### Acceptance Criteria
 
@@ -247,7 +247,7 @@ GitHub Release published with `v0.4.0` tag.
 - [x] Docker image runs scans without local installation
 - [x] GitHub Action uploads SARIF to Code Scanning
 - [x] AWS keys are verified via STS
-- [ ] VS Code extension provides inline feedback
+- [x] VS Code extension provides inline diagnostics and scan-on-save
 
 ### Exit Criteria
 
