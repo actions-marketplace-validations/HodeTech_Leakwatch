@@ -1,0 +1,83 @@
+# Leakwatch - Example Custom Rules
+#
+# Place this file (or your own) in the custom-rules section of .leakwatch.yaml:
+#
+#   custom-rules:
+#     - rules/examples.yaml
+#     - rules/my-company.yaml
+#
+# Each rule defines a secret pattern to detect. Leakwatch will load these
+# at startup alongside the built-in detectors.
+#
+# See: docs/guides/custom-rules.md for full documentation.
+
+rules:
+  # -----------------------------------------------------------------------
+  # Cloud Provider Tokens
+  # -----------------------------------------------------------------------
+
+  - id: digitalocean-token
+    description: "DigitalOcean Personal Access Token"
+    regex: "dop_v1_[a-f0-9]{64}"
+    keywords:
+      - "dop_v1_"
+    severity: critical
+
+  - id: hetzner-api-token
+    description: "Hetzner Cloud API Token"
+    regex: "[a-zA-Z0-9]{64}"
+    keywords:
+      - "hcloud"
+      - "hetzner"
+    severity: high
+    entropy: 4.5
+
+  - id: cloudflare-api-token
+    description: "Cloudflare API Token"
+    regex: "[a-zA-Z0-9_-]{40}"
+    keywords:
+      - "cloudflare"
+      - "CF_API_TOKEN"
+    severity: critical
+    entropy: 4.0
+
+  # -----------------------------------------------------------------------
+  # Internal / Company-Specific
+  # -----------------------------------------------------------------------
+
+  - id: internal-api-key
+    description: "Internal API Key (example pattern)"
+    regex: "mycompany_[a-zA-Z0-9]{32}"
+    keywords:
+      - "mycompany_"
+    severity: high
+
+  - id: internal-webhook-secret
+    description: "Internal Webhook Signing Secret"
+    regex: "whsec_[a-zA-Z0-9]{32,64}"
+    keywords:
+      - "whsec_"
+    severity: high
+
+  # -----------------------------------------------------------------------
+  # Certificates & Passwords
+  # -----------------------------------------------------------------------
+
+  - id: pkcs12-password
+    description: "PKCS#12 / PFX Certificate Password"
+    regex: "(?i)(pkcs12|pfx|keystore)[_-]?pass(word)?\\s*[:=]\\s*['\"]?([^\\s'\"]{8,})['\"]?"
+    keywords:
+      - "pkcs12"
+      - "pfx"
+      - "keystore"
+    severity: high
+    entropy: 3.0
+
+  - id: ldap-bind-password
+    description: "LDAP Bind Password"
+    regex: "(?i)ldap[_-]?(bind)?[_-]?pass(word)?\\s*[:=]\\s*['\"]?([^\\s'\"]{8,})['\"]?"
+    keywords:
+      - "ldap"
+      - "bind_password"
+    severity: critical
+    entropy: 3.0
