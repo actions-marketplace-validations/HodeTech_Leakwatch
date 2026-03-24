@@ -18,7 +18,7 @@ type Formatter struct {
 }
 
 // Format writes findings as a formatted table to the given writer.
-// Columns: SEVERITY | DETECTOR | FILE | REDACTED | STATUS
+// Columns: SEVERITY | DETECTOR | FILE | REDACTED | STATUS | REMEDIATION
 // A summary line is appended at the bottom.
 // When ShowRaw is false, the Raw field is actively stripped from the output.
 func (f *Formatter) Format(w io.Writer, findings []finding.Finding) error {
@@ -34,23 +34,29 @@ func (f *Formatter) Format(w io.Writer, findings []finding.Finding) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 
 	// Write header.
-	if _, err := fmt.Fprintln(tw, "SEVERITY\tDETECTOR\tFILE\tREDACTED\tSTATUS"); err != nil {
+	if _, err := fmt.Fprintln(tw, "SEVERITY\tDETECTOR\tFILE\tREDACTED\tSTATUS\tREMEDIATION"); err != nil {
 		return fmt.Errorf("failed to write table header: %w", err)
 	}
 
 	// Write separator.
-	if _, err := fmt.Fprintln(tw, "--------\t--------\t----\t--------\t------"); err != nil {
+	if _, err := fmt.Fprintln(tw, "--------\t--------\t----\t--------\t------\t-----------"); err != nil {
 		return fmt.Errorf("failed to write table separator: %w", err)
 	}
 
 	// Write rows.
 	for _, fd := range output {
-		line := fmt.Sprintf("%s\t%s\t%s\t%s\t%s",
+		remediation := "-"
+		if fd.Remediation != nil && fd.Remediation.Title != "" {
+			remediation = fd.Remediation.Title
+		}
+
+		line := fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s",
 			strings.ToUpper(fd.Severity.String()),
 			fd.DetectorID,
 			fd.SourceMetadata.FilePath,
 			fd.Redacted,
 			fd.Verification.Status.String(),
+			remediation,
 		)
 		if _, err := fmt.Fprintln(tw, line); err != nil {
 			return fmt.Errorf("failed to write table row: %w", err)

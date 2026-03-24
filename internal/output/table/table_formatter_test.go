@@ -130,6 +130,65 @@ func TestFormatter_Format_ColumnsAligned_TabwriterProducesAlignedOutput(t *testi
 	require.GreaterOrEqual(t, len(lines), 4)
 }
 
+func TestFormatter_Format_WithRemediation_ShowsRemediationTitle(t *testing.T) {
+	f := &Formatter{}
+	var buf bytes.Buffer
+
+	findings := []finding.Finding{
+		{
+			ID:         "rem-1",
+			DetectorID: "aws-access-key-id",
+			Severity:   finding.SeverityCritical,
+			Redacted:   "AKIA****MPLE",
+			SourceMetadata: finding.SourceMetadata{
+				FilePath: "config.yaml",
+			},
+			Verification: finding.VerificationResult{
+				Status: finding.StatusVerifiedActive,
+			},
+			Remediation: &finding.Remediation{
+				Title:   "Rotate AWS Access Key",
+				Steps:   []string{"Deactivate the key", "Create a new key"},
+				Urgency: "immediate",
+			},
+			DetectedAt: time.Now(),
+		},
+	}
+
+	err := f.Format(&buf, findings)
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "REMEDIATION")
+	assert.Contains(t, output, "Rotate AWS Access Key")
+}
+
+func TestFormatter_Format_WithoutRemediation_ShowsDash(t *testing.T) {
+	f := &Formatter{}
+	var buf bytes.Buffer
+
+	findings := []finding.Finding{
+		{
+			ID:         "no-rem-1",
+			DetectorID: "generic-secret",
+			Severity:   finding.SeverityMedium,
+			Redacted:   "****",
+		},
+	}
+
+	err := f.Format(&buf, findings)
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "REMEDIATION")
+	// The row should contain a dash for the remediation column.
+	lines := strings.Split(output, "\n")
+	// Find the data row (skip header and separator).
+	require.GreaterOrEqual(t, len(lines), 3)
+	dataRow := lines[2]
+	assert.Contains(t, dataRow, "-")
+}
+
 func TestFormatter_FileExtension_ReturnsTXT(t *testing.T) {
 	f := &Formatter{}
 	assert.Equal(t, ".txt", f.FileExtension())

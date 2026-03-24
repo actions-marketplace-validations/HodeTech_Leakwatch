@@ -161,6 +161,72 @@ func TestFormatter_Format_ShowRawFalse_DoesNotMutateOriginal(t *testing.T) {
 		"Format must not mutate the original slice")
 }
 
+func TestFormatter_Format_WithRemediation_RuleHasHelpAndHelpURI(t *testing.T) {
+	f := &Formatter{}
+	var buf bytes.Buffer
+
+	findings := []finding.Finding{
+		{
+			ID:         "rem-1",
+			DetectorID: "aws-access-key-id",
+			Severity:   finding.SeverityCritical,
+			Redacted:   "AKIA****MPLE",
+			SourceMetadata: finding.SourceMetadata{
+				FilePath: "config.yaml",
+			},
+			Remediation: &finding.Remediation{
+				Title:   "Rotate AWS Access Key",
+				Steps:   []string{"Deactivate the key in IAM", "Create a new key", "Update all consumers"},
+				DocURL:  "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html",
+				Urgency: "immediate",
+			},
+			DetectedAt: time.Now(),
+		},
+	}
+
+	err := f.Format(&buf, findings)
+	require.NoError(t, err)
+
+	var doc sarifDocument
+	err = json.Unmarshal(buf.Bytes(), &doc)
+	require.NoError(t, err)
+
+	require.Len(t, doc.Runs[0].Tool.Driver.Rules, 1)
+	rule := doc.Runs[0].Tool.Driver.Rules[0]
+
+	require.NotNil(t, rule.Help, "rule should have help when remediation is present")
+	assert.Contains(t, rule.Help.Text, "Deactivate the key in IAM")
+	assert.Contains(t, rule.Help.Text, "Create a new key")
+	assert.Contains(t, rule.Help.Text, "Update all consumers")
+	assert.Equal(t, "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html", rule.HelpURI)
+}
+
+func TestFormatter_Format_WithoutRemediation_RuleHasNoHelp(t *testing.T) {
+	f := &Formatter{}
+	var buf bytes.Buffer
+
+	findings := []finding.Finding{
+		{
+			ID:         "no-rem-1",
+			DetectorID: "generic-secret",
+			Severity:   finding.SeverityMedium,
+			Redacted:   "****",
+		},
+	}
+
+	err := f.Format(&buf, findings)
+	require.NoError(t, err)
+
+	var doc sarifDocument
+	err = json.Unmarshal(buf.Bytes(), &doc)
+	require.NoError(t, err)
+
+	require.Len(t, doc.Runs[0].Tool.Driver.Rules, 1)
+	rule := doc.Runs[0].Tool.Driver.Rules[0]
+	assert.Nil(t, rule.Help, "rule should not have help when remediation is absent")
+	assert.Empty(t, rule.HelpURI, "rule should not have helpUri when remediation is absent")
+}
+
 func TestFormatter_FileExtension_ReturnsSARIF(t *testing.T) {
 	f := &Formatter{}
 	assert.Equal(t, ".sarif", f.FileExtension())

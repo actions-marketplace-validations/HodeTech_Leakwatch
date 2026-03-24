@@ -151,6 +151,16 @@ type SourceMetadata struct {
 	LayerIdx int    `json:"layer_idx,omitempty"`
 }
 
+// Remediation provides actionable guidance for rotating or revoking a detected secret.
+type Remediation struct {
+	Title      string   `json:"title"`
+	Steps      []string `json:"steps"`
+	DocURL     string   `json:"doc_url,omitempty"`
+	ConsoleURL string   `json:"console_url,omitempty"`
+	Urgency    string   `json:"urgency"`
+	Checklist  []string `json:"checklist,omitempty"`
+}
+
 // Finding represents a fully enriched secret finding.
 type Finding struct {
 	ID             string             `json:"id"`
@@ -160,6 +170,7 @@ type Finding struct {
 	Redacted       string             `json:"redacted"`
 	SourceMetadata SourceMetadata     `json:"source"`
 	Verification   VerificationResult `json:"verification"`
+	Remediation    *Remediation       `json:"remediation,omitempty"`
 	DetectedAt     time.Time          `json:"detected_at"`
 	Entropy        float64            `json:"entropy,omitempty"`
 	ExtraData      map[string]string  `json:"extra_data,omitempty"`

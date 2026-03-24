@@ -156,3 +156,66 @@ func TestFormatter_Format_WriterError_ReturnsError(t *testing.T) {
 	err := f.Format(&errWriter{}, findings)
 	assert.Error(t, err)
 }
+
+func TestFormatter_Format_WithRemediation_IncludesRemediationInOutput(t *testing.T) {
+	f := &Formatter{}
+	var buf bytes.Buffer
+
+	findings := []finding.Finding{
+		{
+			ID:         "rem-1",
+			DetectorID: "aws-access-key-id",
+			Severity:   finding.SeverityCritical,
+			Redacted:   "AKIA****MPLE",
+			Remediation: &finding.Remediation{
+				Title:   "Rotate AWS Access Key",
+				Steps:   []string{"Deactivate the key in IAM", "Create a new key", "Update all consumers"},
+				DocURL:  "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html",
+				Urgency: "immediate",
+			},
+			DetectedAt: time.Now(),
+		},
+	}
+
+	err := f.Format(&buf, findings)
+	require.NoError(t, err)
+
+	var rawJSON []map[string]interface{}
+	err = json.Unmarshal(buf.Bytes(), &rawJSON)
+	require.NoError(t, err)
+
+	rem, hasRemediation := rawJSON[0]["remediation"]
+	assert.True(t, hasRemediation, "remediation field should appear in JSON when populated")
+
+	remMap, ok := rem.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "Rotate AWS Access Key", remMap["title"])
+	assert.Equal(t, "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html", remMap["doc_url"])
+	assert.Equal(t, "immediate", remMap["urgency"])
+
+	steps, ok := remMap["steps"].([]interface{})
+	require.True(t, ok)
+	assert.Len(t, steps, 3)
+}
+
+func TestFormatter_Format_WithoutRemediation_OmitsRemediationFromOutput(t *testing.T) {
+	f := &Formatter{}
+	var buf bytes.Buffer
+
+	findings := []finding.Finding{
+		{
+			ID:       "no-rem-1",
+			Redacted: "****",
+		},
+	}
+
+	err := f.Format(&buf, findings)
+	require.NoError(t, err)
+
+	var rawJSON []map[string]interface{}
+	err = json.Unmarshal(buf.Bytes(), &rawJSON)
+	require.NoError(t, err)
+
+	_, hasRemediation := rawJSON[0]["remediation"]
+	assert.False(t, hasRemediation, "remediation field should not appear in JSON when nil")
+}

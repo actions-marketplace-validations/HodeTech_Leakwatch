@@ -24,7 +24,7 @@ func TestFormatter_Format_EmptyFindings_WritesHeaderOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, records, 1, "should only contain the header row")
-	assert.Equal(t, []string{"id", "detector_id", "severity", "redacted", "file_path", "commit", "verification_status"}, records[0])
+	assert.Equal(t, []string{"id", "detector_id", "severity", "redacted", "file_path", "commit", "verification_status", "remediation"}, records[0])
 }
 
 func TestFormatter_Format_SingleFinding_WritesCorrectRow(t *testing.T) {
@@ -129,6 +129,70 @@ func TestFormatter_Format_SpecialCharacters_ProperlyEscaped(t *testing.T) {
 	require.Len(t, records, 2)
 	assert.Equal(t, "value,with\"quotes\nand,commas", records[1][3])
 	assert.Equal(t, "path/with spaces/file.go", records[1][4])
+}
+
+func TestFormatter_Format_WithRemediation_CSVHasRemediationColumn(t *testing.T) {
+	f := &Formatter{}
+	var buf bytes.Buffer
+
+	findings := []finding.Finding{
+		{
+			ID:         "rem-1",
+			DetectorID: "aws-access-key-id",
+			Severity:   finding.SeverityCritical,
+			Redacted:   "AKIA****MPLE",
+			SourceMetadata: finding.SourceMetadata{
+				FilePath: "config.yaml",
+				Commit:   "deadbeef",
+			},
+			Verification: finding.VerificationResult{
+				Status: finding.StatusVerifiedActive,
+			},
+			Remediation: &finding.Remediation{
+				Title:   "Rotate AWS Access Key",
+				Steps:   []string{"Deactivate the key", "Create a new key"},
+				DocURL:  "https://docs.aws.amazon.com/iam",
+				Urgency: "immediate",
+			},
+			DetectedAt: time.Now(),
+		},
+	}
+
+	err := f.Format(&buf, findings)
+	require.NoError(t, err)
+
+	reader := csv.NewReader(bytes.NewReader(buf.Bytes()))
+	records, err := reader.ReadAll()
+	require.NoError(t, err)
+
+	require.Len(t, records, 2)
+	assert.Equal(t, "remediation", records[0][7])
+	assert.Equal(t, "Rotate AWS Access Key", records[1][7])
+}
+
+func TestFormatter_Format_WithoutRemediation_CSVHasEmptyRemediationColumn(t *testing.T) {
+	f := &Formatter{}
+	var buf bytes.Buffer
+
+	findings := []finding.Finding{
+		{
+			ID:         "no-rem-1",
+			DetectorID: "generic-secret",
+			Severity:   finding.SeverityMedium,
+			Redacted:   "****",
+		},
+	}
+
+	err := f.Format(&buf, findings)
+	require.NoError(t, err)
+
+	reader := csv.NewReader(bytes.NewReader(buf.Bytes()))
+	records, err := reader.ReadAll()
+	require.NoError(t, err)
+
+	require.Len(t, records, 2)
+	assert.Equal(t, "remediation", records[0][7])
+	assert.Equal(t, "", records[1][7])
 }
 
 func TestFormatter_FileExtension_ReturnsCSV(t *testing.T) {

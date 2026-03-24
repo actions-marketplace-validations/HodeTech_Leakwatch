@@ -23,6 +23,7 @@ import (
 	jsonout "github.com/cemililik/leakwatch/internal/output/json"
 	sarifout "github.com/cemililik/leakwatch/internal/output/sarif"
 	tableout "github.com/cemililik/leakwatch/internal/output/table"
+	"github.com/cemililik/leakwatch/internal/remediation"
 	"github.com/cemililik/leakwatch/internal/source"
 	"github.com/cemililik/leakwatch/internal/verifier"
 	"github.com/cemililik/leakwatch/pkg/finding"
@@ -46,6 +47,7 @@ type scanConfig struct {
 	noVerify         bool
 	onlyVerified     bool
 	minSeverity      finding.Severity
+	enableRemediation bool
 	scanRoot         string // root path for .leakwatchignore resolution
 }
 
@@ -73,6 +75,7 @@ func addVerifyFlags(flags *pflag.FlagSet) {
 	flags.Bool("no-verify", false, "disable secret verification")
 	flags.Bool("only-verified", false, "only show verified active findings")
 	flags.String("min-severity", "low", "minimum severity to report (low, medium, high, critical)")
+	flags.Bool("remediation", false, "include remediation guidance in output")
 }
 
 // loadScanConfig loads and validates configuration from Viper and flags.
@@ -95,6 +98,10 @@ func loadScanConfig(cmd *cobra.Command) (*scanConfig, error) {
 		slog.Debug("min-severity flag not available", "error", err)
 	}
 	minSev := parseSeverity(minSevStr)
+	enableRemediation, err := cmd.Flags().GetBool("remediation")
+	if err != nil {
+		slog.Debug("remediation flag not available", "error", err)
+	}
 
 	format, err := cmd.Flags().GetString("format")
 	if err != nil || format == "" {
@@ -121,6 +128,7 @@ func loadScanConfig(cmd *cobra.Command) (*scanConfig, error) {
 		noVerify:         noVerify,
 		onlyVerified:     onlyVerified,
 		minSeverity:      minSev,
+		enableRemediation: enableRemediation,
 	}, nil
 }
 
@@ -199,6 +207,11 @@ func executeScan(parent context.Context, cfg *scanConfig, src source.Source, cl 
 			result.Findings = filtered
 			slog.Debug("applied .leakwatchignore", "path", ignorePath)
 		}
+	}
+
+	// Enrich findings with remediation guidance if enabled.
+	if cfg.enableRemediation {
+		result.Findings = remediation.EnrichFindings(result.Findings)
 	}
 
 	// Write output.

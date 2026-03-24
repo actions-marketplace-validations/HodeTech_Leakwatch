@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
@@ -44,6 +45,14 @@ type sarifRule struct {
 	ID               string              `json:"id"`
 	ShortDescription sarifMessage        `json:"shortDescription"`
 	DefaultConfig    sarifDefaultConfig  `json:"defaultConfiguration"`
+	Help             *sarifHelp          `json:"help,omitempty"`
+	HelpURI          string              `json:"helpUri,omitempty"`
+}
+
+// sarifHelp represents the help text for a SARIF rule.
+type sarifHelp struct {
+	Text     string `json:"text"`
+	Markdown string `json:"markdown,omitempty"`
 }
 
 // sarifDefaultConfig holds the default severity level for a rule.
@@ -126,11 +135,23 @@ func (f *Formatter) Format(w io.Writer, findings []finding.Finding) error {
 	for _, fd := range output {
 		if _, exists := ruleIndex[fd.DetectorID]; !exists {
 			ruleIndex[fd.DetectorID] = len(rules)
-			rules = append(rules, sarifRule{
+			rule := sarifRule{
 				ID:               fd.DetectorID,
 				ShortDescription: sarifMessage{Text: fmt.Sprintf("Secret detected by %s", fd.DetectorID)},
 				DefaultConfig:    sarifDefaultConfig{Level: severityToLevel(fd.Severity)},
-			})
+			}
+
+			// Populate help from remediation guidance when available.
+			if fd.Remediation != nil && len(fd.Remediation.Steps) > 0 {
+				rule.Help = &sarifHelp{
+					Text: strings.Join(fd.Remediation.Steps, "\n"),
+				}
+				if fd.Remediation.DocURL != "" {
+					rule.HelpURI = fd.Remediation.DocURL
+				}
+			}
+
+			rules = append(rules, rule)
 		}
 	}
 

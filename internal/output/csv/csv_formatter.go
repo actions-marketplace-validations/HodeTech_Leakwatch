@@ -17,7 +17,7 @@ type Formatter struct {
 }
 
 // Format writes findings as CSV to the given writer.
-// Header: id,detector_id,severity,redacted,file_path,commit,verification_status
+// Header: id,detector_id,severity,redacted,file_path,commit,verification_status,remediation
 // When ShowRaw is false, the Raw field is actively stripped from the output.
 func (f *Formatter) Format(w io.Writer, findings []finding.Finding) error {
 	output := make([]finding.Finding, len(findings))
@@ -33,13 +33,18 @@ func (f *Formatter) Format(w io.Writer, findings []finding.Finding) error {
 	defer writer.Flush()
 
 	// Write header row.
-	header := []string{"id", "detector_id", "severity", "redacted", "file_path", "commit", "verification_status"}
+	header := []string{"id", "detector_id", "severity", "redacted", "file_path", "commit", "verification_status", "remediation"}
 	if err := writer.Write(header); err != nil {
 		return fmt.Errorf("failed to write CSV header: %w", err)
 	}
 
 	// Write one row per finding.
 	for _, fd := range output {
+		remediation := ""
+		if fd.Remediation != nil {
+			remediation = fd.Remediation.Title
+		}
+
 		row := []string{
 			fd.ID,
 			fd.DetectorID,
@@ -48,6 +53,7 @@ func (f *Formatter) Format(w io.Writer, findings []finding.Finding) error {
 			fd.SourceMetadata.FilePath,
 			fd.SourceMetadata.Commit,
 			fd.Verification.Status.String(),
+			remediation,
 		}
 		if err := writer.Write(row); err != nil {
 			return fmt.Errorf("failed to write CSV row: %w", err)
