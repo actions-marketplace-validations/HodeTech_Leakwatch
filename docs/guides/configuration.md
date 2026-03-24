@@ -220,6 +220,32 @@ flowchart LR
 | `severity` | string | Yes | `low`, `medium`, `high`, `critical` |
 | `entropy` | bool | No | Whether to apply entropy check (default: false) |
 
+#### `slack` -- Slack Workspace Scanning
+
+Configuration for scanning Slack workspaces via `scan slack`.
+
+```yaml
+# .leakwatch.yaml
+slack:
+  token: ""                    # Or use LEAKWATCH_SLACK_TOKEN env var
+  channels: []                 # Channel names to scan (empty = all)
+  exclude_channels: []         # Channels to skip
+  include_dms: false           # Scan direct messages
+  include_files: true          # Scan uploaded files
+  rate_limit: 20               # Max API requests per second
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `token` | string | `""` | Slack Bot token (`xoxb-...`). Prefer the `LEAKWATCH_SLACK_TOKEN` env var to avoid storing tokens in config files |
+| `channels` | []string | `[]` | Channel names to scan. Empty list scans all accessible channels |
+| `exclude_channels` | []string | `[]` | Channel names to exclude from scanning |
+| `include_dms` | bool | `false` | Whether to scan direct messages (requires appropriate token scopes) |
+| `include_files` | bool | `true` | Whether to scan content of uploaded files |
+| `rate_limit` | int | `20` | Maximum Slack API requests per second to avoid rate limiting |
+
+> **Security note:** Always provide the Slack token via the `LEAKWATCH_SLACK_TOKEN` environment variable rather than hardcoding it in `.leakwatch.yaml`. If the token must be in the config file, ensure the file is excluded from version control.
+
 ---
 
 ## 3. Environment Variables

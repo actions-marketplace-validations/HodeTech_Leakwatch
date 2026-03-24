@@ -17,6 +17,8 @@ flowchart LR
         S2[Filesystem]
         S3[Container]
         S4["S3 (v2)"]
+        S5[GCS]
+        S6[Slack]
     end
 
     subgraph Engine["Detection Engine"]
@@ -113,6 +115,9 @@ classDiagram
     GitSource ..|> Source
     FilesystemSource ..|> Source
     ContainerSource ..|> Source
+    S3Source ..|> Source
+    GCSSource ..|> Source
+    SlackSource ..|> Source
 
     AWSDetector ..|> Detector
     GitHubDetector ..|> Detector
@@ -507,15 +512,22 @@ func (d *AWSAccessKeyID) Scan(ctx context.Context, data []byte) []RawFinding {
 import (
     // Register detectors
     _ "github.com/cemililik/leakwatch/internal/detector/aws"
-    _ "github.com/cemililik/leakwatch/internal/detector/github"
-    _ "github.com/cemililik/leakwatch/internal/detector/gcp"
     _ "github.com/cemililik/leakwatch/internal/detector/generic"
     _ "github.com/cemililik/leakwatch/internal/detector/privatekey"
+    _ "github.com/cemililik/leakwatch/internal/detector/github"
+    _ "github.com/cemililik/leakwatch/internal/detector/slack"
+    _ "github.com/cemililik/leakwatch/internal/detector/stripe"
+    _ "github.com/cemililik/leakwatch/internal/detector/jwt"
+    _ "github.com/cemililik/leakwatch/internal/detector/dbconn"
+    _ "github.com/cemililik/leakwatch/internal/detector/custom"
 
     // Register sources
     _ "github.com/cemililik/leakwatch/internal/source/git"
     _ "github.com/cemililik/leakwatch/internal/source/filesystem"
     _ "github.com/cemililik/leakwatch/internal/source/container"
+    _ "github.com/cemililik/leakwatch/internal/source/s3"
+    _ "github.com/cemililik/leakwatch/internal/source/gcs"
+    _ "github.com/cemililik/leakwatch/internal/source/slack"
 
     // Register verifiers
     _ "github.com/cemililik/leakwatch/internal/verifier/aws"

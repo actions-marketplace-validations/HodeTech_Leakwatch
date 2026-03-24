@@ -14,7 +14,7 @@ Leakwatch is a high-performance, open source (MIT) security tool that detects, v
 
 - **Hybrid detection engine** -- Aho-Corasick pre-filter, regex validation, and Shannon entropy analysis for a low false positive rate
 - **Secret verification** -- Verifies whether discovered secrets are still active via API calls (AWS, GitHub, Slack, etc.)
-- **Multi-source support** -- Filesystem, Git repository (local and remote), container images
+- **Multi-source support** -- Filesystem, Git repository, container images, S3, GCS, parallel multi-repo, and Slack
 - **Flexible output** -- JSON, SARIF, CSV, and table formats
 - **Single binary, zero dependencies** -- Runs on every platform, no Docker daemon required
 
@@ -24,6 +24,9 @@ flowchart LR
         S1["Filesystem"]
         S2["Git Repository"]
         S3["Container Image"]
+        S4["S3 / GCS"]
+        S5["Multi-Repo"]
+        S6["Slack"]
     end
 
     subgraph Motor["Detection Engine"]
@@ -107,7 +110,7 @@ leakwatch version v0.x.x (commit: abc1234, built: 2026-03-24)
 
 ## 3. First Scan
 
-Leakwatch can scan three different source types. Below are basic usage examples for each.
+Leakwatch supports seven scan commands for different source types. Below are basic usage examples for each.
 
 ### 3.1 Filesystem Scan (`scan fs`)
 
@@ -183,6 +186,61 @@ leakwatch scan image registry.example.com/team/service:main
 - When checking images before deploying to production
 - During security audits of third-party images
 - For post-build checks in CI/CD pipelines
+
+### 3.4 S3 Bucket Scan (`scan s3`)
+
+Scans objects in an AWS S3 bucket. Uses your default AWS credentials or the credentials configured in your environment.
+
+```bash
+# Scan an entire S3 bucket
+leakwatch scan s3 my-bucket
+
+# Scan only objects under a specific prefix
+leakwatch scan s3 my-bucket --prefix config/
+```
+
+**When to use:**
+- When auditing cloud storage for accidentally uploaded secrets
+- During security reviews of shared S3 buckets
+
+### 3.5 GCS Bucket Scan (`scan gcs`)
+
+Scans objects in a Google Cloud Storage bucket.
+
+```bash
+# Scan a GCS bucket
+leakwatch scan gcs my-bucket --project my-project
+```
+
+**When to use:**
+- When auditing GCP storage for leaked secrets
+- During cloud infrastructure security reviews
+
+### 3.6 Parallel Multi-Repo Scan (`scan repos`)
+
+Scans multiple Git repositories in parallel, useful for auditing an entire organization.
+
+```bash
+# Scan multiple repos in parallel
+leakwatch scan repos https://github.com/org/repo1 https://github.com/org/repo2 --parallel 3
+```
+
+**When to use:**
+- When auditing all repositories in an organization
+- During large-scale security assessments across multiple projects
+
+### 3.7 Slack Workspace Scan (`scan slack`)
+
+Scans messages and files in a Slack workspace for leaked secrets.
+
+```bash
+# Scan a Slack workspace
+leakwatch scan slack --token xoxb-... --channels general,engineering
+```
+
+**When to use:**
+- When checking whether secrets have been shared in Slack channels
+- During incident response to assess secret exposure in messaging
 
 ---
 
@@ -272,7 +330,7 @@ stateDiagram-v2
 
 ## 5. Common Flags
 
-The following flags are shared across all scan commands (`scan fs`, `scan git`, `scan image`).
+The following flags are shared across all scan commands (`scan fs`, `scan git`, `scan image`, `scan s3`, `scan gcs`, `scan repos`, `scan slack`).
 
 ### 5.1 Output Flags
 
@@ -462,6 +520,10 @@ sequenceDiagram
 | Scan Git history | `leakwatch scan git .` |
 | Scan remote repository | `leakwatch scan git https://github.com/org/repo.git` |
 | Scan container image | `leakwatch scan image nginx:latest` |
+| Scan S3 bucket | `leakwatch scan s3 my-bucket --prefix config/` |
+| Scan GCS bucket | `leakwatch scan gcs my-bucket --project my-project` |
+| Scan multiple repos | `leakwatch scan repos repo1-url repo2-url --parallel 3` |
+| Scan Slack workspace | `leakwatch scan slack --token xoxb-... --channels general` |
 | Show only active secrets | `leakwatch scan git . --only-verified` |
 | Generate SARIF output | `leakwatch scan fs . --format sarif --output results.sarif` |
 | Scan last commit | `leakwatch scan git . --since-commit HEAD~1` |

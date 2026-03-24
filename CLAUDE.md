@@ -32,7 +32,8 @@ leakwatch/
 │   │   ├── git/            # Git repository source (go-git)
 │   │   ├── container/      # Container image source (go-containerregistry)
 │   │   ├── s3/             # AWS S3 bucket source
-│   │   └── gcs/            # Google Cloud Storage source
+│   │   ├── gcs/            # Google Cloud Storage source
+│   │   └── slack/          # Slack workspace source
 │   ├── verifier/           # Secret verification (Verifier interface)
 │   │   ├── aws/            # AWS STS verifier
 │   │   └── github/         # GitHub API verifier
@@ -43,6 +44,7 @@ leakwatch/
 │   │   ├── sarif/          # SARIF v2.1.0 formatter
 │   │   ├── csv/            # CSV formatter
 │   │   └── table/          # Terminal table formatter
+│   ├── remediation/        # Remediation guidance registry
 │   ├── config/             # Viper-based configuration
 │   └── filter/             # .leakwatchignore, inline ignore
 ├── pkg/                    # Public packages (finding model)
@@ -103,7 +105,7 @@ Full standards: [docs/standards/04-DEVELOPMENT-STANDARDS.md](docs/standards/04-D
 
 - `cmd/` → CLI wiring only, no business logic
 - `internal/` → All business logic, not externally accessible
-- `pkg/` → Public types (Finding model)
+- `pkg/` → Public types (Finding model, which includes an optional `Remediation` field for remediation guidance)
 - Prefer the standard library, do not add unnecessary dependencies
 
 ### Writing Tests
@@ -144,6 +146,8 @@ test(entropy): add Shannon entropy edge case tests
 | `cloud.google.com/go/storage` | GCS scanning |
 | `stretchr/testify` | Test assertions |
 | `golang.org/x/time` | Rate limiting |
+| `slack-go/slack` | Slack API integration |
+| `modernc.org/sqlite` | Pure Go SQLite (planned) |
 
 ## Documentation Standards
 

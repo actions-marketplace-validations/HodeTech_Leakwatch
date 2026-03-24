@@ -72,8 +72,14 @@ leakwatch scan s3 my-bucket --prefix config/
 # Scan Google Cloud Storage bucket
 leakwatch scan gcs my-bucket --prefix secrets/
 
+# Scan Slack workspace
+leakwatch scan slack --token xoxb-... --channels general,engineering
+
 # Scan multiple repos in parallel
 leakwatch scan repos https://github.com/org/repo1.git https://github.com/org/repo2.git --parallel 5
+
+# Include remediation guidance (rotation steps, doc links)
+leakwatch scan fs . --remediation
 ```
 
 ---
@@ -86,7 +92,7 @@ leakwatch scan repos https://github.com/org/repo1.git https://github.com/org/rep
 | **GitHub** | Personal Access Token, OAuth | Yes |
 | **GCP** | Service Account Key, API Key | Planned |
 | **Azure** | Storage Key, Connection String | Planned |
-| **Slack** | Bot Token, Webhook URL | Yes |
+| **Slack** | Bot Token, Webhook URL | Planned |
 | **Stripe** | API Key (live/test) | Planned |
 | **Generic** | Private Key (RSA/SSH/PGP), JWT, Generic API Key | — |
 | **Database** | Connection String (Postgres, MySQL, MongoDB) | Planned |
