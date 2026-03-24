@@ -37,6 +37,9 @@ brew install cemililik/tap/leakwatch
 # Go install
 go install github.com/cemililik/leakwatch@latest
 
+# Docker
+docker run --rm -v $(pwd):/scan ghcr.io/cemililik/leakwatch:latest scan fs /scan
+
 # Binary download
 curl -sSfL https://github.com/cemililik/Leakwatch/releases/latest/download/leakwatch_$(uname -s)_$(uname -m).tar.gz | tar xz
 ```
@@ -62,6 +65,15 @@ leakwatch scan fs . --format sarif --output results.sarif
 
 # Scan since last commit (for CI/CD)
 leakwatch scan git . --since-commit HEAD~1
+
+# Scan AWS S3 bucket
+leakwatch scan s3 my-bucket --prefix config/
+
+# Scan Google Cloud Storage bucket
+leakwatch scan gcs my-bucket --prefix secrets/
+
+# Scan multiple repos in parallel
+leakwatch scan repos https://github.com/org/repo1.git https://github.com/org/repo2.git --parallel 5
 ```
 
 ---
@@ -236,6 +248,6 @@ MIT License — see the [LICENSE](LICENSE) file for details.
 
 ## Status
 
-> **The project is under active development.** Phase 1 (MVP) is currently in progress.
+> **Phases 1–5 are complete.** Leakwatch supports filesystem, Git, container, S3, and GCS scanning with verification, multiple output formats, and CI/CD integration.
 
 To track the project's progress, see the [Roadmap](docs/05-ROADMAP.md) document.
