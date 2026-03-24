@@ -81,7 +81,7 @@ Full standards: [docs/standards/04-DEVELOPMENT-STANDARDS.md](docs/standards/04-D
 
 ### Critical Rules
 
-- **Language:** Go 1.22+, `CGO_ENABLED=0`
+- **Language:** Go 1.25+, `CGO_ENABLED=0`
 - **Style:** Effective Go + Uber Go Style Guide
 - **Linting:** `golangci-lint` is mandatory, runs in all CI
 - **Formatting:** `gofumpt` (strict gofmt)
