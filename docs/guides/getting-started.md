@@ -12,6 +12,7 @@ Leakwatch is a high-performance, open source (MIT) security tool that detects, v
 
 **Key features:**
 
+- **63 built-in detectors + unlimited YAML custom rules** -- Covers major cloud providers, AI platforms, CI/CD tools, databases, and SaaS services out of the box, with YAML custom rules for anything else
 - **Hybrid detection engine** -- Aho-Corasick pre-filter, regex validation, and Shannon entropy analysis for a low false positive rate
 - **Secret verification** -- Verifies whether discovered secrets are still active via API calls (AWS, GitHub, Slack, etc.)
 - **Multi-source support** -- Filesystem, Git repository, container images, S3, GCS, parallel multi-repo, and Slack

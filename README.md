@@ -84,26 +84,75 @@ leakwatch scan fs . --remediation
 
 ---
 
-## Supported Secret Types
+## Supported Secret Types (63 detectors)
 
-| Category | Examples | Verification |
-|----------|----------|--------------|
-| **AWS** | Access Key ID, Secret Access Key | Yes |
-| **GitHub** | Personal Access Token, OAuth | Yes |
-| **GitLab** | Personal Access Token (glpat-) | — |
-| **Slack** | Bot Token, Webhook URL | Yes |
-| **Stripe** | API Key (live/test) | — |
-| **OpenAI** | API Key (sk-proj-) | — |
-| **Anthropic** | API Key (sk-ant-) | — |
-| **Discord** | Bot Token | — |
-| **Telegram** | Bot Token | — |
-| **Datadog** | API Key (DD_API_KEY) | — |
-| **SendGrid** | API Key (SG.) | — |
-| **NPM** | Access Token (npm_) | — |
-| **Database** | Connection String (Postgres, MySQL, MongoDB, Redis) | — |
-| **Snowflake** | JDBC Connection Credentials | — |
-| **Generic** | Private Key (RSA/SSH/PGP), JWT, Generic API Key | — |
-| **Custom** | YAML-defined rules | — |
+| Category | Detector | ID | Severity |
+|----------|----------|----|----------|
+| **Cloud — AWS** | Access Key ID | `aws-access-key-id` | Critical |
+| **Cloud — GCP** | Service Account Key | `gcp-service-account` | Critical |
+| **Cloud — Azure** | Storage Connection String | `azure-storage-key` | Critical |
+| **Cloud — Azure** | Entra ID Client Secret | `azure-entra-secret` | Critical |
+| **Cloud — Cloudflare** | API Token | `cloudflare-api-token` | Critical |
+| **Cloud — DigitalOcean** | Personal Access Token | `digitalocean-token` | Critical |
+| **Cloud — Heroku** | API Key | `heroku-api-key` | Critical |
+| **Cloud — Vercel** | API Token | `vercel-token` | High |
+| **AI/ML** | OpenAI API Key | `openai-api-key` | Critical |
+| **AI/ML** | Anthropic API Key | `anthropic-api-key` | Critical |
+| **AI/ML** | Hugging Face Token | `huggingface-token` | Critical |
+| **AI/ML** | DeepSeek API Key | `deepseek-api-key` | Critical |
+| **DevTools** | GitHub PAT | `github-token` | Critical |
+| **DevTools** | GitHub OAuth Token | `github-oauth-token` | Critical |
+| **DevTools** | GitLab PAT | `gitlab-pat` | Critical |
+| **DevTools** | Bitbucket App Password | `bitbucket-app-password` | Critical |
+| **DevTools** | NPM Token | `npm-token` | High |
+| **DevTools** | PyPI Token | `pypi-api-token` | High |
+| **DevTools** | RubyGems Key | `rubygems-api-key` | High |
+| **DevTools** | Docker Hub PAT | `dockerhub-pat` | Critical |
+| **CI/CD** | CircleCI Token | `circleci-token` | High |
+| **CI/CD** | Terraform Cloud Token | `terraform-cloud-token` | Critical |
+| **Communication** | Slack Bot Token | `slack-token` | Critical |
+| **Communication** | Slack Webhook | `slack-webhook` | High |
+| **Communication** | Discord Bot Token | `discord-bot-token` | Critical |
+| **Communication** | Telegram Bot Token | `telegram-bot-token` | High |
+| **Communication** | MS Teams Webhook | `teams-webhook` | High |
+| **Email** | SendGrid API Key | `sendgrid-api-key` | Critical |
+| **Email** | Mailgun API Key | `mailgun-api-key` | Critical |
+| **Email** | Postmark Server Token | `postmark-server-token` | High |
+| **Payment** | Stripe Live Key | `stripe-api-key-live` | Critical |
+| **Payment** | Stripe Test Key | `stripe-api-key-test` | High |
+| **Payment** | Coinbase API Key | `coinbase-api-key` | Critical |
+| **Database** | Connection String (PG/MySQL/MongoDB) | `database-connection-string` | Critical |
+| **Database** | Redis Connection | `redis-connection-string` | Critical |
+| **Database** | Snowflake Credentials | `snowflake-credentials` | Critical |
+| **Database** | RabbitMQ Connection | `rabbitmq-connection-string` | Critical |
+| **Database** | Supabase Service Key | `supabase-service-key` | Critical |
+| **Infrastructure** | FTP/SFTP Credentials | `ftp-credentials` | Critical |
+| **Infrastructure** | LDAP Credentials | `ldap-credentials` | Critical |
+| **Infrastructure** | Databricks PAT | `databricks-token` | Critical |
+| **Identity** | JWT | `jwt` | High |
+| **Identity** | Private Key (RSA/SSH/PGP) | `private-key` | Critical |
+| **Identity** | Okta API Token | `okta-api-token` | Critical |
+| **Identity** | Auth0 Management Token | `auth0-management-token` | Critical |
+| **Identity** | HashiCorp Vault Token | `hashicorp-vault-token` | Critical |
+| **Monitoring** | Datadog API Key | `datadog-api-key` | Critical |
+| **Monitoring** | Grafana API Key | `grafana-api-key` | High |
+| **Monitoring** | PagerDuty API Key | `pagerduty-api-key` | High |
+| **Monitoring** | New Relic API Key | `newrelic-api-key` | High |
+| **Monitoring** | Sentry Auth Token | `sentry-token` | High |
+| **Security** | Snyk API Key | `snyk-api-key` | High |
+| **Security** | Twilio API Key | `twilio-api-key` | Critical |
+| **Secrets Mgmt** | Doppler Service Token | `doppler-token` | Critical |
+| **Feature Flags** | LaunchDarkly SDK Key | `launchdarkly-sdk-key` | High |
+| **Code Quality** | SonarCloud Token | `sonarcloud-token` | High |
+| **SaaS** | Shopify Access Token | `shopify-access-token` | Critical |
+| **SaaS** | Notion Token | `notion-token` | High |
+| **SaaS** | Linear API Key | `linear-api-key` | High |
+| **SaaS** | Figma PAT | `figma-pat` | High |
+| **SaaS** | Airtable PAT | `airtable-pat` | High |
+| **Generic** | Generic API Key | `generic-api-key` | Medium |
+| **Custom** | YAML-defined rules | user-defined | user-defined |
+
+> **Can't find your secret type?** Leakwatch supports [YAML custom rules](docs/guides/custom-rules.md) — define your own detector in 5 lines of YAML without writing Go code.
 
 ---
 

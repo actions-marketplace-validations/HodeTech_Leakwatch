@@ -17,15 +17,10 @@ leakwatch/
 ├── cmd/                    # CLI commands (Cobra) — thin layer, no business logic
 ├── internal/               # Internal packages — all business logic lives here
 │   ├── engine/             # Scan engine (worker pool, pipeline)
-│   ├── detector/           # Secret detectors (Detector interface)
+│   ├── detector/           # Secret detectors (60 packages, 63 detectors)
 │   │   ├── aws/            # AWS Access Key detector
-│   │   ├── github/         # GitHub Token detector
-│   │   ├── slack/          # Slack Token/Webhook detectors
-│   │   ├── stripe/         # Stripe API Key detectors (live/test)
-│   │   ├── jwt/            # JWT detector
-│   │   ├── dbconn/         # Database Connection String detector
-│   │   ├── privatekey/     # Private Key detector
-│   │   ├── generic/        # Generic API Key detector
+│   │   ├── openai/         # OpenAI API Key detector
+│   │   ├── ...             # 58 more detector packages
 │   │   └── custom/         # YAML custom rule support
 │   ├── source/             # Scan sources (Source interface)
 │   │   ├── filesystem/     # Local filesystem source

@@ -5,6 +5,19 @@ All notable changes to Leakwatch will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **53 new secret detectors** bringing the total to 63 built-in detectors
+  - Sprint 1: OpenAI, Anthropic, GitLab, SendGrid, NPM, Discord, Telegram, Redis, Snowflake, Datadog
+  - Sprint 2: Hugging Face, DeepSeek, GCP, Azure (Storage + Entra), Okta, Twilio, Mailgun, Vault, Grafana, PagerDuty, CircleCI, GitHub OAuth
+  - Sprint 3: PyPI, RubyGems, Docker Hub, DigitalOcean, Heroku, Vercel, New Relic, Sentry, Shopify, Supabase, Cloudflare, Notion, Linear, Figma, Airtable
+  - Sprint 4: Terraform, Databricks, Bitbucket, Coinbase, Infura, RabbitMQ, FTP, LDAP, Auth0, LaunchDarkly, Snyk, SonarCloud, Doppler, MS Teams, Postmark
+- Remediation guidance for all 63 detectors
+- APISIX key patterns added to generic API key detector
+
+---
+
 ## [v1.2.0] - 2026-03-24
 
 ### Added
@@ -22,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 - **Remediation Guidance** — actionable rotation/revocation instructions for all detectors
 - `--remediation` flag on all scan commands to include guidance in output
-- Remediation registry with guidance for 10+ detector types (AWS, GitHub, Slack, Stripe, JWT, DB Connection, Private Key, Generic)
+- Remediation registry with guidance for all built-in detector types (AWS, GitHub, Slack, Stripe, JWT, DB Connection, Private Key, Generic, and more)
 - SARIF output includes `help` and `helpUri` properties on rules when remediation is enabled
 - CSV output includes `remediation` column
 - Table output includes `REMEDIATION` column
