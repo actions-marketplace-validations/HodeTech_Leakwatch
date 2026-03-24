@@ -559,4 +559,213 @@ func init() {
 			"Review app permissions.",
 		},
 	})
+
+	// Sprint 3 detectors
+
+	Register("pypi-api-token", finding.Remediation{
+		Title: "Revoke PyPI API Token",
+		Steps: []string{
+			"Go to pypi.org > Account Settings > API Tokens.",
+			"Delete the compromised token.",
+			"Create a new scoped token with minimal permissions.",
+			"Update CI/CD pipelines with the new token.",
+		},
+		DocURL:     "https://pypi.org/help/#apitoken",
+		ConsoleURL: "https://pypi.org/manage/account/#api-tokens",
+		Urgency:    "immediate",
+	})
+
+	Register("rubygems-api-key", finding.Remediation{
+		Title: "Revoke RubyGems API Key",
+		Steps: []string{
+			"Go to rubygems.org > Settings > API Keys.",
+			"Delete the compromised key.",
+			"Create a new API key with minimal scopes.",
+			"Update CI/CD pipelines with the new key.",
+		},
+		DocURL:     "https://guides.rubygems.org/api-key-scopes/",
+		ConsoleURL: "https://rubygems.org/settings/edit",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Check for unauthorized gem publishes.",
+		},
+	})
+
+	Register("dockerhub-pat", finding.Remediation{
+		Title: "Revoke Docker Hub PAT",
+		Steps: []string{
+			"Go to hub.docker.com > Account Settings > Security.",
+			"Delete the compromised personal access token.",
+			"Create a new token with appropriate permissions.",
+			"Update all Docker CLI and CI/CD configurations.",
+		},
+		DocURL:     "https://docs.docker.com/security/for-developers/access-tokens/",
+		ConsoleURL: "https://hub.docker.com/settings/security",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Check image push history for unauthorized publishes.",
+		},
+	})
+
+	Register("digitalocean-token", finding.Remediation{
+		Title: "Revoke DigitalOcean Token",
+		Steps: []string{
+			"Go to cloud.digitalocean.com > API > Tokens.",
+			"Delete the compromised token.",
+			"Create a new token with required scopes.",
+			"Update all integrations with the new token.",
+		},
+		DocURL:     "https://docs.digitalocean.com/reference/api/",
+		ConsoleURL: "https://cloud.digitalocean.com/account/api/tokens",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Check droplet/resource activity for unauthorized changes.",
+		},
+	})
+
+	Register("heroku-api-key", finding.Remediation{
+		Title: "Regenerate Heroku API Key",
+		Steps: []string{
+			"Go to dashboard.heroku.com > Account Settings.",
+			"Regenerate the API key.",
+			"Update all CLI sessions and CI/CD pipelines with the new key.",
+		},
+		DocURL:     "https://devcenter.heroku.com/articles/authentication",
+		ConsoleURL: "https://dashboard.heroku.com/account",
+		Urgency:    "immediate",
+	})
+
+	Register("vercel-token", finding.Remediation{
+		Title: "Revoke Vercel Token",
+		Steps: []string{
+			"Go to vercel.com > Settings > Tokens.",
+			"Delete the compromised token.",
+			"Create a new token.",
+			"Update all integrations with the new token.",
+		},
+		DocURL:     "https://vercel.com/docs/rest-api",
+		ConsoleURL: "https://vercel.com/account/tokens",
+		Urgency:    "high",
+	})
+
+	Register("newrelic-api-key", finding.Remediation{
+		Title: "Delete New Relic API Key",
+		Steps: []string{
+			"Go to one.newrelic.com > API Keys.",
+			"Delete the compromised key.",
+			"Create a new API key.",
+			"Update all integrations with the new key.",
+		},
+		DocURL:     "https://docs.newrelic.com/docs/apis/intro-apis/new-relic-api-keys/",
+		ConsoleURL: "https://one.newrelic.com/api-keys",
+		Urgency:    "high",
+	})
+
+	Register("sentry-token", finding.Remediation{
+		Title: "Revoke Sentry Auth Token",
+		Steps: []string{
+			"Go to sentry.io > Settings > Auth Tokens.",
+			"Delete the compromised token.",
+			"Create a new auth token.",
+			"Update all integrations with the new token.",
+		},
+		DocURL:     "https://docs.sentry.io/api/auth/",
+		ConsoleURL: "https://sentry.io/settings/account/api/auth-tokens/",
+		Urgency:    "high",
+	})
+
+	Register("shopify-access-token", finding.Remediation{
+		Title: "Rotate Shopify Access Token",
+		Steps: []string{
+			"Go to Shopify Admin > Apps > Manage private apps.",
+			"Rotate the compromised access token.",
+			"Update all integrations with the new token.",
+		},
+		DocURL:     "https://shopify.dev/docs/apps/auth",
+		ConsoleURL: "",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Check order/customer data access for unauthorized activity.",
+		},
+	})
+
+	Register("supabase-service-key", finding.Remediation{
+		Title: "Rotate Supabase Service Key",
+		Steps: []string{
+			"Go to app.supabase.com > Project Settings > API.",
+			"Regenerate the service role key.",
+			"Update all backend services with the new key.",
+		},
+		DocURL:     "https://supabase.com/docs/guides/api",
+		ConsoleURL: "https://app.supabase.com",
+		Urgency:    "immediate",
+	})
+
+	Register("cloudflare-api-token", finding.Remediation{
+		Title: "Revoke Cloudflare API Token",
+		Steps: []string{
+			"Go to dash.cloudflare.com > My Profile > API Tokens.",
+			"Delete the compromised token.",
+			"Create a new token with minimal permissions.",
+			"Update all integrations with the new token.",
+		},
+		DocURL:     "https://developers.cloudflare.com/api/tokens/create/",
+		ConsoleURL: "https://dash.cloudflare.com/profile/api-tokens",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Check DNS changes and firewall rules for unauthorized modifications.",
+		},
+	})
+
+	Register("notion-token", finding.Remediation{
+		Title: "Revoke Notion Integration Token",
+		Steps: []string{
+			"Go to notion.so > Settings > Connections > Develop or manage integrations.",
+			"Revoke the compromised integration token.",
+			"Create a new integration secret.",
+			"Update all integrations with the new token.",
+		},
+		DocURL:     "https://developers.notion.com/docs/authorization",
+		ConsoleURL: "https://www.notion.so/my-integrations",
+		Urgency:    "high",
+	})
+
+	Register("linear-api-key", finding.Remediation{
+		Title: "Revoke Linear API Key",
+		Steps: []string{
+			"Go to linear.app > Settings > API.",
+			"Delete the compromised key.",
+			"Create a new API key.",
+			"Update all integrations with the new key.",
+		},
+		DocURL:     "https://developers.linear.app/docs/graphql/working-with-the-graphql-api",
+		ConsoleURL: "https://linear.app/settings/api",
+		Urgency:    "high",
+	})
+
+	Register("figma-pat", finding.Remediation{
+		Title: "Revoke Figma PAT",
+		Steps: []string{
+			"Go to figma.com > Settings > Personal Access Tokens.",
+			"Delete the compromised token.",
+			"Create a new personal access token.",
+			"Update all integrations with the new token.",
+		},
+		DocURL:     "https://www.figma.com/developers/api#access-tokens",
+		ConsoleURL: "https://www.figma.com/settings",
+		Urgency:    "high",
+	})
+
+	Register("airtable-pat", finding.Remediation{
+		Title: "Revoke Airtable PAT",
+		Steps: []string{
+			"Go to airtable.com > Account > Developer hub > Personal access tokens.",
+			"Delete the compromised token.",
+			"Create a new personal access token with minimal scopes.",
+			"Update all integrations with the new token.",
+		},
+		DocURL:     "https://airtable.com/developers/web/guides/personal-access-tokens",
+		ConsoleURL: "https://airtable.com/create/tokens",
+		Urgency:    "high",
+	})
 }

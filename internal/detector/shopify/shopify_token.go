@@ -1,0 +1,46 @@
+// Package shopify provides a Shopify Access Token secret detector.
+package shopify
+
+import (
+	"context"
+	"regexp"
+
+	"github.com/cemililik/leakwatch/internal/detector"
+	"github.com/cemililik/leakwatch/pkg/finding"
+)
+
+var shopifyTokenPattern = regexp.MustCompile(`shpat_[a-f0-9]{32}`)
+
+// Detector detects Shopify Access Tokens.
+type Detector struct{}
+
+func (d *Detector) ID() string { return "shopify-access-token" }
+
+func (d *Detector) Description() string { return "Shopify Access Token" }
+
+func (d *Detector) Keywords() []string { return []string{"shpat_"} }
+
+func (d *Detector) Severity() finding.Severity { return finding.SeverityCritical }
+
+// Scan searches the data for Shopify Access Token patterns.
+func (d *Detector) Scan(_ context.Context, data []byte) []detector.RawFinding {
+	matches := shopifyTokenPattern.FindAll(data, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+
+	findings := make([]detector.RawFinding, 0, len(matches))
+	for _, match := range matches {
+		s := string(match)
+		findings = append(findings, detector.RawFinding{
+			DetectorID: d.ID(),
+			Raw:        match,
+			Redacted:   "shpat_****" + s[len(s)-4:],
+		})
+	}
+	return findings
+}
+
+func init() {
+	detector.Register(&Detector{})
+}

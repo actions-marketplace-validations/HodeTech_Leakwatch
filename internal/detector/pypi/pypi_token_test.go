@@ -1,0 +1,83 @@
+package pypi
+
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"github.com/cemililik/leakwatch/pkg/finding"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestDetector_Metadata_ReturnsExpectedValues(t *testing.T) {
+	d := &Detector{}
+	assert.Equal(t, "pypi-api-token", d.ID())
+	assert.Equal(t, "PyPI API Token", d.Description())
+	assert.Equal(t, finding.SeverityHigh, d.Severity())
+	assert.NotEmpty(t, d.Keywords())
+}
+
+func TestDetector_Scan_MatchAndReject(t *testing.T) {
+	// synthetic 20-char suffix
+	suffix20 := strings.Repeat("Abcd", 5)
+	// synthetic 48-char suffix (longer valid token)
+	suffix48 := strings.Repeat("Abcd", 12)
+
+	tests := []struct {
+		name     string
+		input    string
+		expected int
+		redacted string
+	}{
+		{
+			name:     "valid token with 20 char suffix",
+			input:    "pypi-" + suffix20,
+			expected: 1,
+			redacted: "pypi-****" + suffix20[len(suffix20)-4:],
+		},
+		{
+			name:     "valid token with longer suffix",
+			input:    "pypi-" + suffix48,
+			expected: 1,
+			redacted: "pypi-****" + suffix48[len(suffix48)-4:],
+		},
+		{
+			name:     "token embedded in config",
+			input:    `PYPI_TOKEN=pypi-` + suffix20,
+			expected: 1,
+		},
+		{
+			name:     "no match - too short suffix",
+			input:    "pypi-abc123",
+			expected: 0,
+		},
+		{
+			name:     "no match - wrong prefix",
+			input:    "npm_" + suffix20,
+			expected: 0,
+		},
+		{
+			name:     "no match - plain text",
+			input:    "this is just normal text",
+			expected: 0,
+		},
+		{
+			name:     "empty input",
+			input:    "",
+			expected: 0,
+		},
+	}
+
+	d := &Detector{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			findings := d.Scan(context.Background(), []byte(tt.input))
+			assert.Len(t, findings, tt.expected)
+			if tt.expected > 0 && tt.redacted != "" {
+				require.NotEmpty(t, findings)
+				assert.Equal(t, tt.redacted, findings[0].Redacted)
+			}
+		})
+	}
+}
