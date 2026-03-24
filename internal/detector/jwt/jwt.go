@@ -14,9 +14,16 @@ var jwtPattern = regexp.MustCompile(`eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,
 // JWT detects JSON Web Tokens.
 type JWT struct{}
 
-func (d *JWT) ID() string          { return "jwt" }
-func (d *JWT) Description() string  { return "JSON Web Token" }
-func (d *JWT) Keywords() []string   { return []string{"eyJ"} }
+// ID returns the unique identifier of the JWT detector.
+func (d *JWT) ID() string { return "jwt" }
+
+// Description returns a human-readable description of the JWT detector.
+func (d *JWT) Description() string { return "JSON Web Token" }
+
+// Keywords returns the Aho-Corasick pre-filter keywords for JWT detection.
+func (d *JWT) Keywords() []string { return []string{"eyJ"} }
+
+// Severity returns the default severity level for JWT findings.
 func (d *JWT) Severity() finding.Severity { return finding.SeverityHigh }
 
 // Scan scans the given data for JSON Web Token patterns.
@@ -29,20 +36,11 @@ func (d *JWT) Scan(_ context.Context, data []byte) []detector.RawFinding {
 	findings := make([]detector.RawFinding, 0, len(matches))
 	for _, match := range matches {
 		s := string(match)
-		// Redact the signature portion (everything after the second dot).
-		firstDot := -1
-		secondDot := -1
-		for i, c := range s {
-			if c == '.' {
-				if firstDot == -1 {
-					firstDot = i
-				} else {
-					secondDot = i
-					break
-				}
-			}
+		// Redact to only show a short prefix to avoid exposing header+payload.
+		redacted := s
+		if len(s) > 10 {
+			redacted = s[:10] + "****"
 		}
-		redacted := s[:secondDot+1] + "****"
 		findings = append(findings, detector.RawFinding{
 			DetectorID: d.ID(),
 			Raw:        match,

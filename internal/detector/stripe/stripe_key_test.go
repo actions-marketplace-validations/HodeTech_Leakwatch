@@ -10,49 +10,40 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestKey_Metadata(t *testing.T) {
-	d := &Key{}
-	assert.Equal(t, "stripe-api-key", d.ID())
-	assert.Equal(t, "Stripe API Key", d.Description())
+func TestLiveKey_Metadata(t *testing.T) {
+	d := &LiveKey{}
+	assert.Equal(t, "stripe-api-key-live", d.ID())
+	assert.Equal(t, "Stripe Live API Key", d.Description())
 	assert.Equal(t, finding.SeverityCritical, d.Severity())
 	assert.NotEmpty(t, d.Keywords())
 }
 
-func TestKey_Scan_MatchesValidKeys(t *testing.T) {
+func TestTestKey_Metadata(t *testing.T) {
+	d := &TestKey{}
+	assert.Equal(t, "stripe-api-key-test", d.ID())
+	assert.Equal(t, "Stripe Test API Key", d.Description())
+	assert.Equal(t, finding.SeverityHigh, d.Severity())
+	assert.NotEmpty(t, d.Keywords())
+}
+
+func TestLiveKey_Scan_MatchesValidKeys(t *testing.T) {
 	tests := []struct {
-		name             string
-		input            string
-		expected         int
-		redacted         string
-		expectedSeverity string
+		name     string
+		input    string
+		expected int
+		redacted string
 	}{
 		{
-			name:             "valid sk_live key",
-			input:            "sk_live_AbCdEfGhIjKlMnOpQrStUvWx",
-			expected:         1,
-			redacted:         "sk_live_****UvWx",
-			expectedSeverity: "critical",
+			name:     "valid sk_live key",
+			input:    "sk_live_AbCdEfGhIjKlMnOpQrStUvWx",
+			expected: 1,
+			redacted: "sk_live_****UvWx",
 		},
 		{
-			name:             "valid sk_test key",
-			input:            "sk_test_AbCdEfGhIjKlMnOpQrStUvWx",
-			expected:         1,
-			redacted:         "sk_test_****UvWx",
-			expectedSeverity: "high",
-		},
-		{
-			name:             "valid rk_live key",
-			input:            "rk_live_AbCdEfGhIjKlMnOpQrStUvWx",
-			expected:         1,
-			redacted:         "rk_live_****UvWx",
-			expectedSeverity: "critical",
-		},
-		{
-			name:             "valid rk_test key",
-			input:            "rk_test_AbCdEfGhIjKlMnOpQrStUvWx",
-			expected:         1,
-			redacted:         "rk_test_****UvWx",
-			expectedSeverity: "high",
+			name:     "valid rk_live key",
+			input:    "rk_live_AbCdEfGhIjKlMnOpQrStUvWx",
+			expected: 1,
+			redacted: "rk_live_****UvWx",
 		},
 		{
 			name:     "key in env var",
@@ -65,18 +56,13 @@ func TestKey_Scan_MatchesValidKeys(t *testing.T) {
 			expected: 1,
 		},
 		{
-			name:     "multiple keys",
-			input:    "sk_live_AbCdEfGhIjKlMnOpQrStUvWx sk_test_AbCdEfGhIjKlMnOpQrStUvWx",
-			expected: 2,
-		},
-		{
 			name:     "key in large text",
 			input:    strings.Repeat("x", 10000) + "sk_live_AbCdEfGhIjKlMnOpQrStUvWx" + strings.Repeat("y", 10000),
 			expected: 1,
 		},
 	}
 
-	d := &Key{}
+	d := &LiveKey{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			findings := d.Scan(context.Background(), []byte(tt.input))
@@ -85,12 +71,59 @@ func TestKey_Scan_MatchesValidKeys(t *testing.T) {
 				require.NotEmpty(t, findings)
 				assert.Equal(t, tt.redacted, findings[0].Redacted)
 			}
-			if tt.expectedSeverity != "" {
+		})
+	}
+}
+
+func TestLiveKey_Scan_DoesNotMatchTestKeys(t *testing.T) {
+	d := &LiveKey{}
+	findings := d.Scan(context.Background(), []byte("sk_test_AbCdEfGhIjKlMnOpQrStUvWx"))
+	assert.Empty(t, findings)
+}
+
+func TestTestKey_Scan_MatchesValidKeys(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected int
+		redacted string
+	}{
+		{
+			name:     "valid sk_test key",
+			input:    "sk_test_AbCdEfGhIjKlMnOpQrStUvWx",
+			expected: 1,
+			redacted: "sk_test_****UvWx",
+		},
+		{
+			name:     "valid rk_test key",
+			input:    "rk_test_AbCdEfGhIjKlMnOpQrStUvWx",
+			expected: 1,
+			redacted: "rk_test_****UvWx",
+		},
+		{
+			name:     "multiple test keys",
+			input:    "sk_test_AbCdEfGhIjKlMnOpQrStUvWx rk_test_AbCdEfGhIjKlMnOpQrStUvWx",
+			expected: 2,
+		},
+	}
+
+	d := &TestKey{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			findings := d.Scan(context.Background(), []byte(tt.input))
+			assert.Len(t, findings, tt.expected)
+			if tt.expected > 0 && tt.redacted != "" {
 				require.NotEmpty(t, findings)
-				assert.Equal(t, tt.expectedSeverity, findings[0].ExtraData["severity"])
+				assert.Equal(t, tt.redacted, findings[0].Redacted)
 			}
 		})
 	}
+}
+
+func TestTestKey_Scan_DoesNotMatchLiveKeys(t *testing.T) {
+	d := &TestKey{}
+	findings := d.Scan(context.Background(), []byte("sk_live_AbCdEfGhIjKlMnOpQrStUvWx"))
+	assert.Empty(t, findings)
 }
 
 func TestKey_Scan_RejectsInvalidInput(t *testing.T) {
@@ -116,10 +149,15 @@ func TestKey_Scan_RejectsInvalidInput(t *testing.T) {
 		},
 	}
 
-	d := &Key{}
+	liveD := &LiveKey{}
+	testD := &TestKey{}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			findings := d.Scan(context.Background(), []byte(tt.input))
+		t.Run(tt.name+"_live", func(t *testing.T) {
+			findings := liveD.Scan(context.Background(), []byte(tt.input))
+			assert.Empty(t, findings)
+		})
+		t.Run(tt.name+"_test", func(t *testing.T) {
+			findings := testD.Scan(context.Background(), []byte(tt.input))
 			assert.Empty(t, findings)
 		})
 	}

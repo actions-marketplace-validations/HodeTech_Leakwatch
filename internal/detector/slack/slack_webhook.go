@@ -8,14 +8,21 @@ import (
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
-var webhookPattern = regexp.MustCompile(`https://hooks\.slack\.com/services/T[A-Z0-9]{8,}/B[A-Z0-9]{8,}/[a-zA-Z0-9]{24}`)
+var webhookPattern = regexp.MustCompile(`https://hooks\.slack\.com/services/T[A-Z0-9]{8,}/B[A-Z0-9]{8,}/[a-zA-Z0-9]{20,48}`)
 
 // Webhook detects Slack Incoming Webhook URLs.
 type Webhook struct{}
 
-func (d *Webhook) ID() string          { return "slack-webhook" }
-func (d *Webhook) Description() string  { return "Slack Webhook URL" }
-func (d *Webhook) Keywords() []string   { return []string{"hooks.slack.com"} }
+// ID returns the unique identifier of the Slack webhook detector.
+func (d *Webhook) ID() string { return "slack-webhook" }
+
+// Description returns a human-readable description of the Slack webhook detector.
+func (d *Webhook) Description() string { return "Slack Webhook URL" }
+
+// Keywords returns the Aho-Corasick pre-filter keywords for Slack webhook detection.
+func (d *Webhook) Keywords() []string { return []string{"hooks.slack.com"} }
+
+// Severity returns the default severity level for Slack webhook findings.
 func (d *Webhook) Severity() finding.Severity { return finding.SeverityHigh }
 
 // Scan scans the given data for Slack Webhook URL patterns.

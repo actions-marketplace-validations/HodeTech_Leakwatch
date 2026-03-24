@@ -4,6 +4,8 @@
 package matcher
 
 import (
+	"bytes"
+	"log/slog"
 	"strings"
 
 	"github.com/cloudflare/ahocorasick"
@@ -30,6 +32,7 @@ func New(detectors []detector.Detector) *Matcher {
 	}
 
 	var keywords []string
+	seen := make(map[string]bool)
 	for _, det := range detectors {
 		m.allDetectors[det.ID()] = det
 
@@ -42,6 +45,10 @@ func New(detectors []detector.Detector) *Matcher {
 		for _, kw := range kws {
 			lower := strings.ToLower(kw)
 			m.keywordToDet[lower] = append(m.keywordToDet[lower], det.ID())
+			if seen[lower] {
+				continue
+			}
+			seen[lower] = true
 			keywords = append(keywords, lower)
 		}
 	}
@@ -74,8 +81,8 @@ func (m *Matcher) Match(data []byte) []detector.Detector {
 	}
 
 	// Run Aho-Corasick on lowercased data.
-	lower := strings.ToLower(string(data))
-	hits := m.machine.Match([]byte(lower))
+	lower := bytes.ToLower(data)
+	hits := m.machine.Match(lower)
 
 	for _, idx := range hits {
 		if idx < len(m.keywords) {
@@ -83,6 +90,8 @@ func (m *Matcher) Match(data []byte) []detector.Detector {
 			for _, detID := range m.keywordToDet[kw] {
 				matchedIDs[detID] = true
 			}
+		} else {
+			slog.Warn("unexpected match index", "index", idx, "max", len(m.keywords))
 		}
 	}
 

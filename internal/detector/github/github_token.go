@@ -9,14 +9,21 @@ import (
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
-var tokenPattern = regexp.MustCompile(`(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,255}`)
+var tokenPattern = regexp.MustCompile(`(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,100}`)
 
 // Token detects GitHub Personal Access Tokens.
 type Token struct{}
 
-func (d *Token) ID() string          { return "github-token" }
-func (d *Token) Description() string  { return "GitHub Personal Access Token" }
-func (d *Token) Keywords() []string   { return []string{"ghp_", "gho_", "ghu_", "ghs_", "ghr_"} }
+// ID returns the unique identifier of the GitHub token detector.
+func (d *Token) ID() string { return "github-token" }
+
+// Description returns a human-readable description of the GitHub token detector.
+func (d *Token) Description() string { return "GitHub Personal Access Token" }
+
+// Keywords returns the Aho-Corasick pre-filter keywords for GitHub token detection.
+func (d *Token) Keywords() []string { return []string{"ghp_", "gho_", "ghu_", "ghs_", "ghr_"} }
+
+// Severity returns the default severity level for GitHub token findings.
 func (d *Token) Severity() finding.Severity { return finding.SeverityCritical }
 
 // Scan scans the given data for GitHub Personal Access Token patterns.

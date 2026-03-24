@@ -25,7 +25,8 @@ const (
 	channelBufferMultiplier = 2
 
 	// hashTruncateLen, Finding ID hash kesme uzunluğu (byte).
-	hashTruncateLen = 8
+	// 16 bytes = 128 bits provides sufficient collision resistance.
+	hashTruncateLen = 16
 )
 
 // Config holds the scan engine configuration.
@@ -38,7 +39,8 @@ type Config struct {
 	Clock            func() time.Time // Optional; defaults to time.Now
 	VerifierConfig   verifier.Config
 	Verifiers        []verifier.Verifier
-	OnlyVerified     bool // If true, only return verified active findings
+	OnlyVerified     bool             // If true, only return verified active findings
+	MinSeverity      finding.Severity // Minimum severity to include in results
 }
 
 // ScanResult represents the outcome of a scan.
@@ -62,7 +64,7 @@ func New(cfg Config) *Engine {
 	if cfg.Concurrency < 1 {
 		cfg.Concurrency = 1
 	}
-	if cfg.EntropyThreshold == 0 {
+	if cfg.EntropyThreshold <= 0 {
 		cfg.EntropyThreshold = defaultEntropyThreshold
 	}
 	if cfg.Clock == nil {
@@ -113,7 +115,10 @@ func (e *Engine) Scan(ctx context.Context, src source.Source) (*ScanResult, erro
 		}
 	}()
 
-	// Chunk'ları jobs kanalına gönder
+	// Chunk'ları jobs kanalına gönder.
+	// NOTE: Context cancellation during this loop depends on the source implementation
+	// closing its Chunks channel promptly when ctx is cancelled. If a source blocks
+	// indefinitely on send, this loop may not exit until the source returns.
 	scannedChunks := 0
 loop:
 	for chunk := range src.Chunks(ctx) {
@@ -136,16 +141,8 @@ loop:
 	// Run verification on collected pairs.
 	findings := e.verifyEn.VerifyAll(ctx, pairs)
 
-	// Apply --only-verified filter.
-	if e.config.OnlyVerified {
-		var filtered []finding.Finding
-		for _, f := range findings {
-			if f.Verification.Status == finding.StatusVerifiedActive {
-				filtered = append(filtered, f)
-			}
-		}
-		findings = filtered
-	}
+	// Apply post-scan filters.
+	findings = e.applyFilters(findings)
 
 	result := &ScanResult{
 		Findings:      findings,
@@ -230,4 +227,22 @@ func (e *Engine) rawToFinding(raw detector.RawFinding, chunk source.Chunk, det d
 	f.ID = fmt.Sprintf("%x", hash[:hashTruncateLen])
 
 	return f
+}
+
+// applyFilters applies post-scan filters (severity, verification status).
+func (e *Engine) applyFilters(findings []finding.Finding) []finding.Finding {
+	var result []finding.Finding
+	for _, f := range findings {
+		if e.config.OnlyVerified && f.Verification.Status != finding.StatusVerifiedActive {
+			continue
+		}
+		if f.Severity < e.config.MinSeverity {
+			continue
+		}
+		result = append(result, f)
+	}
+	if result == nil {
+		return []finding.Finding{}
+	}
+	return result
 }

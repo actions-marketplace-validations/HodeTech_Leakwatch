@@ -2,6 +2,7 @@ package custom
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/cemililik/leakwatch/internal/detector"
@@ -46,6 +47,14 @@ func TestNewFromDef_InvalidRegex_ReturnsError(t *testing.T) {
 	_, err := NewFromDef(def)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid regex")
+}
+
+func TestNewFromDef_RegexTooLong_ReturnsError(t *testing.T) {
+	longRegex := strings.Repeat("a", maxRegexLength+1)
+	def := RuleDef{ID: "test", Regex: longRegex}
+	_, err := NewFromDef(def)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds maximum")
 }
 
 func TestCustomDetector_Scan_MatchFound_ReturnsFinding(t *testing.T) {

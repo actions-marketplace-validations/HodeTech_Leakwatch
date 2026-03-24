@@ -17,6 +17,7 @@ import (
 	"github.com/cemililik/leakwatch/internal/config"
 	"github.com/cemililik/leakwatch/internal/detector"
 	"github.com/cemililik/leakwatch/internal/engine"
+	"github.com/cemililik/leakwatch/internal/filter"
 	"github.com/cemililik/leakwatch/internal/output"
 	csvout "github.com/cemililik/leakwatch/internal/output/csv"
 	jsonout "github.com/cemililik/leakwatch/internal/output/json"
@@ -45,46 +46,68 @@ type scanConfig struct {
 	noVerify         bool
 	onlyVerified     bool
 	minSeverity      finding.Severity
+	scanRoot         string // root path for .leakwatchignore resolution
 }
 
 // bindScanFlags binds common scan flags to Viper.
 func bindScanFlags(flags *pflag.FlagSet) {
-	_ = viper.BindPFlag("scan.concurrency", flags.Lookup("concurrency"))
-	_ = viper.BindPFlag("scan.max-file-size", flags.Lookup("max-file-size"))
-	_ = viper.BindPFlag("output.format", flags.Lookup("format"))
-	_ = viper.BindPFlag("output.file", flags.Lookup("output"))
-	_ = viper.BindPFlag("output.show-raw", flags.Lookup("show-raw"))
+	if err := viper.BindPFlag("scan.concurrency", flags.Lookup("concurrency")); err != nil {
+		slog.Warn("failed to bind concurrency flag", "error", err)
+	}
+	if err := viper.BindPFlag("scan.max-file-size", flags.Lookup("max-file-size")); err != nil {
+		slog.Warn("failed to bind max-file-size flag", "error", err)
+	}
+	if err := viper.BindPFlag("output.format", flags.Lookup("format")); err != nil {
+		slog.Warn("failed to bind format flag", "error", err)
+	}
+	if err := viper.BindPFlag("output.file", flags.Lookup("output")); err != nil {
+		slog.Warn("failed to bind output flag", "error", err)
+	}
+	if err := viper.BindPFlag("output.show-raw", flags.Lookup("show-raw")); err != nil {
+		slog.Warn("failed to bind show-raw flag", "error", err)
+	}
 }
 
-// addVerifyFlags adds --no-verify and --only-verified flags to a command.
+// addVerifyFlags adds --no-verify, --only-verified and --min-severity flags.
 func addVerifyFlags(flags *pflag.FlagSet) {
 	flags.Bool("no-verify", false, "disable secret verification")
 	flags.Bool("only-verified", false, "only show verified active findings")
 	flags.String("min-severity", "low", "minimum severity to report (low, medium, high, critical)")
 }
 
-// loadScanConfig loads and validates configuration from Viper.
+// loadScanConfig loads and validates configuration from Viper and flags.
 func loadScanConfig(cmd *cobra.Command) (*scanConfig, error) {
 	cfg, err := config.Load()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	noVerify, _ := cmd.Flags().GetBool("no-verify")
-	onlyVerified, _ := cmd.Flags().GetBool("only-verified")
-	minSevStr, _ := cmd.Flags().GetString("min-severity")
+	noVerify, err := cmd.Flags().GetBool("no-verify")
+	if err != nil {
+		slog.Debug("no-verify flag not available", "error", err)
+	}
+	onlyVerified, err := cmd.Flags().GetBool("only-verified")
+	if err != nil {
+		slog.Debug("only-verified flag not available", "error", err)
+	}
+	minSevStr, err := cmd.Flags().GetString("min-severity")
+	if err != nil {
+		slog.Debug("min-severity flag not available", "error", err)
+	}
 	minSev := parseSeverity(minSevStr)
 
-	// Read format and output directly from flags (overrides config file).
-	format, _ := cmd.Flags().GetString("format")
-	if format == "" {
+	format, err := cmd.Flags().GetString("format")
+	if err != nil || format == "" {
 		format = cfg.Output.Format
 	}
-	outputFile, _ := cmd.Flags().GetString("output")
-	if outputFile == "" {
+	outputFile, err := cmd.Flags().GetString("output")
+	if err != nil || outputFile == "" {
 		outputFile = cfg.Output.File
 	}
-	showRaw, _ := cmd.Flags().GetBool("show-raw")
+	showRaw, err := cmd.Flags().GetBool("show-raw")
+	if err != nil {
+		showRaw = cfg.Output.ShowRaw
+	}
 
 	return &scanConfig{
 		concurrency:      cfg.Scan.Concurrency,
@@ -138,6 +161,11 @@ func executeScan(parent context.Context, cfg *scanConfig, src source.Source, cl 
 		verifierCfg.Enabled = false
 	}
 
+	// Warn if --only-verified is used with --no-verify.
+	if cfg.onlyVerified && cfg.noVerify {
+		slog.Warn("--only-verified has no effect when --no-verify is set")
+	}
+
 	eng := engine.New(engine.Config{
 		Concurrency:      cfg.concurrency,
 		Detectors:        detectors,
@@ -147,6 +175,7 @@ func executeScan(parent context.Context, cfg *scanConfig, src source.Source, cl 
 		VerifierConfig:   verifierCfg,
 		Verifiers:        verifier.All(),
 		OnlyVerified:     cfg.onlyVerified,
+		MinSeverity:      cfg.minSeverity,
 	})
 
 	ctx, cancel := signal.NotifyContext(parent, syscall.SIGINT, syscall.SIGTERM)
@@ -157,15 +186,19 @@ func executeScan(parent context.Context, cfg *scanConfig, src source.Source, cl 
 		return fmt.Errorf("scan failed: %w", err)
 	}
 
-	// Apply severity filter.
-	if cfg.minSeverity > finding.SeverityLow {
-		var filtered []finding.Finding
-		for _, f := range result.Findings {
-			if f.Severity >= cfg.minSeverity {
-				filtered = append(filtered, f)
+	// Apply .leakwatchignore if file exists in scan root.
+	if cfg.scanRoot != "" {
+		ignorePath := filepath.Join(cfg.scanRoot, ".leakwatchignore")
+		if rules, err := filter.LoadIgnoreFile(ignorePath); err == nil {
+			var filtered []finding.Finding
+			for _, f := range result.Findings {
+				if !rules.ShouldIgnore(f.SourceMetadata.FilePath) {
+					filtered = append(filtered, f)
+				}
 			}
+			result.Findings = filtered
+			slog.Debug("applied .leakwatchignore", "path", ignorePath)
 		}
-		result.Findings = filtered
 	}
 
 	// Write output.

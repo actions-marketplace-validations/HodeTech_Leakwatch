@@ -27,13 +27,13 @@ func TestConnectionString_Scan_MatchesValidStrings(t *testing.T) {
 	}{
 		{
 			name:     "postgres connection string",
-			input:    "postgres://admin:secretpass@localhost:5432/mydb",
+			input:    "postgres://admin:TESTPASS@localhost:5432/mydb",
 			expected: 1,
 			redacted: "postgres://admin:****@localhost:5432/mydb",
 		},
 		{
 			name:     "mysql connection string",
-			input:    "mysql://root:p4ssw0rd@db.example.com:3306/app",
+			input:    "mysql://root:TESTPWD@db.example.com:3306/app",
 			expected: 1,
 			redacted: "mysql://root:****@db.example.com:3306/app",
 		},
@@ -57,22 +57,22 @@ func TestConnectionString_Scan_MatchesValidStrings(t *testing.T) {
 		},
 		{
 			name:     "connection string in env var",
-			input:    `DATABASE_URL=postgres://admin:secretpass@localhost:5432/mydb`,
+			input:    `DATABASE_URL=postgres://admin:TESTPASS@localhost:5432/mydb`,
 			expected: 1,
 		},
 		{
 			name:     "connection string in JSON",
-			input:    `{"dsn": "mysql://root:p4ssw0rd@db.example.com:3306/app"}`,
+			input:    `{"dsn": "mysql://root:TESTPWD@db.example.com:3306/app"}`,
 			expected: 1,
 		},
 		{
 			name:     "multiple connection strings",
-			input:    "postgres://admin:secretpass@localhost:5432/mydb mysql://root:p4ssw0rd@db.example.com:3306/app",
+			input:    "postgres://admin:TESTPASS@localhost:5432/mydb mysql://root:TESTPWD@db.example.com:3306/app",
 			expected: 2,
 		},
 		{
 			name:     "connection string in large text",
-			input:    strings.Repeat("x", 10000) + "postgres://admin:secretpass@localhost:5432/mydb" + strings.Repeat("y", 10000),
+			input:    strings.Repeat("x", 10000) + "postgres://admin:TESTPASS@localhost:5432/mydb" + strings.Repeat("y", 10000),
 			expected: 1,
 		},
 	}
@@ -100,8 +100,8 @@ func TestConnectionString_Scan_RejectsInvalidInput(t *testing.T) {
 			input: "http://example.com/api/v1",
 		},
 		{
-			name:  "too short after scheme",
-			input: "postgres://short",
+			name:  "database URL without credentials",
+			input: "postgres://localhost:5432/mydb",
 		},
 		{
 			name:  "plain text",
@@ -134,14 +134,14 @@ func TestRedactPassword_VariousFormats(t *testing.T) {
 			expected: "postgres://user:****@host:5432/db",
 		},
 		{
-			name:     "no password in URL",
+			name:     "no credentials in URL",
 			input:    "postgres://host:5432/db",
-			expected: "postgres://****",
+			expected: "postgres://host:5432/db",
 		},
 		{
 			name:     "user without password",
 			input:    "postgres://user@host:5432/db",
-			expected: "postgres://user****",
+			expected: "postgres://user:****@host:5432/db",
 		},
 	}
 

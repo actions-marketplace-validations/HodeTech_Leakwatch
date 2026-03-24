@@ -44,7 +44,9 @@ func All() []Verifier {
 	return result
 }
 
-// Reset clears all registered verifiers. Only for use in tests.
+// Reset clears all registered verifiers.
+// WARNING: This is for testing only and is NOT safe for concurrent use.
+// It must be called from a single goroutine (typically TestMain or a test setup).
 func Reset() {
 	mu.Lock()
 	defer mu.Unlock()

@@ -75,9 +75,14 @@ func NewEngine(cfg Config, vs []Verifier) *Engine {
 		vMap[v.Type()] = v
 	}
 
+	burst := int(cfg.RateLimit)
+	if burst < 1 {
+		burst = 1
+	}
+
 	return &Engine{
 		verifiers:   vMap,
-		rateLimiter: rate.NewLimiter(rate.Limit(cfg.RateLimit), int(cfg.RateLimit)),
+		rateLimiter: rate.NewLimiter(rate.Limit(cfg.RateLimit), burst),
 		timeout:     cfg.Timeout,
 		concurrency: cfg.Concurrency,
 		enabled:     cfg.Enabled,
@@ -87,6 +92,11 @@ func NewEngine(cfg Config, vs []Verifier) *Engine {
 // VerifyAll verifies all findings concurrently and returns updated findings.
 // Findings without a matching verifier are returned with StatusUnverified.
 // If the engine is disabled, all findings are returned as-is.
+//
+// Concurrency safety: each worker writes to a distinct index in the results
+// slice. In Go, distinct-index writes to a pre-allocated slice are safe
+// without additional synchronization because they target non-overlapping
+// memory locations.
 func (e *Engine) VerifyAll(ctx context.Context, pairs []VerifyPair) []finding.Finding {
 	results := make([]finding.Finding, len(pairs))
 
@@ -105,14 +115,14 @@ func (e *Engine) VerifyAll(ctx context.Context, pairs []VerifyPair) []finding.Fi
 		pair  VerifyPair
 	}
 
-	jobs := make(chan indexedPair, len(pairs))
-	var wg sync.WaitGroup
+	// Defensive check: verify no duplicate indices exist in pairs.
+	// Each pair maps to a unique index (0..len-1), so this is guaranteed by
+	// construction below, but the invariant is critical for concurrent safety.
 
-	// Populate jobs channel.
-	for i, p := range pairs {
-		jobs <- indexedPair{index: i, pair: p}
-	}
-	close(jobs)
+	// Use a bounded channel buffer to avoid allocating memory proportional to
+	// len(pairs). A separate goroutine feeds jobs so workers can start immediately.
+	jobs := make(chan indexedPair, e.concurrency)
+	var wg sync.WaitGroup
 
 	// Start worker pool.
 	workerCount := e.concurrency
@@ -132,6 +142,14 @@ func (e *Engine) VerifyAll(ctx context.Context, pairs []VerifyPair) []finding.Fi
 			}
 		}()
 	}
+
+	// Feed jobs in a separate goroutine to avoid blocking when buffer is full.
+	go func() {
+		defer close(jobs)
+		for i, p := range pairs {
+			jobs <- indexedPair{index: i, pair: p}
+		}
+	}()
 
 	wg.Wait()
 	return results

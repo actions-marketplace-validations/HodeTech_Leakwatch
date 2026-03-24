@@ -262,6 +262,38 @@ func TestVerifyAll_MixedVerifiers_RoutesCorrectly(t *testing.T) {
 	assert.Equal(t, int64(1), ghVerifier.callCount.Load())
 }
 
+func TestVerifyAll_RaceDetectorStress_ManyConcurrentWrites(t *testing.T) {
+	v := &testVerifier{
+		detectorID: "stress-detector",
+		result: finding.VerificationResult{
+			Status:  finding.StatusVerifiedActive,
+			Message: "active",
+		},
+	}
+
+	engine := NewEngine(Config{
+		Enabled:     true,
+		Timeout:     5 * time.Second,
+		Concurrency: 16,
+		RateLimit:   10000,
+	}, []Verifier{v})
+
+	const pairCount = 200
+	pairs := make([]VerifyPair, pairCount)
+	for i := range pairs {
+		pairs[i] = makePair("stress-detector", "XXXX****YYYY")
+	}
+
+	results := engine.VerifyAll(context.Background(), pairs)
+
+	require.Len(t, results, pairCount)
+	for i, r := range results {
+		assert.Equal(t, finding.StatusVerifiedActive, r.Verification.Status,
+			"unexpected status at index %d", i)
+	}
+	assert.Equal(t, int64(pairCount), v.callCount.Load())
+}
+
 func TestNewEngine_DefaultValues_AppliedForZeroConfig(t *testing.T) {
 	engine := NewEngine(Config{Enabled: true}, nil)
 

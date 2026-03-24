@@ -12,6 +12,9 @@ import (
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
+// maxRegexLength is the maximum allowed length of a custom rule regex pattern.
+const maxRegexLength = 4096
+
 // RuleDef represents a user-defined custom detection rule from YAML config.
 type RuleDef struct {
 	ID          string   `yaml:"id" mapstructure:"id"`
@@ -30,13 +33,16 @@ type CustomDetector struct {
 }
 
 // NewFromDef creates a CustomDetector from a RuleDef.
-// Returns an error if the regex pattern is invalid.
+// Returns an error if the regex pattern is invalid or exceeds the maximum length.
 func NewFromDef(def RuleDef) (*CustomDetector, error) {
 	if def.ID == "" {
 		return nil, fmt.Errorf("custom rule ID is required")
 	}
 	if def.Regex == "" {
 		return nil, fmt.Errorf("custom rule %q: regex is required", def.ID)
+	}
+	if len(def.Regex) > maxRegexLength {
+		return nil, fmt.Errorf("custom rule %q: regex length %d exceeds maximum %d", def.ID, len(def.Regex), maxRegexLength)
 	}
 
 	pattern, err := regexp.Compile(def.Regex)
@@ -53,9 +59,16 @@ func NewFromDef(def RuleDef) (*CustomDetector, error) {
 	}, nil
 }
 
-func (d *CustomDetector) ID() string          { return d.def.ID }
-func (d *CustomDetector) Description() string  { return d.def.Description }
-func (d *CustomDetector) Keywords() []string   { return d.def.Keywords }
+// ID returns the unique identifier of the custom detector.
+func (d *CustomDetector) ID() string { return d.def.ID }
+
+// Description returns a human-readable description of the custom detector.
+func (d *CustomDetector) Description() string { return d.def.Description }
+
+// Keywords returns the Aho-Corasick pre-filter keywords for the custom detector.
+func (d *CustomDetector) Keywords() []string { return d.def.Keywords }
+
+// Severity returns the default severity level for the custom detector findings.
 func (d *CustomDetector) Severity() finding.Severity { return d.sev }
 
 // Scan searches the data for matches against the custom regex pattern.

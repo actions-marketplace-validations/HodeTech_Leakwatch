@@ -110,7 +110,7 @@ func TestNew_NoDetectors_ReturnsEmptyMatcher(t *testing.T) {
 	assert.Empty(t, result)
 }
 
-func BenchmarkMatch_100Keywords(b *testing.B) {
+func BenchmarkMatch_40Keywords(b *testing.B) {
 	dets := make([]detector.Detector, 20)
 	for i := range dets {
 		dets[i] = &stubDetector{
@@ -119,7 +119,8 @@ func BenchmarkMatch_100Keywords(b *testing.B) {
 		}
 	}
 	m := New(dets)
-	data := []byte("this text contains keyword_a somewhere in a large file with lots of content")
+	// Data contains "keyworda" which matches the first detector's keyword.
+	data := []byte("this text contains keyworda somewhere in a large file with lots of content")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

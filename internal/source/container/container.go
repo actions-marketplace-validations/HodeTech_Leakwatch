@@ -69,7 +69,7 @@ func (s *ContainerSource) Chunks(ctx context.Context) <-chan source.Chunk {
 			return
 		}
 
-		img, err := remote.Image(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+		img, err := remote.Image(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain), remote.WithContext(ctx))
 		if err != nil {
 			slog.Error("failed to pull image", "image", s.imageRef, "error", err)
 			return
@@ -90,7 +90,10 @@ func (s *ContainerSource) Chunks(ctx context.Context) <-chan source.Chunk {
 			default:
 			}
 
-			digest, _ := layer.Digest()
+			digest, err := layer.Digest()
+			if err != nil {
+				slog.Warn("failed to get layer digest", "layer", idx, "error", err)
+			}
 			layerID := digest.String()
 
 			reader, err := layer.Uncompressed()
@@ -99,8 +102,10 @@ func (s *ContainerSource) Chunks(ctx context.Context) <-chan source.Chunk {
 				continue
 			}
 
-			s.scanTarLayer(ctx, ch, tar.NewReader(reader), idx, layerID)
-			reader.Close()
+			func() {
+				defer reader.Close()
+				s.scanTarLayer(ctx, ch, tar.NewReader(reader), idx, layerID)
+			}()
 		}
 
 		slog.Info("container image scan completed", "image", s.imageRef)
@@ -130,7 +135,7 @@ func (s *ContainerSource) scanTarLayer(ctx context.Context, ch chan<- source.Chu
 			continue
 		}
 
-		// Skip large files.
+		// Skip files that are empty or exceed the size limit.
 		if header.Size > s.maxFileSize || header.Size == 0 {
 			continue
 		}
@@ -142,6 +147,12 @@ func (s *ContainerSource) scanTarLayer(ctx context.Context, ch chan<- source.Chu
 
 		// Skip common non-secret paths.
 		if shouldSkipContainerPath(header.Name) {
+			continue
+		}
+
+		cleanPath := filepath.Clean(header.Name)
+		if strings.HasPrefix(cleanPath, "..") {
+			slog.Warn("skipping tar entry with path traversal", "path", header.Name)
 			continue
 		}
 
@@ -163,7 +174,7 @@ func (s *ContainerSource) scanTarLayer(ctx context.Context, ch chan<- source.Chu
 				Image:      s.imageRef,
 				Layer:      layerID,
 				LayerIdx:   layerIdx,
-				FilePath:   filepath.Clean(header.Name),
+				FilePath:   cleanPath,
 			},
 		}:
 		case <-ctx.Done():

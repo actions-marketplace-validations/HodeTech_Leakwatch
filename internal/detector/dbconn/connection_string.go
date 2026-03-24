@@ -3,23 +3,30 @@ package dbconn
 
 import (
 	"context"
+	"net/url"
 	"regexp"
-	"strings"
 
 	"github.com/cemililik/leakwatch/internal/detector"
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
-var connStringPattern = regexp.MustCompile(`(postgres|mysql|mongodb(\+srv)?|redis)://[^\s'"]{10,}`)
+var connStringPattern = regexp.MustCompile(`(postgres|mysql|mongodb(\+srv)?|redis)://[^\s'"]+@[^\s'"]+`)
 
 // ConnectionString detects database connection strings containing credentials.
 type ConnectionString struct{}
 
-func (d *ConnectionString) ID() string          { return "database-connection-string" }
-func (d *ConnectionString) Description() string  { return "Database Connection String" }
+// ID returns the unique identifier of the database connection string detector.
+func (d *ConnectionString) ID() string { return "database-connection-string" }
+
+// Description returns a human-readable description of the database connection string detector.
+func (d *ConnectionString) Description() string { return "Database Connection String" }
+
+// Keywords returns the Aho-Corasick pre-filter keywords for database connection string detection.
 func (d *ConnectionString) Keywords() []string {
 	return []string{"postgres://", "mysql://", "mongodb://", "mongodb+srv://", "redis://"}
 }
+
+// Severity returns the default severity level for database connection string findings.
 func (d *ConnectionString) Severity() finding.Severity { return finding.SeverityCritical }
 
 // Scan scans the given data for database connection string patterns.
@@ -42,34 +49,19 @@ func (d *ConnectionString) Scan(_ context.Context, data []byte) []detector.RawFi
 }
 
 // redactPassword masks the password portion in a database connection URL.
-// Input format: scheme://user:password@host/db
-// Output format: scheme://user:****@host/db
-func redactPassword(url string) string {
-	// Find the :// separator.
-	schemeEnd := strings.Index(url, "://")
-	if schemeEnd == -1 {
-		return url
+// Uses net/url.Parse for proper parsing, then reconstructs with masked password.
+func redactPassword(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "****"
 	}
-	authority := url[schemeEnd+3:]
-
-	// Find the @ that separates userinfo from host.
-	atIdx := strings.Index(authority, "@")
-	if atIdx == -1 {
-		// No credentials in URL; redact everything after scheme.
-		return url[:schemeEnd+3] + "****"
+	if u.User == nil {
+		return raw // No credentials to redact
 	}
-
-	userinfo := authority[:atIdx]
-	rest := authority[atIdx:] // includes the @
-
-	// Find the colon separating user from password.
-	colonIdx := strings.Index(userinfo, ":")
-	if colonIdx == -1 {
-		// No password found; return as-is with host redacted minimally.
-		return url[:schemeEnd+3] + userinfo + "****"
-	}
-
-	return url[:schemeEnd+3] + userinfo[:colonIdx+1] + "****" + rest
+	username := u.User.Username()
+	// Reconstruct manually to avoid URL-encoding of **** characters.
+	u.User = nil
+	return u.Scheme + "://" + username + ":****@" + u.Host + u.RequestURI()
 }
 
 func init() {
