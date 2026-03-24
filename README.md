@@ -182,6 +182,8 @@ Detaylı mimari: [docs/architecture/03-ARCHITECTURE.md](docs/architecture/03-ARC
 | Belge | Açıklama |
 |-------|----------|
 | [Dokümantasyon Standartları](docs/standards/00-DOCUMENTATION-STANDARDS.md) | Diyagram, format ve belge kuralları |
+| [Kod İnceleme Standartları](docs/standards/01-CODE-REVIEW-STANDARDS.md) | İnceleme süreci, kontrol listeleri, bulgu sınıflandırması |
+| [Sürüm ve Dağıtım Standartları](docs/standards/02-RELEASE-STANDARDS.md) | Sürüm yönetimi, CI/CD, release checklist |
 | [Geliştirme Standartları](docs/standards/04-DEVELOPMENT-STANDARDS.md) | Kod standartları, test ve CI/CD |
 
 ### Kararlar (ADR)

@@ -30,6 +30,8 @@ docs/
 │   └── ...
 ├── standards/          # Standartlar ve kurallar
 │   ├── 00-DOCUMENTATION-STANDARDS.md   (bu belge)
+│   ├── 01-CODE-REVIEW-STANDARDS.md
+│   ├── 02-RELEASE-STANDARDS.md
 │   └── 04-DEVELOPMENT-STANDARDS.md
 ├── 05-ROADMAP.md       # Yol haritası (kök docs/ altında)
 └── guides/             # Kullanım rehberleri (gelecekte)
