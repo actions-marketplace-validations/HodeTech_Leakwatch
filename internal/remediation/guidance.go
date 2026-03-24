@@ -378,4 +378,185 @@ func init() {
 			"Notify team.",
 		},
 	})
+
+	// Sprint 2 detectors
+
+	Register("huggingface-token", finding.Remediation{
+		Title: "Revoke Hugging Face Token",
+		Steps: []string{
+			"Go to huggingface.co/settings/tokens.",
+			"Delete the compromised token.",
+			"Create a new token.",
+		},
+		DocURL:     "https://huggingface.co/docs/hub/security-tokens",
+		ConsoleURL: "",
+		Urgency:    "immediate",
+	})
+
+	Register("deepseek-api-key", finding.Remediation{
+		Title: "Rotate DeepSeek API Key",
+		Steps: []string{
+			"Go to platform.deepseek.com, API Keys section.",
+			"Delete the compromised key.",
+			"Create a new API key.",
+		},
+		DocURL:     "https://platform.deepseek.com/api-docs",
+		ConsoleURL: "",
+		Urgency:    "immediate",
+	})
+
+	Register("gcp-service-account", finding.Remediation{
+		Title: "Rotate GCP Service Account Key",
+		Steps: []string{
+			"Go to GCP Console > IAM > Service Accounts.",
+			"Delete the compromised key.",
+			"Create a new key.",
+			"Update all deployments with the new key.",
+		},
+		DocURL:     "https://cloud.google.com/iam/docs/keys-create-delete",
+		ConsoleURL: "https://console.cloud.google.com/iam-admin/serviceaccounts",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Check Cloud Audit Logs.",
+			"Review IAM permissions.",
+			"Notify security team.",
+		},
+	})
+
+	Register("azure-storage-key", finding.Remediation{
+		Title: "Rotate Azure Storage Access Key",
+		Steps: []string{
+			"Go to Azure Portal > Storage Account > Access Keys.",
+			"Rotate the compromised key.",
+			"Update all connection strings.",
+		},
+		DocURL:     "https://learn.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage",
+		ConsoleURL: "",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Check Storage Analytics logs.",
+			"Review SAS tokens derived from key.",
+		},
+	})
+
+	Register("azure-entra-secret", finding.Remediation{
+		Title: "Rotate Azure Entra ID Client Secret",
+		Steps: []string{
+			"Go to Azure Portal > App Registrations > Certificates & Secrets.",
+			"Delete the old secret.",
+			"Create a new client secret.",
+			"Update all applications with the new secret.",
+		},
+		DocURL:     "https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal",
+		ConsoleURL: "",
+		Urgency:    "immediate",
+	})
+
+	Register("okta-api-token", finding.Remediation{
+		Title: "Revoke Okta API Token",
+		Steps: []string{
+			"Go to Okta Admin Console > Security > API > Tokens.",
+			"Revoke the compromised token.",
+		},
+		DocURL:     "https://developer.okta.com/docs/guides/create-an-api-token",
+		ConsoleURL: "",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Review system log for unauthorized API calls.",
+		},
+	})
+
+	Register("twilio-api-key", finding.Remediation{
+		Title: "Rotate Twilio API Key",
+		Steps: []string{
+			"Go to Twilio Console > API Keys.",
+			"Delete the compromised key.",
+			"Create a new API key.",
+		},
+		DocURL:     "https://www.twilio.com/docs/iam/api-keys",
+		ConsoleURL: "https://console.twilio.com/us1/account/keys-credentials/api-keys",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Check call/SMS logs for abuse.",
+		},
+	})
+
+	Register("mailgun-api-key", finding.Remediation{
+		Title: "Rotate Mailgun API Key",
+		Steps: []string{
+			"Go to Mailgun Dashboard > API Keys.",
+			"Create a new key.",
+			"Update all integrations.",
+			"Delete the old key.",
+		},
+		DocURL:     "https://documentation.mailgun.com/docs/mailgun/api-reference/authentication/",
+		ConsoleURL: "",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Check sending logs for unauthorized emails.",
+		},
+	})
+
+	Register("hashicorp-vault-token", finding.Remediation{
+		Title: "Revoke Vault Token",
+		Steps: []string{
+			"Run `vault token revoke <token>` or revoke via API.",
+		},
+		DocURL:     "https://developer.hashicorp.com/vault/docs/commands/token/revoke",
+		ConsoleURL: "",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Check Vault audit logs.",
+			"Review token policies.",
+		},
+	})
+
+	Register("grafana-api-key", finding.Remediation{
+		Title: "Revoke Grafana Service Account Token",
+		Steps: []string{
+			"Go to Grafana > Administration > Service Accounts.",
+			"Delete the compromised token.",
+		},
+		DocURL:     "https://grafana.com/docs/grafana/latest/administration/service-accounts/",
+		ConsoleURL: "",
+		Urgency:    "high",
+	})
+
+	Register("pagerduty-api-key", finding.Remediation{
+		Title: "Rotate PagerDuty API Key",
+		Steps: []string{
+			"Go to PagerDuty > My Profile > User Settings > API Access.",
+			"Create a new key.",
+			"Delete the old key.",
+		},
+		DocURL:     "https://support.pagerduty.com/docs/api-access-keys",
+		ConsoleURL: "",
+		Urgency:    "high",
+	})
+
+	Register("circleci-token", finding.Remediation{
+		Title: "Revoke CircleCI Token",
+		Steps: []string{
+			"Go to CircleCI > User Settings > Personal API Tokens.",
+			"Delete the compromised token.",
+		},
+		DocURL:     "https://circleci.com/docs/managing-api-tokens/",
+		ConsoleURL: "",
+		Urgency:    "high",
+	})
+
+	Register("github-oauth-token", finding.Remediation{
+		Title: "Revoke GitHub OAuth Token",
+		Steps: []string{
+			"Go to GitHub Settings > Developer Settings > OAuth Apps.",
+			"Revoke the compromised token.",
+		},
+		DocURL:     "https://docs.github.com/en/apps/oauth-apps",
+		ConsoleURL: "",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Check GitHub audit log.",
+			"Review app permissions.",
+		},
+	})
 }
