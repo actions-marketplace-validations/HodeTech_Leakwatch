@@ -768,4 +768,185 @@ func init() {
 		ConsoleURL: "https://airtable.com/create/tokens",
 		Urgency:    "high",
 	})
+
+	// Sprint 4 detectors
+
+	Register("terraform-cloud-token", finding.Remediation{
+		Title: "Revoke Terraform Cloud Token",
+		Steps: []string{
+			"Go to app.terraform.io > User Settings > Tokens.",
+			"Delete the compromised token.",
+			"Create a new token.",
+			"Update all integrations with the new token.",
+		},
+		DocURL:  "https://developer.hashicorp.com/terraform/cloud-docs/users-teams-organizations/api-tokens",
+		Urgency: "immediate",
+	})
+
+	Register("databricks-token", finding.Remediation{
+		Title: "Revoke Databricks PAT",
+		Steps: []string{
+			"Go to Databricks workspace > User Settings > Access Tokens.",
+			"Revoke the compromised token.",
+			"Create a new personal access token.",
+			"Update all integrations with the new token.",
+		},
+		DocURL:  "https://docs.databricks.com/en/dev-tools/auth/pat.html",
+		Urgency: "immediate",
+	})
+
+	Register("bitbucket-app-password", finding.Remediation{
+		Title: "Revoke Bitbucket App Password",
+		Steps: []string{
+			"Go to bitbucket.org > Personal Settings > App passwords.",
+			"Revoke the compromised app password.",
+			"Create a new app password with minimal permissions.",
+			"Update all integrations with the new password.",
+		},
+		DocURL:  "https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/",
+		Urgency: "immediate",
+	})
+
+	Register("coinbase-api-key", finding.Remediation{
+		Title: "Rotate Coinbase API Key",
+		Steps: []string{
+			"Go to coinbase.com > Settings > API.",
+			"Delete the compromised API key.",
+			"Create a new API key with minimal permissions.",
+			"Update all integrations with the new key.",
+		},
+		DocURL:  "https://docs.cdp.coinbase.com/coinbase-app/docs/getting-started",
+		Urgency: "immediate",
+		Checklist: []string{
+			"Check transaction history for unauthorized activity.",
+		},
+	})
+
+	Register("infura-api-key", finding.Remediation{
+		Title: "Rotate Infura API Key",
+		Steps: []string{
+			"Go to app.infura.io > Project Settings.",
+			"Regenerate the compromised API key.",
+			"Update all integrations with the new key.",
+		},
+		DocURL:  "https://docs.infura.io/api/getting-started",
+		Urgency: "high",
+	})
+
+	Register("rabbitmq-connection-string", finding.Remediation{
+		Title: "Rotate RabbitMQ Credentials",
+		Steps: []string{
+			"Access RabbitMQ management UI or use rabbitmqctl.",
+			"Change the compromised user password.",
+			"Update all application connection strings.",
+			"Restart consumers to pick up new credentials.",
+		},
+		DocURL:  "https://www.rabbitmq.com/docs/passwords",
+		Urgency: "immediate",
+	})
+
+	Register("ftp-credentials", finding.Remediation{
+		Title: "Change FTP/SFTP Password",
+		Steps: []string{
+			"Access the server admin panel or FTP server configuration.",
+			"Change the compromised FTP/SFTP password.",
+			"Update all clients and scripts using the old credentials.",
+		},
+		Urgency: "immediate",
+		Checklist: []string{
+			"Check FTP logs for unauthorized access.",
+		},
+	})
+
+	Register("ldap-credentials", finding.Remediation{
+		Title: "Change LDAP Bind Password",
+		Steps: []string{
+			"Access the LDAP admin console.",
+			"Change the bind DN password.",
+			"Update all applications using the old bind credentials.",
+		},
+		DocURL:  "https://ldap.com/ldapv3-wire-protocol-reference-bind/",
+		Urgency: "immediate",
+	})
+
+	Register("auth0-management-token", finding.Remediation{
+		Title: "Revoke Auth0 Token",
+		Steps: []string{
+			"Go to Auth0 Dashboard > Applications.",
+			"Rotate the client secret or revoke the management API token.",
+			"Update all integrations with the new credentials.",
+		},
+		DocURL:  "https://auth0.com/docs/secure/tokens/management-api-access-tokens",
+		Urgency: "immediate",
+	})
+
+	Register("launchdarkly-sdk-key", finding.Remediation{
+		Title: "Rotate LaunchDarkly SDK Key",
+		Steps: []string{
+			"Go to LaunchDarkly dashboard > Account Settings > Projects.",
+			"Reset the compromised SDK key.",
+			"Update all integrations with the new key.",
+		},
+		DocURL:  "https://docs.launchdarkly.com/sdk/concepts/client-side-server-side",
+		Urgency: "high",
+	})
+
+	Register("snyk-api-key", finding.Remediation{
+		Title: "Revoke Snyk Token",
+		Steps: []string{
+			"Go to app.snyk.io > Account Settings > API Token.",
+			"Revoke the compromised token.",
+			"Generate a new API token.",
+			"Update all integrations with the new token.",
+		},
+		DocURL:  "https://docs.snyk.io/snyk-api/authentication-for-api",
+		Urgency: "high",
+	})
+
+	Register("sonarcloud-token", finding.Remediation{
+		Title: "Revoke SonarCloud Token",
+		Steps: []string{
+			"Go to sonarcloud.io > My Account > Security.",
+			"Revoke the compromised token.",
+			"Generate a new token.",
+			"Update all integrations with the new token.",
+		},
+		DocURL:  "https://docs.sonarsource.com/sonarcloud/advanced-setup/user-accounts/generating-and-using-tokens/",
+		Urgency: "high",
+	})
+
+	Register("doppler-token", finding.Remediation{
+		Title: "Revoke Doppler Service Token",
+		Steps: []string{
+			"Go to dashboard.doppler.com > Project > Service Tokens.",
+			"Delete the compromised service token.",
+			"Create a new service token.",
+			"Update all integrations with the new token.",
+		},
+		DocURL:  "https://docs.doppler.com/docs/service-tokens",
+		Urgency: "immediate",
+	})
+
+	Register("teams-webhook", finding.Remediation{
+		Title: "Delete Teams Webhook",
+		Steps: []string{
+			"Go to Teams channel > Connectors > Incoming Webhook.",
+			"Remove the compromised webhook.",
+			"Create a new incoming webhook if needed.",
+			"Update all integrations with the new webhook URL.",
+		},
+		DocURL:  "https://learn.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/add-incoming-webhook",
+		Urgency: "high",
+	})
+
+	Register("postmark-server-token", finding.Remediation{
+		Title: "Rotate Postmark Server Token",
+		Steps: []string{
+			"Go to account.postmarkapp.com > Servers > API Tokens.",
+			"Regenerate the compromised server token.",
+			"Update all integrations with the new token.",
+		},
+		DocURL:  "https://postmarkapp.com/developer/api/overview",
+		Urgency: "high",
+	})
 }
