@@ -285,4 +285,97 @@ func init() {
 			"Run npm audit on affected packages.",
 		},
 	})
+
+	Register("datadog-api-key", finding.Remediation{
+		Title: "Rotate Datadog API Key",
+		Steps: []string{
+			"Go to Datadog Organization Settings > API Keys.",
+			"Create a new API key.",
+			"Update DD_API_KEY in all deployments.",
+			"Delete the old API key.",
+		},
+		DocURL:     "https://docs.datadoghq.com/account_management/api-app-keys/",
+		ConsoleURL: "https://app.datadoghq.com/organization-settings/api-keys",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Check Datadog audit trail.",
+			"Review metric submissions.",
+			"Notify SRE team.",
+		},
+	})
+
+	Register("discord-bot-token", finding.Remediation{
+		Title: "Reset Discord Bot Token",
+		Steps: []string{
+			"Go to Discord Developer Portal.",
+			"Select your application.",
+			"Navigate to Bot settings.",
+			"Click Reset Token.",
+			"Update all bot configurations.",
+		},
+		DocURL:     "https://discord.com/developers/docs/reference",
+		ConsoleURL: "https://discord.com/developers/applications",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Check bot activity logs.",
+			"Review server permissions.",
+			"Notify server admins.",
+		},
+	})
+
+	Register("redis-connection-string", finding.Remediation{
+		Title: "Rotate Redis Credentials",
+		Steps: []string{
+			"Connect to Redis.",
+			"Create new user/password with ACL SETUSER.",
+			"Update all application configs.",
+			"Remove old credentials with ACL DELUSER.",
+		},
+		DocURL:     "https://redis.io/docs/latest/operate/oss_and_stack/management/security/acl/",
+		ConsoleURL: "",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Check Redis MONITOR for unauthorized access.",
+			"Review connected clients.",
+			"Flush suspicious sessions.",
+		},
+	})
+
+	Register("snowflake-credentials", finding.Remediation{
+		Title: "Rotate Snowflake Password",
+		Steps: []string{
+			"Log in to Snowflake.",
+			"ALTER USER to change password.",
+			"Update all JDBC connection strings.",
+			"Revoke active sessions with ALTER USER ABORT ALL QUERIES.",
+		},
+		DocURL:     "https://docs.snowflake.com/en/sql-reference/sql/alter-user",
+		ConsoleURL: "https://app.snowflake.com",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Review QUERY_HISTORY for unauthorized access.",
+			"Check ACCESS_HISTORY.",
+			"Notify data team.",
+		},
+	})
+
+	Register("telegram-bot-token", finding.Remediation{
+		Title: "Revoke Telegram Bot Token",
+		Steps: []string{
+			"Open Telegram.",
+			"Message @BotFather.",
+			"Use /revoke command.",
+			"Select the bot.",
+			"Create new token with /token.",
+			"Update integrations.",
+		},
+		DocURL:     "https://core.telegram.org/bots/api",
+		ConsoleURL: "https://t.me/BotFather",
+		Urgency:    "immediate",
+		Checklist: []string{
+			"Check bot message history.",
+			"Review webhook configurations.",
+			"Notify team.",
+		},
+	})
 }
