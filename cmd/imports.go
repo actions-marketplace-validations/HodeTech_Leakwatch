@@ -65,7 +65,18 @@ import (
 
 // Register verifiers at compile time via init().
 import (
+	_ "github.com/cemililik/leakwatch/internal/verifier/anthropic"
 	_ "github.com/cemililik/leakwatch/internal/verifier/aws"
+	_ "github.com/cemililik/leakwatch/internal/verifier/cloudflare"
+	_ "github.com/cemililik/leakwatch/internal/verifier/digitalocean"
+	_ "github.com/cemililik/leakwatch/internal/verifier/discord"
 	_ "github.com/cemililik/leakwatch/internal/verifier/github"
+	_ "github.com/cemililik/leakwatch/internal/verifier/gitlab"
+	_ "github.com/cemililik/leakwatch/internal/verifier/heroku"
+	_ "github.com/cemililik/leakwatch/internal/verifier/newrelic"
+	_ "github.com/cemililik/leakwatch/internal/verifier/notion"
+	_ "github.com/cemililik/leakwatch/internal/verifier/openai"
+	_ "github.com/cemililik/leakwatch/internal/verifier/sendgrid"
 	_ "github.com/cemililik/leakwatch/internal/verifier/slack"
+	_ "github.com/cemililik/leakwatch/internal/verifier/telegram"
 )
