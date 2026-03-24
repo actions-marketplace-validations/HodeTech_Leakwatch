@@ -16,4 +16,5 @@ import (
 import (
 	_ "github.com/cemililik/leakwatch/internal/verifier/aws"
 	_ "github.com/cemililik/leakwatch/internal/verifier/github"
+	_ "github.com/cemililik/leakwatch/internal/verifier/slack"
 )

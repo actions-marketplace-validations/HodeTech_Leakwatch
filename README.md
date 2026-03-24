@@ -92,7 +92,7 @@ leakwatch scan fs . --remediation
 | **GitHub** | Personal Access Token, OAuth | Yes |
 | **GCP** | Service Account Key, API Key | Planned |
 | **Azure** | Storage Key, Connection String | Planned |
-| **Slack** | Bot Token, Webhook URL | Planned |
+| **Slack** | Bot Token, Webhook URL | Yes |
 | **Stripe** | API Key (live/test) | Planned |
 | **Generic** | Private Key (RSA/SSH/PGP), JWT, Generic API Key | — |
 | **Database** | Connection String (Postgres, MySQL, MongoDB) | Planned |
