@@ -5,6 +5,18 @@ All notable changes to Leakwatch will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v1.1.0] - 2026-03-24
+
+### Added
+- **Remediation Guidance** — actionable rotation/revocation instructions for all detectors
+- `--remediation` flag on all scan commands to include guidance in output
+- Remediation registry with guidance for 10+ detector types (AWS, GitHub, Slack, Stripe, JWT, DB Connection, Private Key, Generic)
+- SARIF output includes `help` and `helpUri` properties on rules when remediation is enabled
+- CSV output includes `remediation` column
+- Table output includes `REMEDIATION` column
+
+---
+
 ## [v1.0.0] - 2026-03-24
 
 ### Added

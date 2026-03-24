@@ -310,13 +310,14 @@ leakwatch scan fs . --concurrency 4
 leakwatch scan fs . --max-file-size 52428800
 ```
 
-### 5.3 Verification Flags
+### 5.3 Verification and Remediation Flags
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--no-verify` | `false` | Disable secret verification |
 | `--only-verified` | `false` | Show only verified active findings |
 | `--min-severity` | `low` | Minimum severity level to report |
+| `--remediation` | `false` | Include remediation guidance (rotation steps, doc links) |
 
 ```bash
 # Quick scan without verification
@@ -330,6 +331,9 @@ leakwatch scan git . --min-severity high
 
 # Combination: only verified critical findings
 leakwatch scan git . --only-verified --min-severity critical
+
+# Include remediation guidance with rotation steps
+leakwatch scan fs . --remediation
 ```
 
 ### 5.4 Git-Specific Flags

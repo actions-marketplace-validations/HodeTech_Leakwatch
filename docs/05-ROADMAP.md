@@ -16,7 +16,7 @@
 | Phase 3 — Detection & Verification | Completed | `v0.3.0` | 2026-03-24 |
 | Phase 4 — Enterprise Capabilities | Completed | `v0.4.0` | 2026-03-24 |
 | Phase 5 — Platform Expansion | Completed (8/8) | `v1.0.0` | 2026-03-24 |
-| Phase 6 — Remediation Guidance | Planned | `v1.1.0` | — |
+| Phase 6 — Remediation Guidance | Completed | `v1.1.0` | 2026-03-24 |
 | Phase 7 — Slack Scanning | Planned | `v1.2.0` | — |
 | Phase 8 — Confluence/Jira | Planned | `v1.3.0` | — |
 | Phase 9 — Secrets Inventory | Planned | `v1.4.0` | — |
@@ -259,11 +259,11 @@ GitHub Release published with `v1.0.0` tag.
 
 ---
 
-## Phase 6: Remediation Guidance — PLANNED
+## Phase 6: Remediation Guidance — COMPLETED
 
 **Goal:** Actionable remediation instructions for every detected secret type.
 
-**Duration:** 2 weeks | **Version:** `v1.1.0` | **Status:** Planned
+**Duration:** 2 weeks | **Version:** `v1.1.0` | **Status:** Completed
 
 ### Deliverables
 
@@ -277,9 +277,9 @@ GitHub Release published with `v1.0.0` tag.
 
 ### Acceptance Criteria
 
-- [ ] `leakwatch scan fs /path --remediation` includes rotation steps
-- [ ] SARIF output includes remediation in rule `help` property
-- [ ] All 10+ detectors have remediation guidance
+- [x] `leakwatch scan fs /path --remediation` includes rotation steps
+- [x] SARIF output includes remediation in rule `help` property
+- [x] All 10+ detectors have remediation guidance
 
 ---
 
