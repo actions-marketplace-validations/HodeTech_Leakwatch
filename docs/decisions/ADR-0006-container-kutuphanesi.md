@@ -1,49 +1,49 @@
-# ADR-0006: Container Kütüphanesi — go-containerregistry
+# ADR-0006: Container Library — go-containerregistry
 
-- **Durum:** Kabul Edildi
-- **Tarih:** 2026-03-24
-- **Karar Verenler:** Proje ekibi
+- **Status:** Accepted
+- **Date:** 2026-03-24
+- **Decision Makers:** Project team
 
-## Bağlam
+## Context
 
-Container imajları, genellikle hassas yapılandırma verileri ve sırlar barındırır. Sırlar, imajın son halinden silinmiş olsa bile önceki katmanlarda var olmaya devam edebilir. Leakwatch, imaj katmanlarını ayrı ayrı inceleyerek "gizlenmiş" sırları ortaya çıkarabilmelidir.
+Container images often contain sensitive configuration data and secrets. Even if secrets are deleted from the final image, they can persist in previous layers. Leakwatch must be able to inspect image layers individually to uncover "hidden" secrets.
 
-## Karar
+## Decision
 
-**google/go-containerregistry** kütüphanesi seçilmiştir.
+**google/go-containerregistry** library has been selected.
 
-### Gerekçe
+### Rationale
 
-- Docker daemon gerektirmez — hafif, taşınabilir, CI/CD ortamlarında çalışır
-- OCI ve Docker manifest formatlarını tam destekler
-- Katman bazlı analiz — her katmanı ayrı ayrı inceleme
-- crane, ko, cosign gibi endüstri araçları tarafından kullanılıyor
-- Registry kimlik doğrulaması (Docker Hub, GHCR, ECR, GCR)
-- Aktif olarak bakımda, Google destekli
+- Does not require Docker daemon — lightweight, portable, works in CI/CD environments
+- Full support for OCI and Docker manifest formats
+- Layer-by-layer analysis — inspect each layer individually
+- Used by industry tools such as crane, ko, and cosign
+- Registry authentication (Docker Hub, GHCR, ECR, GCR)
+- Actively maintained, backed by Google
 
-## Değerlendirilen Alternatifler
+## Alternatives Considered
 
 ### Docker SDK (docker/docker)
 
-- **Artılar:** Docker API'sine tam erişim
-- **Eksiler:** Çalışan Docker daemon gerektirir, ağır bağımlılık
-- **Karar:** Reddedildi. Daemon bağımlılığı taşınabilirliği kısıtlar.
+- **Pros:** Full access to the Docker API
+- **Cons:** Requires a running Docker daemon, heavy dependency
+- **Decision:** Rejected. Daemon dependency restricts portability.
 
-### Manuel tar/gzip ayrıştırma
+### Manual tar/gzip parsing
 
-- **Artılar:** Sıfır bağımlılık
-- **Eksiler:** Registry auth, manifest parsing, katman yönetimi baştan yazılmalı — büyük iş yükü
-- **Karar:** Reddedildi.
+- **Pros:** Zero dependencies
+- **Cons:** Registry auth, manifest parsing, layer management must be written from scratch — significant effort
+- **Decision:** Rejected.
 
-## Sonuçlar
+## Consequences
 
-### Olumlu
+### Positive
 
-- Daemon'sız çalışma: daha hafif, daha güvenli
-- Katman bazlı analiz: silinen sırları önceki katmanlarda tespit
-- Çoklu registry desteği: Docker Hub, GHCR, ECR, GCR, özel registry'ler
+- Daemonless operation: lighter, more secure
+- Layer-by-layer analysis: detect deleted secrets in previous layers
+- Multi-registry support: Docker Hub, GHCR, ECR, GCR, private registries
 
-### Olumsuz
+### Negative
 
-- Büyük imajların katmanlarını indirmek ağ bant genişliği gerektirir
-- Bazı özel registry yapılandırmalarında kimlik doğrulama komplikasyonları olabilir
+- Downloading layers of large images requires network bandwidth
+- Authentication complications may arise with some custom registry configurations

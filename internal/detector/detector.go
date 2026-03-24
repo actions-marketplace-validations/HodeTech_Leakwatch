@@ -1,4 +1,4 @@
-// Package detector, sır tespiti için dedektör arayüzlerini tanımlar.
+// Package detector defines secret detection interfaces.
 package detector
 
 import (
@@ -7,26 +7,26 @@ import (
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
-// Detector, belirli bir sır türünü tespit eden bileşeni temsil eder.
+// Detector represents a component that detects a specific secret type.
 type Detector interface {
-	// ID, dedektörün benzersiz tanımlayıcısını döndürür (örn: "aws-access-key-id").
+	// ID returns the unique identifier (e.g., "aws-access-key-id").
 	ID() string
 
-	// Description, dedektörün insan tarafından okunabilir açıklamasını döndürür.
+	// Description returns a human-readable description.
 	Description() string
 
-	// Keywords, Aho-Corasick ön-filtreleme için anahtar kelimeleri döndürür.
-	// Boş döndürürse, ön-filtreleme atlanır ve her chunk'a regex uygulanır.
+	// Keywords returns Aho-Corasick pre-filter keywords.
+	// If empty, pre-filtering is skipped and regex is applied to every chunk.
 	Keywords() []string
 
-	// Scan, verilen veriyi tarar ve bulunan potansiyel sırları döndürür.
+	// Scan scans the given data and returns potential secret findings.
 	Scan(ctx context.Context, data []byte) []RawFinding
 
-	// Severity, bu dedektörün bulguları için varsayılan önem derecesini döndürür.
+	// Severity returns the default severity for findings from this detector.
 	Severity() finding.Severity
 }
 
-// RawFinding, doğrulanmamış bir ham bulguyu temsil eder.
+// RawFinding represents an unverified raw finding.
 type RawFinding struct {
 	DetectorID string
 	Raw        []byte

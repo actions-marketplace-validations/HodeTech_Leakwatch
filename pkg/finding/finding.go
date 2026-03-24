@@ -1,5 +1,5 @@
-// Package finding, Leakwatch bulgu modelini tanımlar.
-// Bu paket dışa açıktır ve CI eklentileri gibi harici tüketiciler tarafından kullanılabilir.
+// Package finding defines the Leakwatch finding model.
+// This package is public and can be consumed by external tools such as CI plugins.
 package finding
 
 import (
@@ -8,17 +8,17 @@ import (
 	"time"
 )
 
-// Severity, bulgu önem derecesi.
+// Severity represents the finding severity level.
 type Severity int
 
 const (
-	SeverityLow      Severity = iota // Düşük
-	SeverityMedium                   // Orta
-	SeverityHigh                     // Yüksek
-	SeverityCritical                 // Kritik
+	SeverityLow      Severity = iota // Low
+	SeverityMedium                   // Medium
+	SeverityHigh                     // High
+	SeverityCritical                 // Critical
 )
 
-// severityToString, Severity değerlerini string'e eşler.
+// severityToString maps Severity values to strings.
 var severityToString = map[Severity]string{
 	SeverityLow:      "low",
 	SeverityMedium:   "medium",
@@ -26,7 +26,7 @@ var severityToString = map[Severity]string{
 	SeverityCritical: "critical",
 }
 
-// stringToSeverity, string değerlerini Severity'ye eşler.
+// stringToSeverity maps strings to Severity values.
 var stringToSeverity = map[string]Severity{
 	"low":      SeverityLow,
 	"medium":   SeverityMedium,
@@ -34,7 +34,7 @@ var stringToSeverity = map[string]Severity{
 	"critical": SeverityCritical,
 }
 
-// String, Severity'nin okunabilir gösterimini döndürür.
+// String returns the human-readable representation of Severity.
 func (s Severity) String() string {
 	if str, ok := severityToString[s]; ok {
 		return str
@@ -42,40 +42,40 @@ func (s Severity) String() string {
 	return "unknown"
 }
 
-// MarshalJSON, Severity'yi JSON string olarak serileştirir.
+// MarshalJSON serializes Severity as a JSON string.
 func (s Severity) MarshalJSON() ([]byte, error) {
 	str := s.String()
 	if str == "unknown" {
-		return nil, fmt.Errorf("geçersiz Severity değeri: %d", int(s))
+		return nil, fmt.Errorf("invalid Severity value: %d", int(s))
 	}
 	return json.Marshal(str)
 }
 
-// UnmarshalJSON, JSON string'den Severity değeri çözümler.
+// UnmarshalJSON parses a Severity value from a JSON string.
 func (s *Severity) UnmarshalJSON(data []byte) error {
 	var str string
 	if err := json.Unmarshal(data, &str); err != nil {
-		return fmt.Errorf("Severity JSON çözümlenemedi: %w", err)
+		return fmt.Errorf("failed to unmarshal Severity JSON: %w", err)
 	}
 	val, ok := stringToSeverity[str]
 	if !ok {
-		return fmt.Errorf("geçersiz Severity değeri: %q", str)
+		return fmt.Errorf("invalid Severity value: %q", str)
 	}
 	*s = val
 	return nil
 }
 
-// VerificationStatus, doğrulama durumu.
+// VerificationStatus represents the verification state.
 type VerificationStatus int
 
 const (
-	StatusUnverified      VerificationStatus = iota // Doğrulama yapılmadı
-	StatusVerifiedActive                             // Doğrulandı: sır aktif
-	StatusVerifiedInactive                           // Doğrulandı: sır devre dışı
-	StatusVerifyError                                // Doğrulama sırasında hata
+	StatusUnverified      VerificationStatus = iota // Not verified
+	StatusVerifiedActive                             // Verified: secret is active
+	StatusVerifiedInactive                           // Verified: secret is inactive
+	StatusVerifyError                                // Verification error
 )
 
-// verificationStatusToString, VerificationStatus değerlerini string'e eşler.
+// verificationStatusToString maps VerificationStatus values to strings.
 var verificationStatusToString = map[VerificationStatus]string{
 	StatusUnverified:      "unverified",
 	StatusVerifiedActive:  "verified_active",
@@ -83,7 +83,7 @@ var verificationStatusToString = map[VerificationStatus]string{
 	StatusVerifyError:     "verify_error",
 }
 
-// stringToVerificationStatus, string değerlerini VerificationStatus'a eşler.
+// stringToVerificationStatus maps strings to VerificationStatus values.
 var stringToVerificationStatus = map[string]VerificationStatus{
 	"unverified":        StatusUnverified,
 	"verified_active":   StatusVerifiedActive,
@@ -91,7 +91,7 @@ var stringToVerificationStatus = map[string]VerificationStatus{
 	"verify_error":      StatusVerifyError,
 }
 
-// String, VerificationStatus'un okunabilir gösterimini döndürür.
+// String returns the human-readable representation of VerificationStatus.
 func (v VerificationStatus) String() string {
 	if str, ok := verificationStatusToString[v]; ok {
 		return str
@@ -99,41 +99,41 @@ func (v VerificationStatus) String() string {
 	return "unknown"
 }
 
-// MarshalJSON, VerificationStatus'u JSON string olarak serileştirir.
+// MarshalJSON serializes VerificationStatus as a JSON string.
 func (v VerificationStatus) MarshalJSON() ([]byte, error) {
 	str := v.String()
 	if str == "unknown" {
-		return nil, fmt.Errorf("geçersiz VerificationStatus değeri: %d", int(v))
+		return nil, fmt.Errorf("invalid VerificationStatus value: %d", int(v))
 	}
 	return json.Marshal(str)
 }
 
-// UnmarshalJSON, JSON string'den VerificationStatus değeri çözümler.
+// UnmarshalJSON parses a VerificationStatus value from a JSON string.
 func (v *VerificationStatus) UnmarshalJSON(data []byte) error {
 	var str string
 	if err := json.Unmarshal(data, &str); err != nil {
-		return fmt.Errorf("VerificationStatus JSON çözümlenemedi: %w", err)
+		return fmt.Errorf("failed to unmarshal VerificationStatus JSON: %w", err)
 	}
 	val, ok := stringToVerificationStatus[str]
 	if !ok {
-		return fmt.Errorf("geçersiz VerificationStatus değeri: %q", str)
+		return fmt.Errorf("invalid VerificationStatus value: %q", str)
 	}
 	*v = val
 	return nil
 }
 
-// VerificationResult, doğrulama sonucunu temsil eder.
+// VerificationResult represents the outcome of a verification attempt.
 type VerificationResult struct {
 	Status    VerificationStatus `json:"status"`
 	Message   string             `json:"message,omitempty"`
 	ExtraData map[string]string  `json:"extra_data,omitempty"`
 }
 
-// SourceMetadata, bir bulgunun kaynak bilgisini tanımlar.
+// SourceMetadata describes the origin of a finding.
 type SourceMetadata struct {
 	SourceType string `json:"source_type"`
 
-	// Git'e özgü
+	// Git-specific fields
 	Repository string    `json:"repository,omitempty"`
 	Commit     string    `json:"commit,omitempty"`
 	Author     string    `json:"author,omitempty"`
@@ -141,17 +141,17 @@ type SourceMetadata struct {
 	Date       time.Time `json:"date,omitempty"`
 	Branch     string    `json:"branch,omitempty"`
 
-	// Dosyaya özgü
+	// File-specific fields
 	FilePath string `json:"file_path,omitempty"`
 	Line     int    `json:"line,omitempty"`
 
-	// Container'a özgü
+	// Container-specific fields
 	Image    string `json:"image,omitempty"`
 	Layer    string `json:"layer,omitempty"`
 	LayerIdx int    `json:"layer_idx,omitempty"`
 }
 
-// Finding, tam olarak zenginleştirilmiş bir bulguyu temsil eder.
+// Finding represents a fully enriched secret finding.
 type Finding struct {
 	ID             string             `json:"id"`
 	DetectorID     string             `json:"detector_id"`

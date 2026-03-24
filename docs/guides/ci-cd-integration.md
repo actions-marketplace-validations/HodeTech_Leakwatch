@@ -1,0 +1,911 @@
+# Leakwatch - CI/CD Integration Guide
+
+> **Document Version:** 1.0
+> **Date:** 2026-03-24
+> **Status:** Approved
+
+---
+
+## Table of Contents
+
+1. [Why Secret Scanning in CI/CD?](#1-why-secret-scanning-in-cicd)
+2. [GitHub Actions Integration](#2-github-actions-integration)
+3. [GitLab CI Integration](#3-gitlab-ci-integration)
+4. [Jenkins Integration](#4-jenkins-integration)
+5. [Pre-commit Hook](#5-pre-commit-hook)
+6. [Docker in CI/CD](#6-docker-in-cicd)
+7. [Failure Strategies](#7-failure-strategies)
+8. [Best Practices](#8-best-practices)
+
+---
+
+## 1. Why Secret Scanning in CI/CD?
+
+When secrets (API keys, passwords, certificates) are accidentally committed to a codebase, serious security risks arise. Since Git history is permanent, once a secret is committed, `git revert` or file deletion is not enough -- the secret remains in the Git history.
+
+Key reasons for performing secret scanning in CI/CD pipelines:
+
+- **Early detection:** Secrets are caught before reaching production
+- **Automatic enforcement:** Does not depend on developers remembering
+- **Continuous protection:** Every PR and every commit is automatically scanned
+- **Compliance:** Standards like SOC 2 and ISO 27001 require automated secret scanning
+
+```mermaid
+flowchart LR
+    subgraph Gelistirici["Gelistirici Ortami"]
+        A[Kod Yaz] --> B[git commit]
+    end
+
+    subgraph CI["CI/CD Pipeline"]
+        C[Pre-commit Hook] --> D[PR Taramasi]
+        D --> E[Tam Gecmis Taramasi]
+    end
+
+    subgraph Sonuc["Sonuc"]
+        F[Basarili: Merge]
+        G[Basarisiz: Blokla]
+    end
+
+    B --> C
+    E -->|Temiz| F
+    E -->|Sir Bulundu| G
+```
+
+---
+
+## 2. GitHub Actions Integration
+
+### 2.1 Leakwatch GitHub Action
+
+Leakwatch provides a ready-to-use GitHub Action. The parameters supported by the Action:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `scan-type` | `fs` | Scan type: `fs`, `git`, or `image` |
+| `path` | `.` | Path or image reference to scan |
+| `format` | `sarif` | Output format: `json`, `sarif`, `csv`, `table` |
+| `only-verified` | `false` | Report only verified secrets |
+| `no-verify` | `true` | Disable secret verification |
+| `min-severity` | `low` | Minimum severity level: `low`, `medium`, `high`, `critical` |
+| `sarif-upload` | `false` | Upload SARIF results to GitHub Code Scanning |
+| `version` | `latest` | Leakwatch version to use |
+
+**Outputs:**
+
+| Output | Description |
+|--------|-------------|
+| `findings-count` | Number of secrets found |
+| `sarif-file` | Path to the SARIF output file |
+
+### 2.2 Basic Usage
+
+The simplest integration -- filesystem scan on every push:
+
+```yaml
+# .github/workflows/leakwatch.yml
+name: Secret Scanning
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  leakwatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Tam Git gecmisi icin gerekli
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Leakwatch Scan
+        uses: cemililik/leakwatch-action@v1
+        with:
+          scan-type: fs
+          only-verified: true
+```
+
+### 2.3 SARIF with GitHub Code Scanning Integration
+
+GitHub Code Scanning displays SARIF-formatted results directly in the Security tab. This way, found secrets are shown alongside the relevant code line.
+
+```yaml
+# .github/workflows/leakwatch-sarif.yml
+name: Secret Scanning with Code Scanning
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  security-events: write
+  contents: read
+
+jobs:
+  leakwatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Leakwatch Scan
+        uses: cemililik/leakwatch-action@v1
+        with:
+          scan-type: git
+          format: sarif
+          sarif-upload: true
+          min-severity: medium
+```
+
+```mermaid
+sequenceDiagram
+    participant GH as GitHub Actions
+    participant LW as Leakwatch
+    participant CS as Code Scanning
+
+    GH->>LW: leakwatch scan git . --format sarif
+    LW-->>GH: results.sarif
+    GH->>CS: Upload SARIF
+    CS-->>GH: Security sekmesinde goruntule
+```
+
+### 2.4 Pull Request Scanning (Changed Files Only)
+
+Scanning the entire history in PR scans wastes unnecessary time. With the `--since-commit` parameter, you can scan only the changes in the PR:
+
+```yaml
+# .github/workflows/leakwatch-pr.yml
+name: PR Secret Scanning
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  security-events: write
+  contents: read
+
+jobs:
+  leakwatch-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      # PR'in base commit'ini bul
+      - name: Base commit'i belirle
+        id: base
+        run: |
+          BASE_SHA=$(git merge-base origin/${{ github.base_ref }} HEAD)
+          echo "sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Leakwatch PR Taramasi
+        run: |
+          go install github.com/cemililik/leakwatch@latest
+          leakwatch scan git . \
+            --since-commit ${{ steps.base.outputs.sha }} \
+            --format sarif \
+            --output results.sarif \
+            --min-severity medium
+
+      - name: SARIF Yukle
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+          category: leakwatch
+```
+
+### 2.5 Full History Scanning
+
+Scanning the entire Git history on a weekly or monthly basis is important for catching secrets that were previously missed:
+
+```yaml
+# .github/workflows/leakwatch-full.yml
+name: Full History Secret Scanning
+
+on:
+  schedule:
+    # Her pazartesi saat 03:00 UTC
+    - cron: '0 3 * * 1'
+  workflow_dispatch:  # Manuel tetikleme
+
+permissions:
+  security-events: write
+  contents: read
+
+jobs:
+  full-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout (tam gecmis)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Tam gecmis taramasi
+        uses: cemililik/leakwatch-action@v1
+        with:
+          scan-type: git
+          format: sarif
+          sarif-upload: true
+          min-severity: low
+
+      - name: Sonuclari artifact olarak kaydet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: leakwatch-full-scan-results
+          path: results.sarif
+          retention-days: 90
+```
+
+### 2.6 Comprehensive Workflow Example
+
+The following example is a comprehensive workflow that combines PR scanning, full scanning, and Code Scanning:
+
+```yaml
+# .github/workflows/leakwatch-complete.yml
+name: Leakwatch Complete Security Scan
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * 1'
+
+permissions:
+  security-events: write
+  contents: read
+  pull-requests: read
+
+env:
+  LEAKWATCH_VERSION: 'v0.1.0'
+
+jobs:
+  # PR'larda sadece degisen dosyalari tara
+  pr-scan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Base commit'i belirle
+        id: base
+        run: |
+          BASE_SHA=$(git merge-base origin/${{ github.base_ref }} HEAD)
+          echo "sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: PR taramasi
+        run: |
+          go install github.com/cemililik/leakwatch@${{ env.LEAKWATCH_VERSION }}
+          leakwatch scan git . \
+            --since-commit ${{ steps.base.outputs.sha }} \
+            --format sarif \
+            --output results.sarif \
+            --min-severity medium
+
+      - name: SARIF yukle
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+          category: leakwatch-pr
+
+  # Push'larda dosya sistemi tara
+  push-scan:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Dosya sistemi taramasi
+        uses: cemililik/leakwatch-action@v1
+        with:
+          scan-type: fs
+          format: sarif
+          sarif-upload: true
+          min-severity: high
+
+  # Zamanlanmis tam gecmis taramasi
+  scheduled-scan:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Tam gecmis taramasi
+        uses: cemililik/leakwatch-action@v1
+        with:
+          scan-type: git
+          format: sarif
+          sarif-upload: true
+          min-severity: low
+
+      - name: Sonuclari kaydet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: leakwatch-scheduled-${{ github.run_id }}
+          path: results.sarif
+          retention-days: 90
+```
+
+---
+
+## 3. GitLab CI Integration
+
+### 3.1 Basic GitLab CI Configuration
+
+```yaml
+# .gitlab-ci.yml
+stages:
+  - security
+
+leakwatch-scan:
+  stage: security
+  image: golang:1.22-alpine
+  before_script:
+    - go install github.com/cemililik/leakwatch@latest
+  script:
+    - leakwatch scan fs . --format sarif --output leakwatch-results.sarif --min-severity medium
+  artifacts:
+    reports:
+      sast: leakwatch-results.sarif
+    paths:
+      - leakwatch-results.sarif
+    when: always
+    expire_in: 30 days
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+```
+
+### 3.2 Merge Request Scanning
+
+To scan only the changed commits in merge requests:
+
+```yaml
+# .gitlab-ci.yml
+stages:
+  - security
+
+leakwatch-mr-scan:
+  stage: security
+  image: golang:1.22-alpine
+  before_script:
+    - apk add --no-cache git
+    - go install github.com/cemililik/leakwatch@latest
+  script:
+    # MR'in base commit'ini bul
+    - BASE_SHA=$(git merge-base origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME HEAD)
+    - leakwatch scan git . --since-commit "$BASE_SHA" --format sarif --output leakwatch-results.sarif
+  artifacts:
+    reports:
+      sast: leakwatch-results.sarif
+    paths:
+      - leakwatch-results.sarif
+    when: always
+    expire_in: 30 days
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+leakwatch-full-scan:
+  stage: security
+  image: golang:1.22-alpine
+  before_script:
+    - apk add --no-cache git
+    - go install github.com/cemililik/leakwatch@latest
+  script:
+    - leakwatch scan git . --format sarif --output leakwatch-results.sarif --min-severity low
+  artifacts:
+    reports:
+      sast: leakwatch-results.sarif
+    paths:
+      - leakwatch-results.sarif
+    when: always
+    expire_in: 90 days
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+  # Haftalik zamanlanmis pipeline icin:
+  # GitLab > CI/CD > Schedules menusunden haftalik schedule olusturun
+```
+
+### 3.3 GitLab CI with Docker Image
+
+Using the Docker image without requiring Go installation:
+
+```yaml
+leakwatch-docker-scan:
+  stage: security
+  image:
+    name: cemililik/leakwatch:latest
+    entrypoint: [""]
+  script:
+    - leakwatch scan fs /builds/$CI_PROJECT_PATH --format sarif --output leakwatch-results.sarif
+  artifacts:
+    reports:
+      sast: leakwatch-results.sarif
+    paths:
+      - leakwatch-results.sarif
+    when: always
+```
+
+---
+
+## 4. Jenkins Integration
+
+### 4.1 Declarative Jenkinsfile
+
+```groovy
+// Jenkinsfile
+pipeline {
+    agent any
+
+    environment {
+        LEAKWATCH_VERSION = 'latest'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Install Leakwatch') {
+            steps {
+                sh '''
+                    go install github.com/cemililik/leakwatch@${LEAKWATCH_VERSION}
+                '''
+            }
+        }
+
+        stage('Secret Scan') {
+            steps {
+                sh '''
+                    leakwatch scan fs . \
+                        --format sarif \
+                        --output leakwatch-results.sarif \
+                        --min-severity medium
+                '''
+            }
+            post {
+                always {
+                    // SARIF sonuclarini arsivle
+                    archiveArtifacts artifacts: 'leakwatch-results.sarif', allowEmptyArchive: true
+                }
+                failure {
+                    echo 'Leakwatch sir tespit etti! Sonuclari inceleyin.'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // JSON raporu da olustur
+            sh '''
+                leakwatch scan fs . \
+                    --format json \
+                    --output leakwatch-results.json \
+                    --min-severity medium || true
+            '''
+            archiveArtifacts artifacts: 'leakwatch-results.json', allowEmptyArchive: true
+        }
+    }
+}
+```
+
+### 4.2 Jenkinsfile with Docker Agent
+
+```groovy
+// Jenkinsfile (Docker agent)
+pipeline {
+    agent {
+        docker {
+            image 'cemililik/leakwatch:latest'
+            args '-v ${WORKSPACE}:/scan'
+        }
+    }
+
+    stages {
+        stage('Secret Scan') {
+            steps {
+                sh '''
+                    leakwatch scan fs /scan \
+                        --format sarif \
+                        --output /scan/leakwatch-results.sarif \
+                        --min-severity medium
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'leakwatch-results.sarif', allowEmptyArchive: true
+        }
+    }
+}
+```
+
+---
+
+## 5. Pre-commit Hook
+
+The pre-commit hook ensures secrets are caught before being committed to the Git repository. This is the earliest point to prevent secret leaks.
+
+### 5.1 Installation
+
+First, install the [pre-commit](https://pre-commit.com/) framework:
+
+```bash
+# pre-commit kurulumu
+pip install pre-commit
+```
+
+Create a `.pre-commit-config.yaml` file in your project root:
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/cemililik/Leakwatch
+    rev: v0.1.0
+    hooks:
+      - id: leakwatch
+```
+
+Activate the hook:
+
+```bash
+# Hook'u kur
+pre-commit install
+
+# Tum dosyalarda test et
+pre-commit run leakwatch --all-files
+```
+
+### 5.2 How Does It Work?
+
+The Leakwatch pre-commit hook runs the `leakwatch scan fs` command. Before each commit, it performs secret scanning on the files to be committed.
+
+```mermaid
+flowchart TD
+    A[git commit] --> B[pre-commit hook tetiklenir]
+    B --> C[leakwatch scan fs]
+    C --> D{Sir bulundu mu?}
+    D -->|Hayir| E[Commit basarili]
+    D -->|Evet| F[Commit engellenir]
+    F --> G[Gelistirici siri temizler]
+    G --> A
+```
+
+### 5.3 Pre-commit Validation in CI
+
+To verify that pre-commit hooks are working correctly in the CI pipeline:
+
+```yaml
+# .github/workflows/pre-commit.yml
+name: Pre-commit Validation
+
+on: [push, pull_request]
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - run: pip install pre-commit
+      - run: pre-commit run --all-files
+```
+
+---
+
+## 6. Docker in CI/CD
+
+The Leakwatch Docker image can be used in any CI/CD environment without requiring Go installation.
+
+### 6.1 Docker Image
+
+The Leakwatch Docker image is published on Docker Hub as `cemililik/leakwatch`. The image is based on Alpine Linux and has a minimal size.
+
+```bash
+# Yerel dizini tara
+docker run --rm -v "$(pwd):/scan" cemililik/leakwatch:latest scan fs /scan
+
+# Git deposunu tara
+docker run --rm -v "$(pwd):/scan" cemililik/leakwatch:latest scan git /scan
+
+# SARIF ciktisi al
+docker run --rm -v "$(pwd):/scan" cemililik/leakwatch:latest \
+  scan fs /scan --format sarif --output /scan/results.sarif
+
+# Sadece dogrulanmis sirlari goster
+docker run --rm -v "$(pwd):/scan" cemililik/leakwatch:latest \
+  scan fs /scan --only-verified
+```
+
+### 6.2 Scanning in Multi-stage Builds
+
+You can perform secret scanning during the build stage within your own Dockerfile:
+
+```dockerfile
+# Build stage
+FROM golang:1.24-alpine AS builder
+
+RUN apk add --no-cache git
+
+WORKDIR /app
+COPY . .
+RUN go build -o myapp .
+
+# Security scan stage
+FROM cemililik/leakwatch:latest AS security
+COPY --from=builder /app /scan
+RUN leakwatch scan fs /scan --min-severity high
+
+# Runtime stage (sadece tarama basarili olursa buraya ulasilir)
+FROM alpine:3.20
+COPY --from=builder /app/myapp /usr/local/bin/
+ENTRYPOINT ["myapp"]
+```
+
+In this approach, if a secret is found, `leakwatch` returns a non-zero exit code and the Docker build fails. This prevents creating an image that contains secrets.
+
+### 6.3 Container Image Scanning
+
+To scan existing container images for secrets:
+
+```bash
+# Docker Hub'daki bir imaji tara
+docker run --rm cemililik/leakwatch:latest scan image nginx:latest
+
+# Yerel imaji tara (Docker socket'i bagla)
+docker run --rm \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  cemililik/leakwatch:latest \
+  scan image myapp:latest
+```
+
+---
+
+## 7. Failure Strategies
+
+It is important to control how the CI/CD pipeline behaves when secret scanning fails (when a secret is found).
+
+### 7.1 Setting Thresholds with `--min-severity`
+
+You can set a minimum severity level to prevent low-priority findings from blocking the pipeline:
+
+```bash
+# Sadece high ve critical bulgularda basarisiz ol
+leakwatch scan fs . --min-severity high
+
+# Sadece critical bulgularda basarisiz ol
+leakwatch scan fs . --min-severity critical
+```
+
+**Severity levels:**
+
+| Level | Description | Example |
+|-------|-------------|---------|
+| `low` | Low risk, may be a false positive | Generic API key pattern |
+| `medium` | Medium risk | Database connection string |
+| `high` | High risk | AWS Secret Access Key |
+| `critical` | Critical risk, verified active secret | Verified AWS key |
+
+### 7.2 Reducing False Positives with `--only-verified`
+
+Leakwatch attempts to verify found secrets through the relevant APIs. With the `--only-verified` parameter, you can report only verified (active) secrets:
+
+```bash
+# Sadece dogrulanmis sirlari raporla
+leakwatch scan git . --only-verified
+
+# PR taramasinda dogrulama ile birlikte kullan
+leakwatch scan git . --since-commit HEAD~1 --only-verified --min-severity medium
+```
+
+**Note:** When `--only-verified` is used, secret types that do not support verification (e.g., generic private keys) will not be reported. For full coverage, periodically run a full scan without `--only-verified`.
+
+### 7.3 Excluding Known Values with `.leakwatchignore`
+
+Use the `.leakwatchignore` file for known false positives or intentional test values in the code:
+
+```bash
+# .leakwatchignore
+
+# Test fixture'lari
+test/fixtures/**
+testdata/**
+
+# Ornek yapilandirma dosyalari
+*.example
+*.sample
+
+# Belirli dosyalar
+docs/examples/config.yaml
+
+# Satir ici yoksayma (kod icinde)
+# leakwatch:ignore
+```
+
+You can use inline comments to ignore specific lines within the code:
+
+```go
+// Test icin ornek anahtar (gercek degil)
+var testKey = "AKIAIOSFODNN7EXAMPLE" // leakwatch:ignore
+```
+
+### 7.4 Strategy Matrix
+
+Recommended configurations for different scenarios:
+
+| Scenario | `--min-severity` | `--only-verified` | `.leakwatchignore` |
+|----------|-------------------|--------------------|--------------------|
+| PR scanning | `medium` | Yes | Yes |
+| Main branch push | `high` | No | Yes |
+| Scheduled full scan | `low` | No | Yes |
+| Pre-commit hook | `medium` | No | Yes |
+| Pre-release | `low` | No | Minimal |
+
+---
+
+## 8. Best Practices
+
+### 8.1 Layered Defense
+
+Do not rely on a single checkpoint. Perform secret scanning at multiple layers:
+
+```mermaid
+flowchart TD
+    A[Gelistirici: pre-commit hook] --> B[PR: Degisiklik taramasi]
+    B --> C[Main: Push taramasi]
+    C --> D[Zamanlanmis: Tam gecmis taramasi]
+    D --> E[Deploy: Container imaj taramasi]
+
+    style A fill:#e1f5fe
+    style B fill:#fff3e0
+    style C fill:#fce4ec
+    style D fill:#f3e5f5
+    style E fill:#e8f5e9
+```
+
+### 8.2 Exit Codes
+
+Interpret Leakwatch exit codes correctly in the CI/CD pipeline:
+
+| Exit Code | Meaning | CI/CD Action |
+|-----------|---------|--------------|
+| `0` | No secrets found | Pipeline continues |
+| `1` | Secrets found | Pipeline fails |
+| `2+` | Error (configuration, IO, etc.) | Pipeline fails, error is investigated |
+
+### 8.3 Performance Optimization
+
+- **`fetch-depth: 0`** should only be used when Git history scanning is needed. For filesystem scanning, `fetch-depth: 1` is sufficient
+- **`--since-commit`** in PR scans, scan only changed commits instead of the entire history
+- **`.leakwatchignore`** to exclude large binary files, vendor directories, and test fixtures
+- **`--max-file-size`** to set a file size limit for skipping large files
+
+### 8.4 Configuration File
+
+Centralize recurring parameters with a `.leakwatch.yaml` file in the project root:
+
+```yaml
+# .leakwatch.yaml
+scan:
+  concurrency: 8
+  max-file-size: 10485760  # 10MB
+
+detection:
+  entropy:
+    enabled: true
+    threshold: 4.0
+
+verification:
+  enabled: true
+  timeout: 10s
+
+filter:
+  exclude-paths:
+    - "vendor/**"
+    - "node_modules/**"
+    - "**/*.lock"
+    - "**/*.min.js"
+    - "testdata/**"
+
+output:
+  format: json
+  show-raw: false  # Bulunan sirlari acik metin olarak gosterme
+```
+
+### 8.5 Privacy and Security
+
+- **Never write the raw values of found secrets to logs** in Leakwatch output. Use the `show-raw: false` setting
+- Do not store SARIF reports for extended periods; 90 days is a reasonable duration
+- Use `--format sarif` or `--format json` to mask secret values in CI/CD logs (`table` format writes to the console)
+- Store API access credentials needed for secret verification in the CI/CD secret manager
+
+### 8.6 Notifications
+
+Use CI/CD notification mechanisms to inform the team when secrets are found:
+
+```yaml
+# GitHub Actions ornegi - Slack bildirimi
+- name: Slack Bildirimi
+  if: failure()
+  uses: slackapi/slack-github-action@v1
+  with:
+    payload: |
+      {
+        "text": "Leakwatch sir tespit etti: ${{ github.repository }} (${{ github.ref_name }})"
+      }
+  env:
+    SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+```
+
+---
+
+## Related Documents
+
+- [Custom Rules Guide](custom-rules.md)
+- [Architecture Design](../architecture/03-ARCHITECTURE.md)
+- [Development Standards](../standards/04-DEVELOPMENT-STANDARDS.md)
+- [Release and Distribution Standards](../standards/02-RELEASE-STANDARDS.md)

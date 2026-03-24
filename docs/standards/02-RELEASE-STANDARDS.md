@@ -1,64 +1,64 @@
-# Leakwatch - Sürüm ve Dağıtım Standartları
+# Leakwatch - Release and Distribution Standards
 
-> **Belge Versiyonu:** 1.0
-> **Tarih:** 2026-03-24
-> **Durum:** Taslak
+> **Document Version:** 1.0
+> **Date:** 2026-03-24
+> **Status:** Draft
 
 ---
 
-## 1. Sürüm Numaralama (Semantic Versioning)
+## 1. Version Numbering (Semantic Versioning)
 
-Leakwatch, [Semantic Versioning 2.0.0](https://semver.org/) standardını takip eder.
+Leakwatch follows the [Semantic Versioning 2.0.0](https://semver.org/) standard.
 
 ```
 v{MAJOR}.{MINOR}.{PATCH}[-{pre-release}]
 
-MAJOR  — Geriye uyumsuz API/CLI değişiklikleri
-MINOR  — Geriye uyumlu yeni özellikler
-PATCH  — Geriye uyumlu hata düzeltmeleri
+MAJOR  — Backward-incompatible API/CLI changes
+MINOR  — Backward-compatible new features
+PATCH  — Backward-compatible bug fixes
 ```
 
-### 1.1 Sürüm Örnekleri
+### 1.1 Version Examples
 
-| Sürüm | Açıklama |
-|-------|----------|
-| `v0.1.0` | MVP — dosya sistemi tarama |
-| `v0.2.0` | Git entegrasyonu |
-| `v0.3.0` | Doğrulama ve Aho-Corasick |
-| `v0.4.0` | Container tarama, SARIF |
-| `v1.0.0` | Kararlı API, üretime hazır |
-| `v1.0.1` | Hata düzeltme |
-| `v1.1.0` | Yeni dedektörler |
-| `v2.0.0` | CLI flag kaldırma, çıktı format değişikliği |
+| Version | Description |
+|---------|-------------|
+| `v0.1.0` | MVP — filesystem scanning |
+| `v0.2.0` | Git integration |
+| `v0.3.0` | Verification and Aho-Corasick |
+| `v0.4.0` | Container scanning, SARIF |
+| `v1.0.0` | Stable API, production-ready |
+| `v1.0.1` | Bug fix |
+| `v1.1.0` | New detectors |
+| `v2.0.0` | CLI flag removal, output format change |
 
-### 1.2 Ön-Sürüm Etiketleri
+### 1.2 Pre-release Tags
 
 ```
-v1.0.0-alpha.1   → Erken geliştirme, kararsız
-v1.0.0-beta.1    → Özellik tam, test aşamasında
-v1.0.0-rc.1      → Sürüm adayı, son düzeltmeler
+v1.0.0-alpha.1   → Early development, unstable
+v1.0.0-beta.1    → Feature complete, in testing
+v1.0.0-rc.1      → Release candidate, final fixes
 ```
 
-### 1.3 Kırılma Değişikliği (Breaking Change) Politikası
+### 1.3 Breaking Change Policy
 
-`v1.0.0` öncesi (`v0.x.x`): MINOR sürüm kırılma değişikliği içerebilir.
+Before `v1.0.0` (`v0.x.x`): MINOR versions may contain breaking changes.
 
-`v1.0.0` sonrası:
-- CLI flag kaldırma/yeniden adlandırma → MAJOR
-- JSON çıktı format değişikliği → MAJOR
-- Çıkış kodu semantiği değişikliği → MAJOR
-- Yeni dedektör ekleme → MINOR
-- Yeni flag ekleme → MINOR
-- Hata düzeltme → PATCH
+After `v1.0.0`:
+- CLI flag removal/renaming → MAJOR
+- JSON output format change → MAJOR
+- Exit code semantics change → MAJOR
+- Adding a new detector → MINOR
+- Adding a new flag → MINOR
+- Bug fix → PATCH
 
-Kullanımdan kaldırma süreci:
-1. Eski davranışı `deprecated` olarak işaretle ve uyarı logla
-2. En az 1 MINOR sürüm boyunca destekle
-3. Sonraki MAJOR sürümde kaldır
+Deprecation process:
+1. Mark the old behavior as `deprecated` and log a warning
+2. Support for at least 1 MINOR version
+3. Remove in the next MAJOR version
 
 ---
 
-## 2. Dallanma Stratejisi (GitHub Flow)
+## 2. Branching Strategy (GitHub Flow)
 
 ```mermaid
 gitgraph
@@ -76,23 +76,23 @@ gitgraph
     commit id: "v0.2.1" tag: "v0.2.1"
 ```
 
-### 2.1 Dal Kuralları
+### 2.1 Branch Rules
 
-| Dal | Kaynak | Hedef | Ömür |
-|-----|--------|-------|------|
-| `main` | — | — | Kalıcı, her zaman kararlı |
-| `feature/<isim>` | `main` | `main` | Kısa ömürlü (< 1 hafta) |
-| `fix/<isim>` | `main` | `main` | Kısa ömürlü |
-| `docs/<isim>` | `main` | `main` | Kısa ömürlü |
-| `hotfix/<isim>` | `main` | `main` | Acil düzeltmeler |
+| Branch | Source | Target | Lifetime |
+|--------|--------|--------|----------|
+| `main` | — | — | Permanent, always stable |
+| `feature/<name>` | `main` | `main` | Short-lived (< 1 week) |
+| `fix/<name>` | `main` | `main` | Short-lived |
+| `docs/<name>` | `main` | `main` | Short-lived |
+| `hotfix/<name>` | `main` | `main` | Emergency fixes |
 
-### 2.2 Birleştirme Kuralları
+### 2.2 Merge Rules
 
-- Tüm değişiklikler **Pull Request** ile gelir
-- **Squash merge** tercih edilir (temiz geçmiş)
-- CI pipeline başarılı olmalıdır
-- En az 1 onay (review) gereklidir
-- Güvenlik hassas değişikliklerde 2 onay gereklidir
+- All changes come through **Pull Requests**
+- **Squash merge** is preferred (clean history)
+- CI pipeline must pass
+- At least 1 approval (review) is required
+- Security-sensitive changes require 2 approvals
 
 ---
 
@@ -100,93 +100,93 @@ gitgraph
 
 ### 3.1 PR Pipeline
 
-Her pull request'te otomatik çalışır:
+Runs automatically on every pull request:
 
 ```mermaid
 flowchart LR
-    A["PR Açıldı"] --> B["go test -race ./..."]
+    A["PR Opened"] --> B["go test -race ./..."]
     B --> C["golangci-lint"]
     C --> D["govulncheck"]
     D --> E["go build"]
-    E --> F{"Hepsi Başarılı?"}
-    F -->|Evet| G["✅ İncelemeye Hazır"]
-    F -->|Hayır| H["❌ Düzeltme Gerekli"]
+    E --> F{"All Passed?"}
+    F -->|Yes| G["Ready for Review"]
+    F -->|No| H["Fix Required"]
 ```
 
-| Adım | Komut | Başarısızlık |
-|------|-------|-------------|
-| Test | `go test -race -coverprofile=coverage.out ./...` | PR birleştirilemez |
-| Lint | `golangci-lint run ./...` | PR birleştirilemez |
-| Güvenlik | `govulncheck ./...` | PR birleştirilemez |
-| Build | `CGO_ENABLED=0 go build ./...` | PR birleştirilemez |
+| Step | Command | On Failure |
+|------|---------|------------|
+| Test | `go test -race -coverprofile=coverage.out ./...` | PR cannot be merged |
+| Lint | `golangci-lint run ./...` | PR cannot be merged |
+| Security | `govulncheck ./...` | PR cannot be merged |
+| Build | `CGO_ENABLED=0 go build ./...` | PR cannot be merged |
 
 ### 3.2 Main Pipeline
 
-`main` dalına birleştirmede:
+On merge to the `main` branch:
 
-| Adım | Açıklama |
-|------|----------|
-| PR pipeline adımları | Test + lint + güvenlik + build |
-| Çapraz derleme | linux/darwin/windows × amd64/arm64 |
-| Kapsam raporu | Test kapsamı ≥ %80 kontrolü |
+| Step | Description |
+|------|-------------|
+| PR pipeline steps | Test + lint + security + build |
+| Cross-compilation | linux/darwin/windows x amd64/arm64 |
+| Coverage report | Test coverage >= 80% check |
 
 ### 3.3 Release Pipeline
 
-Tag push'ta (`v*`) otomatik tetiklenir:
+Automatically triggered on tag push (`v*`):
 
 ```mermaid
 flowchart LR
     A["Tag Push\nv0.2.0"] --> B["GoReleaser"]
-    B --> C["Binary Build\n6 platform"]
+    B --> C["Binary Build\n6 platforms"]
     C --> D["Checksum\nchecksums.txt"]
-    D --> E["GitHub Release\nOtomatik changelog"]
-    E --> F["✅ Release Yayında"]
+    D --> E["GitHub Release\nAuto changelog"]
+    E --> F["Release Published"]
 ```
 
-| Adım | Araç | Çıktı |
-|------|------|-------|
-| Build | GoReleaser | 6 binary (3 OS × 2 arch) |
+| Step | Tool | Output |
+|------|------|--------|
+| Build | GoReleaser | 6 binaries (3 OS x 2 arch) |
 | Checksum | GoReleaser | `checksums.txt` (SHA256) |
-| Release | GitHub Releases | Otomatik changelog + binary'ler |
+| Release | GitHub Releases | Auto changelog + binaries |
 
 ---
 
-## 4. Release Süreci
+## 4. Release Process
 
-### 4.1 Release Öncesi Kontrol Listesi
+### 4.1 Pre-Release Checklist
 
-- [ ] `main` dalında tüm testler geçiyor (`go test -race ./...`)
-- [ ] `golangci-lint` uyarısız
-- [ ] `govulncheck` temiz
-- [ ] Test kapsamı ≥ %80
-- [ ] CHANGELOG.md güncellenmiş
-- [ ] README.md güncellenmiş (yeni özellikler varsa)
-- [ ] Kırılma değişikliği varsa belgelenmiş
-- [ ] Yeni dedektörler test edilmiş (yanlış pozitif oranı kabul edilebilir)
-- [ ] Performans benchmark'ları kabul edilebilir düzeyde
+- [ ] All tests pass on `main` branch (`go test -race ./...`)
+- [ ] `golangci-lint` has no warnings
+- [ ] `govulncheck` is clean
+- [ ] Test coverage >= 80%
+- [ ] CHANGELOG.md updated
+- [ ] README.md updated (if new features)
+- [ ] Breaking changes documented if applicable
+- [ ] New detectors tested (false positive rate acceptable)
+- [ ] Performance benchmarks at acceptable levels
 
-### 4.2 Tag Oluşturma ve Yayınlama
+### 4.2 Tag Creation and Publishing
 
 ```bash
-# Sürüm etiketini oluştur
-git tag -a v0.2.0 -m "feat: Git entegrasyonu ve geçmiş taraması"
+# Create the version tag
+git tag -a v0.2.0 -m "feat: Git integration and history scanning"
 
-# Etiket'i push et (release pipeline'ı tetikler)
+# Push the tag (triggers the release pipeline)
 git push origin v0.2.0
 ```
 
-### 4.3 Release Sonrası Kontrol Listesi
+### 4.3 Post-Release Checklist
 
-- [ ] GitHub Release sayfası doğru görünüyor
-- [ ] Binary'ler indirilebilir ve çalışıyor (en az 1 platform test edilmeli)
-- [ ] `leakwatch version` doğru sürümü gösteriyor
-- [ ] Checksum doğrulaması yapılmış
+- [ ] GitHub Release page looks correct
+- [ ] Binaries are downloadable and working (at least 1 platform tested)
+- [ ] `leakwatch version` shows correct version
+- [ ] Checksum verification done
 
 ---
 
-## 5. Changelog Formatı
+## 5. Changelog Format
 
-[Keep a Changelog](https://keepachangelog.com/) formatı kullanılır:
+[Keep a Changelog](https://keepachangelog.com/) format is used:
 
 ```markdown
 # Changelog
@@ -194,43 +194,43 @@ git push origin v0.2.0
 ## [v0.2.0] - 2026-04-20
 
 ### Added
-- `scan git` komutu ile Git deposu tarama (#12)
-- `--since`, `--branch`, `--depth` flag'leri (#14)
-- `--since-commit` ile diff tabanlı tarama (#15)
-- Commit metadata (hash, author, tarih) bulgu çıktısında (#13)
+- Git repository scanning with `scan git` command (#12)
+- `--since`, `--branch`, `--depth` flags (#14)
+- Diff-based scanning with `--since-commit` (#15)
+- Commit metadata (hash, author, date) in finding output (#13)
 
 ### Fixed
-- Worker pool context iptalinde goroutine sızıntısı (#18)
+- Goroutine leak on worker pool context cancellation (#18)
 
 ## [v0.1.0] - 2026-04-01
 
 ### Added
-- `scan fs` komutu ile dosya sistemi tarama
-- AWS Access Key ID dedektörü
-- Private Key (RSA/SSH/DSA/EC/PGP) dedektörü
-- Generic API Key dedektörü
-- JSON çıktı formatı
-- Worker pool ile eşzamanlı tarama
-- Shannon entropi analizi
+- Filesystem scanning with `scan fs` command
+- AWS Access Key ID detector
+- Private Key (RSA/SSH/DSA/EC/PGP) detector
+- Generic API Key detector
+- JSON output format
+- Concurrent scanning with worker pool
+- Shannon entropy analysis
 ```
 
-### Kategori Sırası
+### Category Order
 
-1. **Added** — Yeni özellikler
-2. **Changed** — Mevcut özelliklerde değişiklik
-3. **Deprecated** — Kaldırılacak özellikler
-4. **Removed** — Kaldırılan özellikler
-5. **Fixed** — Hata düzeltmeleri
-6. **Security** — Güvenlik düzeltmeleri
+1. **Added** — New features
+2. **Changed** — Changes to existing features
+3. **Deprecated** — Features to be removed
+4. **Removed** — Removed features
+5. **Fixed** — Bug fixes
+6. **Security** — Security fixes
 
 ---
 
-## 6. Binary Dağıtım
+## 6. Binary Distribution
 
-### 6.1 Desteklenen Platformlar
+### 6.1 Supported Platforms
 
-| OS | Mimari | Dosya Adı |
-|----|--------|-----------|
+| OS | Architecture | File Name |
+|----|-------------|-----------|
 | Linux | amd64 | `leakwatch_v0.2.0_linux_amd64.tar.gz` |
 | Linux | arm64 | `leakwatch_v0.2.0_linux_arm64.tar.gz` |
 | macOS | amd64 | `leakwatch_v0.2.0_darwin_amd64.tar.gz` |
@@ -238,83 +238,83 @@ git push origin v0.2.0
 | Windows | amd64 | `leakwatch_v0.2.0_windows_amd64.zip` |
 | Windows | arm64 | `leakwatch_v0.2.0_windows_arm64.zip` |
 
-### 6.2 Build Gereksinimleri
+### 6.2 Build Requirements
 
-- `CGO_ENABLED=0` — saf Go binary, harici bağımlılık yok
-- `ldflags` ile sürüm bilgisi enjekte edilir:
+- `CGO_ENABLED=0` — pure Go binary, no external dependencies
+- Version info injected via `ldflags`:
   ```
   -X main.version={{.Version}}
   -X main.commit={{.Commit}}
   -X main.date={{.Date}}
   ```
-- Binary boyutu hedefi: < 30MB
+- Binary size target: < 30MB
 
-### 6.3 Kurulum Yöntemleri
+### 6.3 Installation Methods
 
 ```bash
 # Go install
 go install github.com/cemililik/leakwatch@v0.2.0
 
-# Homebrew (planlanıyor)
+# Homebrew (planned)
 brew install cemililik/tap/leakwatch
 
-# Binary indirme
+# Binary download
 curl -sSfL https://github.com/cemililik/Leakwatch/releases/latest/download/leakwatch_$(uname -s)_$(uname -m).tar.gz | tar xz
 ```
 
 ---
 
-## 7. Geri Alma (Rollback) Stratejisi
+## 7. Rollback Strategy
 
-### 7.1 CLI Aracı İçin Rollback
+### 7.1 Rollback for CLI Tool
 
-Leakwatch bir CLI aracı olduğundan rollback nispeten basittir:
+Since Leakwatch is a CLI tool, rollback is relatively straightforward:
 
-| Senaryo | Strateji |
-|---------|----------|
-| Hatalı release yayınlandı | GitHub Release'i `pre-release` olarak işaretle, kullanıcıları bilgilendir |
-| Kritik güvenlik hatası | Yeni PATCH sürüm yayınla (ör: `v0.2.1`) |
-| Kırılma değişikliği planlanmadı | Eski davranışı geri getiren PATCH sürüm yayınla |
+| Scenario | Strategy |
+|----------|----------|
+| Faulty release published | Mark GitHub Release as `pre-release`, notify users |
+| Critical security bug | Publish a new PATCH version (e.g., `v0.2.1`) |
+| Unplanned breaking change | Publish a PATCH version that restores old behavior |
 
-### 7.2 Rollback Süreci
+### 7.2 Rollback Process
 
 ```bash
-# 1. Sorunlu tag'i silinme
-# (GitHub Release'i draft/pre-release yapılabilir ama tag silinmemelidir)
+# 1. Do not delete the problematic tag
+# (GitHub Release can be made draft/pre-release but tag should not be deleted)
 
-# 2. Düzeltme dalı oluştur
+# 2. Create a hotfix branch
 git checkout -b hotfix/fix-description main
 
-# 3. Düzeltmeyi yap, test et
+# 3. Apply the fix and test
 go test -race ./...
 
-# 4. PR oluştur ve birleştir
-# 5. Yeni tag oluştur
-git tag -a v0.2.1 -m "fix: kritik hata düzeltmesi"
+# 4. Create PR and merge
+# 5. Create a new tag
+git tag -a v0.2.1 -m "fix: critical bug fix"
 git push origin v0.2.1
 ```
 
-### 7.3 Zamanlamalar
+### 7.3 Timelines
 
-| Metrik | Hedef |
-|--------|-------|
-| Hotfix PR açma süresi | < 2 saat |
-| Hotfix release süresi | < 4 saat |
-| Sorunlu release'i işaretleme | < 30 dakika |
+| Metric | Target |
+|--------|--------|
+| Time to open hotfix PR | < 2 hours |
+| Hotfix release time | < 4 hours |
+| Time to flag problematic release | < 30 minutes |
 
 ---
 
-## 8. Güvenlik Sürümleri
+## 8. Security Releases
 
-Güvenlik düzeltmeleri özel bir süreç izler:
+Security fixes follow a special process:
 
-1. Güvenlik açığı tespit edilir
-2. Önem derecesi belirlenir (CVSS veya dahili değerlendirme)
-3. **Gizli düzeltme** — Düzeltme PR'ı kamuya açılmadan önce hazırlanır
-4. Düzeltme birleştirilir ve **hemen** yeni sürüm yayınlanır
-5. Güvenlik danışma belgesi (security advisory) GitHub'da yayınlanır
-6. `govulncheck` veritabanına bildirilir
+1. Security vulnerability is identified
+2. Severity is determined (CVSS or internal assessment)
+3. **Private fix** — Fix PR is prepared before public disclosure
+4. Fix is merged and a new version is **immediately** released
+5. Security advisory is published on GitHub
+6. Reported to the `govulncheck` database
 
-### Güvenlik Sürüm Adlandırması
+### Security Release Naming
 
-Güvenlik düzeltmeleri PATCH sürümüdür ve changelog'da `### Security` kategorisinde belgelenir.
+Security fixes are PATCH versions and are documented under the `### Security` category in the changelog.

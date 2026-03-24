@@ -1,30 +1,30 @@
 package filesystem
 
-// Option, FilesystemSource yapılandırma seçeneği.
+// Option configures a FilesystemSource.
 type Option func(*FilesystemSource)
 
-// WithMaxFileSize, maksimum dosya boyutunu ayarlar.
+// WithMaxFileSize sets the maximum file size to scan.
 func WithMaxFileSize(size int64) Option {
 	return func(s *FilesystemSource) {
 		s.maxFileSize = size
 	}
 }
 
-// WithExcludeExtensions, hariç tutulacak dosya uzantılarını ayarlar.
+// WithExcludeExtensions sets file extensions to exclude from scanning.
 func WithExcludeExtensions(exts []string) Option {
 	return func(s *FilesystemSource) {
 		s.excludeExts = exts
 	}
 }
 
-// WithExcludePaths, hariç tutulacak yol desenlerini ayarlar.
+// WithExcludePaths sets path patterns to exclude from scanning.
 func WithExcludePaths(paths []string) Option {
 	return func(s *FilesystemSource) {
 		s.excludePaths = paths
 	}
 }
 
-// WithBufferSize, chunk kanalı tampon boyutunu ayarlar.
+// WithBufferSize sets the chunk channel buffer size.
 func WithBufferSize(size int) Option {
 	return func(s *FilesystemSource) {
 		s.bufferSize = size

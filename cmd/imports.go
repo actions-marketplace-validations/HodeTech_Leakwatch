@@ -1,6 +1,6 @@
 package cmd
 
-// Dedektörleri derleme zamanında kaydet (init() ile).
+// Register detectors at compile time via init().
 import (
 	_ "github.com/cemililik/leakwatch/internal/detector/aws"
 	_ "github.com/cemililik/leakwatch/internal/detector/dbconn"
@@ -12,7 +12,7 @@ import (
 	_ "github.com/cemililik/leakwatch/internal/detector/stripe"
 )
 
-// Doğrulayıcıları derleme zamanında kaydet (init() ile).
+// Register verifiers at compile time via init().
 import (
 	_ "github.com/cemililik/leakwatch/internal/verifier/aws"
 	_ "github.com/cemililik/leakwatch/internal/verifier/github"

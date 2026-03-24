@@ -1,59 +1,59 @@
-# ADR-0007: Lisans — MIT
+# ADR-0007: License — MIT
 
-- **Durum:** Kabul Edildi
-- **Tarih:** 2026-03-24
-- **Karar Verenler:** Proje ekibi
+- **Status:** Accepted
+- **Date:** 2026-03-24
+- **Decision Makers:** Project team
 
-## Bağlam
+## Context
 
-Lisans seçimi, projenin benimsenmesini, topluluk katkılarını ve gelecekteki ticari olasılıkları doğrudan etkiler. Sır tarama pazarındaki mevcut durumda:
+License selection directly affects project adoption, community contributions, and future commercial possibilities. The current state of the secret scanning market:
 
-- TruffleHog **AGPL-3.0** kullanıyor — kurumsal kullanıcıları caydıran güçlü copyleft
-- Gitleaks **MIT** kullanıyor — ancak GitHub Action'ı özel repolar için ticari
-- GitGuardian tamamen ticari
+- TruffleHog uses **AGPL-3.0** — strong copyleft that deters enterprise users
+- Gitleaks uses **MIT** — but its GitHub Action is commercial for private repos
+- GitGuardian is fully commercial
 
-## Karar
+## Decision
 
-**MIT License** seçilmiştir.
+**MIT License** has been selected.
 
-### Gerekçe
+### Rationale
 
-1. **Kurumsal benimseme engeli sıfır:** AGPL'den kaçınan birçok kuruluş (bankalar, savunma, büyük teknoloji firmaları) MIT lisanslı araçları tercih eder
-2. **Pazar farklılaştırma:** "MIT + doğrulama" kombinasyonu açık kaynak pazarında benzersiz
-3. **Open-core model uygunluğu:** Çekirdek MIT olarak kalırken, gelecekte SaaS/Enterprise katmanı eklenebilir
-4. **Topluluk katkısı teşviki:** Minimum kısıtlama, maksimum esneklik
-5. **Embedding/entegrasyon:** Diğer araçlara gömme veya entegrasyon senaryolarında kısıtlama yok
+1. **Zero enterprise adoption barrier:** Many organizations that avoid AGPL (banks, defense, large tech companies) prefer MIT-licensed tools
+2. **Market differentiation:** The "MIT + verification" combination is unique in the open source market
+3. **Open-core model compatibility:** The core remains MIT while a SaaS/Enterprise tier can be added in the future
+4. **Community contribution incentive:** Minimum restrictions, maximum flexibility
+5. **Embedding/integration:** No restrictions in scenarios involving embedding or integrating into other tools
 
-## Değerlendirilen Alternatifler
+## Alternatives Considered
 
 ### AGPL-3.0
 
-- **Artılar:** Kod değişikliklerinin paylaşılmasını zorunlu kılar, ücretsiz SaaS kullanımını engeller
-- **Eksiler:** Birçok kurumsal kuruluş AGPL'yi policy olarak yasaklar; benimseme bariyeri yüksek
-- **Karar:** Reddedildi. Leakwatch'ın konumlandırması TruffleHog'un AGPL zayıflığını hedefliyor.
+- **Pros:** Mandates sharing code changes, prevents free SaaS usage
+- **Cons:** Many enterprise organizations prohibit AGPL as a policy; high adoption barrier
+- **Decision:** Rejected. Leakwatch's positioning targets TruffleHog's AGPL weakness.
 
 ### Apache 2.0
 
-- **Artılar:** Patent koruması içerir, kurumsal dostu
-- **Eksiler:** MIT'ye göre daha karmaşık, fark pratikte minimal
-- **Karar:** Reddedildi. MIT'nin basitliği ve yaygınlığı tercih edildi.
+- **Pros:** Includes patent protection, enterprise-friendly
+- **Cons:** More complex than MIT, practical difference is minimal
+- **Decision:** Rejected. MIT's simplicity and prevalence were preferred.
 
 ### BSL (Business Source License)
 
-- **Artılar:** Ticari SaaS kullanımını kısıtlar, sonra açık kaynağa geçer
-- **Eksiler:** "Gerçek" açık kaynak olarak kabul görmez (OSI onaylı değil), topluluk güveni zedeler
-- **Karar:** Reddedildi.
+- **Pros:** Restricts commercial SaaS usage, transitions to open source later
+- **Cons:** Not recognized as "true" open source (not OSI-approved), erodes community trust
+- **Decision:** Rejected.
 
-## Sonuçlar
+## Consequences
 
-### Olumlu
+### Positive
 
-- AGPL'den kaçınan kurumsal kullanıcılar için doğal bir seçenek
-- Topluluk katkı bariyeri minimum
-- Gelecekteki ticari model (SaaS katmanı) ile uyumlu
+- A natural choice for enterprise users avoiding AGPL
+- Minimum community contribution barrier
+- Compatible with future commercial models (SaaS tier)
 
-### Olumsuz
+### Negative
 
-- Rakipler kodu fork edip ticari ürün oluşturabilir
-- SaaS olarak sunulması engellenemez (AGPL'de olduğu gibi)
-- Bu risk, güçlü bir marka ve topluluk ile azaltılır
+- Competitors can fork the code and create commercial products
+- Cannot prevent being offered as SaaS (as with AGPL)
+- This risk is mitigated through a strong brand and community

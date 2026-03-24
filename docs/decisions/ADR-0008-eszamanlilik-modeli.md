@@ -1,18 +1,18 @@
-# ADR-0008: Eşzamanlılık Modeli — Worker Pool
+# ADR-0008: Concurrency Model — Worker Pool
 
-- **Durum:** Kabul Edildi
-- **Tarih:** 2026-03-24
-- **Karar Verenler:** Proje ekibi
+- **Status:** Accepted
+- **Date:** 2026-03-24
+- **Decision Makers:** Project team
 
-## Bağlam
+## Context
 
-Sır tarama, doğası gereği büyük ölçüde I/O'ya bağlı (dosya okuma, ağ istekleri) bir işlemdir. Taranacak her dosya/commit/katman için kontrolsüz goroutine başlatmak sistem kaynaklarını tüketebilir. Eşzamanlılık seviyesi kontrol altında tutulmalıdır.
+Secret scanning is inherently a largely I/O-bound operation (file reading, network requests). Spawning uncontrolled goroutines for every file/commit/layer to be scanned can exhaust system resources. The concurrency level must be kept under control.
 
-## Karar
+## Decision
 
-**İşçi Havuzu (Worker Pool)** tasarım deseni seçilmiştir.
+**Worker Pool** design pattern has been selected.
 
-### Gerekçe
+### Rationale
 
 ```mermaid
 flowchart TD
@@ -23,52 +23,52 @@ flowchart TD
     W1 --> Results[("Results Channel")]
     W2 --> Results
     WN --> Results
-    Results --> Output[Çıktı]
+    Results --> Output[Output]
 ```
 
-- Sabit sayıda işçi goroutine'i (varsayılan: `runtime.NumCPU()`)
-- İşler (chunks) → buffered jobs channel → işçiler → buffered results channel
-- Eşzamanlılık seviyesi kontrol altında, kaynak kullanımı öngörülebilir
-- `--concurrency` flag'i ile kullanıcı tarafından ayarlanabilir
-- Tarama mantığını veri kaynağı mantığından tamamen ayırır (Separation of Concerns)
+- Fixed number of worker goroutines (default: `runtime.NumCPU()`)
+- Jobs (chunks) -> buffered jobs channel -> workers -> buffered results channel
+- Concurrency level is controlled, resource usage is predictable
+- Configurable by the user via the `--concurrency` flag
+- Completely separates scanning logic from data source logic (Separation of Concerns)
 
-### Kanal yapısı
+### Channel structure
 
-| Kanal | Tampon | Üretici | Tüketici |
-|-------|--------|---------|----------|
-| `jobs` | `ChunkSize` (1024) | Source goroutine'i | Worker goroutine'leri |
-| `results` | `ChunkSize` (1024) | Worker goroutine'leri | Sonuç toplama goroutine'i |
+| Channel | Buffer | Producer | Consumer |
+|---------|--------|----------|----------|
+| `jobs` | `ChunkSize` (1024) | Source goroutine | Worker goroutines |
+| `results` | `ChunkSize` (1024) | Worker goroutines | Result collection goroutine |
 
-## Değerlendirilen Alternatifler
+## Alternatives Considered
 
-### Kontrolsüz goroutine (her chunk için yeni goroutine)
+### Uncontrolled goroutines (new goroutine per chunk)
 
-- **Artılar:** Basit implementasyon
-- **Eksiler:** Kaynak tüketimi kontrolsüz, dosya tanıtıcı limitleri aşılabilir, GC baskısı
-- **Karar:** Reddedildi.
+- **Pros:** Simple implementation
+- **Cons:** Uncontrolled resource consumption, file descriptor limits can be exceeded, GC pressure
+- **Decision:** Rejected.
 
 ### errgroup / semaphore
 
-- **Artılar:** `golang.org/x/sync/errgroup` ile basit eşzamanlılık sınırlama
-- **Eksiler:** Worker pool kadar esnek değil, sonuç toplama ayrı yönetilmeli
-- **Karar:** Kısmen uygulanabilir — worker pool içinde hata yönetimi için errgroup kullanılabilir.
+- **Pros:** Simple concurrency limiting with `golang.org/x/sync/errgroup`
+- **Cons:** Not as flexible as a worker pool, result collection must be managed separately
+- **Decision:** Partially applicable — errgroup can be used for error management within the worker pool.
 
 ### Pipeline (channel chaining)
 
-- **Artılar:** Her aşama bağımsız ölçeklenebilir
-- **Eksiler:** Bu projede aşamalar arası veri dönüşümü basit, pipeline overhead gereksiz
-- **Karar:** Reddedildi. Worker pool, bu kullanım için daha uygun.
+- **Pros:** Each stage can scale independently
+- **Cons:** Data transformation between stages is simple in this project, pipeline overhead is unnecessary
+- **Decision:** Rejected. Worker pool is more suitable for this use case.
 
-## Sonuçlar
+## Consequences
 
-### Olumlu
+### Positive
 
-- Kaynak kullanımı öngörülebilir ve sınırlı
-- Kullanıcı, `--concurrency` ile donanımına göre ayarlayabilir
-- Context iptali ile graceful shutdown desteklenir
-- Kaynaktan bağımsız: Git, dosya sistemi, container — hepsi aynı worker pool'u kullanır
+- Resource usage is predictable and bounded
+- Users can tune via `--concurrency` according to their hardware
+- Graceful shutdown supported via context cancellation
+- Source-agnostic: Git, file system, container — all use the same worker pool
 
-### Olumsuz
+### Negative
 
-- Buffered channel boyutu doğru ayarlanmalı (çok küçük: darboğaz, çok büyük: bellek israfı)
-- Doğrulama (verification) aşaması ayrı bir eşzamanlılık kontrolü gerektirir (ağ I/O + rate limiting)
+- Buffered channel size must be properly tuned (too small: bottleneck, too large: memory waste)
+- The verification stage requires separate concurrency control (network I/O + rate limiting)

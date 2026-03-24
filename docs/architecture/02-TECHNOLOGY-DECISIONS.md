@@ -1,320 +1,320 @@
-# Leakwatch - Teknoloji Kararları ve Gerekçeleri
+# Leakwatch - Technology Decisions and Rationale
 
-> **Belge Versiyonu:** 1.0
-> **Tarih:** 2026-03-24
-> **Durum:** Taslak
-
----
-
-## 1. Yönetici Özeti
-
-Bu belge, Leakwatch projesinin teknoloji seçimlerini, bu seçimlerin arkasındaki gerekçeleri ve değerlendirilen alternatifleri detaylı bir şekilde açıklamaktadır. Her karar, performans, ekosistem uygunluğu, geliştirme hızı ve uzun vadeli sürdürülebilirlik kriterleri çerçevesinde alınmıştır.
-
-**Ana Karar:** Go (Golang) birincil geliştirme dili olarak seçilmiştir.
+> **Document Version:** 1.0
+> **Date:** 2026-03-24
+> **Status:** Draft
 
 ---
 
-## 2. Programlama Dili Seçimi: Go (Golang)
+## 1. Executive Summary
 
-### 2.1 Değerlendirme Kriterleri
+This document describes the technology choices of the Leakwatch project, the rationale behind these choices, and the alternatives that were evaluated. Each decision was made based on performance, ecosystem fit, development velocity, and long-term sustainability criteria.
 
-| Kriter | Ağırlık | Açıklama |
-|--------|---------|----------|
-| Regex/Desen Eşleştirme Performansı | %25 | Tarama motorunun darboğazı |
-| Eşzamanlılık Modeli | %20 | Paralel I/O-bound tarama |
-| Ekosistem (Git, Container, CLI) | %20 | Kritik kütüphanelerin varlığı |
-| Çapraz Derleme & Dağıtım | %15 | Tek binary, sıfır bağımlılık |
-| Geliştirme Hızı | %10 | İlk sürüme ulaşma süresi |
-| Topluluk & İşe Alım | %10 | Katkıda bulunan bulma kolaylığı |
-
-### 2.2 Dil Karşılaştırma Matrisi
-
-| Kriter | Go | Rust | Python | .NET (C#) | TypeScript |
-|--------|-----|------|--------|-----------|------------|
-| **Regex Performansı** | İyi (RE2) | **En İyi** | Zayıf | İyi | Orta |
-| **Aho-Corasick Kalitesi** | Yeterli | **En İyi** | Zayıf | Yeterli | Zayıf |
-| **Eşzamanlılık Kolaylığı** | **En İyi** | İyi (karmaşık) | Zayıf (GIL) | İyi | Zayıf |
-| **Git Kütüphanesi** | **Mükemmel** (go-git) | Mükemmel (gitoxide) | İyi | İyi | Zayıf |
-| **Container İmaj Kütüphanesi** | **En İyi** (go-containerregistry) | Gelişmekte | Yeterli | Zayıf | Zayıf |
-| **Çapraz Derleme** | **En İyi** | İyi | Zayıf | Yeterli | Zayıf |
-| **Tek Binary** | **Evet** | **Evet** | Hayır | Evet (AOT) | Hayır |
-| **SARIF Desteği** | İyi | Yeterli | İyi | **En İyi** | Temel |
-| **Geliştirme Hızı** | **Yüksek** | Orta | Yüksek | Orta | Yüksek |
-| **Güvenlik Topluluğu** | Geniş | Büyüyen | **En Geniş** | Dar | Geniş |
-| **Kanıtlanmış Referanslar** | **TruffleHog, Gitleaks** | ripgrep | detect-secrets | Yok | Yok |
-
-### 2.3 Go Seçim Gerekçesi
-
-1. **Kanıtlanmış Mimari:** TruffleHog ve Gitleaks, Go'nun bu problem alanı için uygunluğunu doğrulamıştır. Çalışan mimariler incelenip iyileştirilebilir.
-
-2. **En İyi Ekosistem Uyumu:**
-   - `go-git` — Saf Go, CGO gerektirmez, tam git geçmiş erişimi
-   - `go-containerregistry` — OCI/Docker imaj işleme için endüstri standardı
-   - `cobra` + `viper` — CLI çerçevesi için altın standart
-   - Bu üç kütüphanenin birlikteliği başka hiçbir dilde yoktur
-
-3. **Eşzamanlılık Basitliği:** Goroutine + channel ile fan-out/fan-in desenleri doğal ve hata yapılması zor.
-
-4. **Dağıtım Mükemmelliği:** `GOOS=linux GOARCH=amd64 go build` ile tüm platformlar için tek statik binary. CI/CD entegrasyonu için kritik.
-
-5. **Geliştirme Hızı:** Hızlı derleme, basit dil, büyük geliştirici havuzu.
-
-### 2.4 Go'nun Bilinen Zayıflığı ve Çözüm Stratejisi
-
-**Sorun:** Go'nun RE2 tabanlı `regexp` paketi, Rust'ın `regex` crate'ine kıyasla 2-5x yavaştır.
-
-**Çözüm Stratejisi (Aho-Corasick Öncelikli Yaklaşım):**
-
-Sır desenlerin çoğunluğu sabit ön-eklerle başlar (örn: `AKIA`, `ghp_`, `sk-live-`). Strateji:
-
-1. **Birincil:** Aho-Corasick algoritması ile sabit ön-ek eşleştirme (O(n) — metin boyutuna bağlı, desen sayısından bağımsız)
-2. **İkincil:** Yalnızca Aho-Corasick eşleşmesi bulunduğunda regex doğrulaması
-3. **Üçüncül:** Entropi analizi ile ek filtreleme
-
-Bu yaklaşım, regex iş yükünü %90+ azaltarak Go'nun regex dezavantajını pratikte ortadan kaldırır.
-
-### 2.5 Neden Rust Değil?
-
-Rust, ham performans açısından en iyi seçim olurdu. Ancak:
-
-- Container imaj kütüphaneleri Go kadar olgun değil
-- Geliştirme hızı daha düşük (ownership model öğrenme eğrisi)
-- Mevcut referans mimari yok (TruffleHog/Gitleaks Go'da)
-- Topluluk katkıları için daha yüksek giriş bariyeri
-
-**Gelecek Olasılık:** Performans kritik hale gelirse, tarama motorunun hot path'i Rust ile yazılıp CGO üzerinden çağrılabilir (hibrit mimari).
-
-### 2.6 Neden .NET Değil?
-
-- Container imaj ayrıştırma için `go-containerregistry` eşdeğeri yok
-- Güvenlik OSS topluluğu .NET ekosisteminde çok zayıf
-- Referans alınacak benzer proje yok
-- Binary boyutları Go/Rust'a göre daha büyük (15-30MB AOT)
+**Key Decision:** Go (Golang) has been selected as the primary development language.
 
 ---
 
-## 3. Temel Kütüphane Seçimleri
+## 2. Programming Language Selection: Go (Golang)
 
-### 3.1 CLI Çerçevesi: Cobra + Viper
+### 2.1 Evaluation Criteria
 
-| Kütüphane | Versiyon | Amaç |
-|-----------|----------|------|
-| `github.com/spf13/cobra` | v1.8+ | Komut yapısı, flag yönetimi, yardım metinleri |
-| `github.com/spf13/viper` | v1.18+ | Yapılandırma yönetimi (YAML, env vars, flags) |
+| Criterion | Weight | Description |
+|-----------|--------|-------------|
+| Regex/Pattern Matching Performance | 25% | The bottleneck of the scanning engine |
+| Concurrency Model | 20% | Parallel I/O-bound scanning |
+| Ecosystem (Git, Container, CLI) | 20% | Availability of critical libraries |
+| Cross-Compilation & Distribution | 15% | Single binary, zero dependencies |
+| Development Velocity | 10% | Time to first release |
+| Community & Hiring | 10% | Ease of finding contributors |
 
-**Gerekçe:**
-- Kubernetes, GitHub CLI, Hugo tarafından kullanılan endüstri standardı
-- İç içe komut desteği (`scan git`, `scan fs`, `scan image`, `verify aws`)
-- POSIX uyumlu flag yönetimi (`-f`, `--flag`)
-- Viper ile sorunsuz entegrasyon — yapılandırma dosyası + ortam değişkeni + flag hiyerarşisi
-- `cobra-cli` ile proje iskeletini hızla oluşturma
-- Otomatik yardım, man page ve markdown dokümantasyon oluşturma
+### 2.2 Language Comparison Matrix
 
-**Alternatif (Reddedilen):** `urfave/cli` — daha basit projeler için yeterli, ancak iç içe komut desteği ve Viper entegrasyonu yetersiz.
+| Criterion | Go | Rust | Python | .NET (C#) | TypeScript |
+|-----------|-----|------|--------|-----------|------------|
+| **Regex Performance** | Good (RE2) | **Best** | Weak | Good | Moderate |
+| **Aho-Corasick Quality** | Adequate | **Best** | Weak | Adequate | Weak |
+| **Concurrency Ease** | **Best** | Good (complex) | Weak (GIL) | Good | Weak |
+| **Git Library** | **Excellent** (go-git) | Excellent (gitoxide) | Good | Good | Weak |
+| **Container Image Library** | **Best** (go-containerregistry) | Developing | Adequate | Weak | Weak |
+| **Cross-Compilation** | **Best** | Good | Weak | Adequate | Weak |
+| **Single Binary** | **Yes** | **Yes** | No | Yes (AOT) | No |
+| **SARIF Support** | Good | Adequate | Good | **Best** | Basic |
+| **Development Velocity** | **High** | Moderate | High | Moderate | High |
+| **Security Community** | Wide | Growing | **Widest** | Narrow | Wide |
+| **Proven References** | **TruffleHog, Gitleaks** | ripgrep | detect-secrets | None | None |
 
-### 3.2 Git İşlemleri: go-git
+### 2.3 Go Selection Rationale
 
-| Kütüphane | Versiyon | Amaç |
-|-----------|----------|------|
-| `github.com/go-git/go-git/v5` | v5.12+ | Git repo işlemleri, geçmiş analizi |
+1. **Proven Architecture:** TruffleHog and Gitleaks have validated Go's suitability for this problem domain. Working architectures can be studied and improved upon.
 
-**Gerekçe:**
-- Saf Go implementasyonu — CGO gerektirmez, çapraz derleme sorunsuz
-- Harici `git` binary bağımlılığı yok
-- Git nesneleri üzerinde tam programatik kontrol
-- TruffleHog tarafından kullanılıyor — kanıtlanmış
-- `LogOptions` ile optimize edilmiş tarama (since, depth)
-- Pluggable storage ile bellek içi test desteği
+2. **Best Ecosystem Fit:**
+   - `go-git` — Pure Go, no CGO required, full git history access
+   - `go-containerregistry` — Industry standard for OCI/Docker image processing
+   - `cobra` + `viper` — Gold standard for CLI frameworks
+   - The combination of these three libraries does not exist in any other language
 
-**Alternatif (Reddedilen):** `git2go` — C bağımlılığı (libgit2), CGO karmaşıklığı, çapraz derleme zorluğu.
+3. **Concurrency Simplicity:** Fan-out/fan-in patterns with goroutines + channels are natural and hard to get wrong.
 
-### 3.3 Container İmaj İşlemleri: go-containerregistry
+4. **Distribution Excellence:** `GOOS=linux GOARCH=amd64 go build` produces a single static binary for all platforms. Critical for CI/CD integration.
 
-| Kütüphane | Versiyon | Amaç |
-|-----------|----------|------|
-| `github.com/google/go-containerregistry` | v0.20+ | OCI/Docker imaj katmanlarının analizi |
+5. **Development Velocity:** Fast compilation, simple language, large developer pool.
 
-**Gerekçe:**
-- Docker daemon gerektirmez — hafif, taşınabilir
-- OCI ve Docker manifest formatlarını destekler
-- Katman bazlı analiz — silinen dosyaları önceki katmanlarda tespit
-- crane, ko, cosign tarafından kullanılıyor
-- Registry kimlik doğrulaması desteği (Docker Hub, GHCR, ECR, GCR)
+### 2.4 Go's Known Weakness and Mitigation Strategy
 
-### 3.4 Desen Eşleştirme: Aho-Corasick
+**Issue:** Go's RE2-based `regexp` package is 2-5x slower than Rust's `regex` crate.
 
-| Kütüphane | Versiyon | Amaç |
-|-----------|----------|------|
-| `github.com/cloudflare/ahocorasick` | latest | Çoklu desen eşleştirme |
+**Mitigation Strategy (Aho-Corasick First Approach):**
 
-**Gerekçe:**
-- O(n) zaman karmaşıklığı — metin boyutuna bağlı, desen sayısından bağımsız
-- Binlerce desen eklendiğinde bile performans sabit
-- CPU cache dostu — tek geçişli tarama
-- Cloudflare'in üretimde kullandığı kanıtlanmış implementasyon
+Most secret patterns start with fixed prefixes (e.g., `AKIA`, `ghp_`, `sk-live-`). The strategy:
 
-**Alternatif:** `github.com/petar-dambovaliev/aho-corasick` — daha yeni, daha Go-idiomatic API.
+1. **Primary:** Aho-Corasick algorithm for fixed prefix matching (O(n) — depends on text size, independent of pattern count)
+2. **Secondary:** Regex validation only when an Aho-Corasick match is found
+3. **Tertiary:** Additional filtering with entropy analysis
 
-### 3.5 Çıktı Formatları
+This approach reduces regex workload by 90%+, effectively eliminating Go's regex disadvantage in practice.
 
-| Kütüphane | Amaç |
-|-----------|------|
-| `github.com/owenrumney/go-sarif` | SARIF çıktı formatı |
-| `encoding/json` (stdlib) | JSON çıktı |
-| `encoding/csv` (stdlib) | CSV çıktı |
+### 2.5 Why Not Rust?
 
-### 3.6 Test Altyapısı
+Rust would be the best choice in terms of raw performance. However:
 
-| Kütüphane | Amaç |
-|-----------|------|
-| `testing` (stdlib) | Birim testler |
-| `testing/fstest` (stdlib) | Bellek içi dosya sistemi testleri |
-| `github.com/stretchr/testify` | Assertion ve mock kütüphanesi |
+- Container image libraries are not as mature as Go's
+- Development velocity is lower (ownership model learning curve)
+- No existing reference architecture (TruffleHog/Gitleaks are in Go)
+- Higher entry barrier for community contributions
 
-### 3.7 AWS/Cloud SDK'ları (Doğrulama İçin)
+**Future Possibility:** If performance becomes critical, the scanning engine's hot path could be written in Rust and called via CGO (hybrid architecture).
 
-| Kütüphane | Amaç |
-|-----------|------|
-| `github.com/aws/aws-sdk-go-v2` | AWS STS GetCallerIdentity (anahtar doğrulama) |
-| `net/http` (stdlib) | GitHub, Slack vb. API doğrulama |
+### 2.6 Why Not .NET?
+
+- No `go-containerregistry` equivalent for container image parsing
+- The security OSS community is very weak in the .NET ecosystem
+- No similar reference project to study
+- Binary sizes are larger compared to Go/Rust (15-30MB AOT)
 
 ---
 
-## 4. Derleme ve Dağıtım Araçları
+## 3. Core Library Selections
+
+### 3.1 CLI Framework: Cobra + Viper
+
+| Library | Version | Purpose |
+|---------|---------|---------|
+| `github.com/spf13/cobra` | v1.8+ | Command structure, flag management, help text |
+| `github.com/spf13/viper` | v1.18+ | Configuration management (YAML, env vars, flags) |
+
+**Rationale:**
+- Industry standard used by Kubernetes, GitHub CLI, Hugo
+- Nested command support (`scan git`, `scan fs`, `scan image`, `verify aws`)
+- POSIX-compliant flag management (`-f`, `--flag`)
+- Seamless integration with Viper — config file + environment variable + flag hierarchy
+- Rapid project scaffolding with `cobra-cli`
+- Automatic help, man page, and markdown documentation generation
+
+**Alternative (Rejected):** `urfave/cli` — sufficient for simpler projects, but inadequate nested command support and Viper integration.
+
+### 3.2 Git Operations: go-git
+
+| Library | Version | Purpose |
+|---------|---------|---------|
+| `github.com/go-git/go-git/v5` | v5.12+ | Git repo operations, history analysis |
+
+**Rationale:**
+- Pure Go implementation — no CGO required, seamless cross-compilation
+- No external `git` binary dependency
+- Full programmatic control over Git objects
+- Used by TruffleHog — proven
+- Optimized scanning with `LogOptions` (since, depth)
+- In-memory test support with pluggable storage
+
+**Alternative (Rejected):** `git2go` — C dependency (libgit2), CGO complexity, cross-compilation difficulty.
+
+### 3.3 Container Image Operations: go-containerregistry
+
+| Library | Version | Purpose |
+|---------|---------|---------|
+| `github.com/google/go-containerregistry` | v0.20+ | OCI/Docker image layer analysis |
+
+**Rationale:**
+- No Docker daemon required — lightweight, portable
+- Supports OCI and Docker manifest formats
+- Layer-by-layer analysis — detects deleted files in previous layers
+- Used by crane, ko, cosign
+- Registry authentication support (Docker Hub, GHCR, ECR, GCR)
+
+### 3.4 Pattern Matching: Aho-Corasick
+
+| Library | Version | Purpose |
+|---------|---------|---------|
+| `github.com/cloudflare/ahocorasick` | latest | Multi-pattern matching |
+
+**Rationale:**
+- O(n) time complexity — depends on text size, independent of pattern count
+- Performance remains constant even when thousands of patterns are added
+- CPU cache friendly — single-pass scanning
+- Proven implementation used by Cloudflare in production
+
+**Alternative:** `github.com/petar-dambovaliev/aho-corasick` — newer, more Go-idiomatic API.
+
+### 3.5 Output Formats
+
+| Library | Purpose |
+|---------|---------|
+| `github.com/owenrumney/go-sarif` | SARIF output format |
+| `encoding/json` (stdlib) | JSON output |
+| `encoding/csv` (stdlib) | CSV output |
+
+### 3.6 Testing Infrastructure
+
+| Library | Purpose |
+|---------|---------|
+| `testing` (stdlib) | Unit tests |
+| `testing/fstest` (stdlib) | In-memory filesystem tests |
+| `github.com/stretchr/testify` | Assertion and mock library |
+
+### 3.7 AWS/Cloud SDKs (For Verification)
+
+| Library | Purpose |
+|---------|---------|
+| `github.com/aws/aws-sdk-go-v2` | AWS STS GetCallerIdentity (key verification) |
+| `net/http` (stdlib) | GitHub, Slack, etc. API verification |
+
+---
+
+## 4. Build and Distribution Tools
 
 ### 4.1 GoReleaser
 
-| Araç | Amaç |
-|------|------|
-| `goreleaser` | Çapraz derleme, arşivleme ve GitHub Release oluşturma |
+| Tool | Purpose |
+|------|---------|
+| `goreleaser` | Cross-compilation, archiving, and GitHub Release creation |
 
-**Gerekçe:**
-- Tek komutla Linux/macOS/Windows (amd64, arm64) için derleme
-- Otomatik GitHub Release varlık yükleme
-- Homebrew formula ve Scoop manifest oluşturma
-- Docker imaj oluşturma ve yayınlama
-- Changelog otomatik oluşturma
+**Rationale:**
+- Single command builds for Linux/macOS/Windows (amd64, arm64)
+- Automatic GitHub Release asset uploading
+- Homebrew formula and Scoop manifest generation
+- Docker image building and publishing
+- Automatic changelog generation
 
 ### 4.2 GitHub Actions
 
-| Workflow | Amaç |
-|----------|------|
-| `ci.yml` | Her push/PR için test, lint, build |
-| `release.yml` | Tag push'ta GoReleaser ile sürüm yayınlama |
+| Workflow | Purpose |
+|----------|---------|
+| `ci.yml` | Test, lint, build on every push/PR |
+| `release.yml` | Release publishing via GoReleaser on tag push |
 
-### 4.3 Kod Kalitesi Araçları
+### 4.3 Code Quality Tools
 
-| Araç | Amaç |
-|------|------|
-| `golangci-lint` | Statik analiz ve linting (50+ linter) |
-| `gofumpt` | Strict Go kod formatlama |
-| `govulncheck` | Bilinen güvenlik açığı taraması |
-
----
-
-## 5. Minimum Go Versiyonu
-
-**Go 1.22+** (tercihen en güncel kararlı sürüm)
-
-**Gerekçe:**
-- `io/fs` paketi (Go 1.16+) — dosya sistemi soyutlaması
-- Generics desteği (Go 1.18+) — tip güvenli koleksiyonlar
-- `log/slog` (Go 1.21+) — yapılandırılmış loglama
-- Gelişmiş GC performansı (Go 1.22+)
-- `range over func` (Go 1.23+) — iterator desteği
+| Tool | Purpose |
+|------|---------|
+| `golangci-lint` | Static analysis and linting (50+ linters) |
+| `gofumpt` | Strict Go code formatting |
+| `govulncheck` | Known vulnerability scanning |
 
 ---
 
-## 6. Proje Yapısı
+## 5. Minimum Go Version
+
+**Go 1.22+** (preferably the latest stable release)
+
+**Rationale:**
+- `io/fs` package (Go 1.16+) — filesystem abstraction
+- Generics support (Go 1.18+) — type-safe collections
+- `log/slog` (Go 1.21+) — structured logging
+- Improved GC performance (Go 1.22+)
+- `range over func` (Go 1.23+) — iterator support
+
+---
+
+## 6. Project Structure
 
 ```
 leakwatch/
-├── cmd/                        # CLI komutları (Cobra)
-│   ├── root.go                 # Ana komut
-│   ├── scan.go                 # scan üst komutu
-│   ├── scan_git.go             # scan git alt komutu
-│   ├── scan_fs.go              # scan fs alt komutu
-│   ├── scan_image.go           # scan image alt komutu
-│   └── verify.go               # verify komutu
-├── internal/                   # Dahili paketler (dışa kapalı)
-│   ├── engine/                 # Tarama motoru çekirdeği
-│   │   ├── engine.go           # İşçi havuzu ve orkestrasyon
-│   │   ├── worker.go           # İşçi goroutine'leri
-│   │   └── pipeline.go         # Tarama pipeline'ı
-│   ├── detector/               # Sır dedektörleri
-│   │   ├── registry.go         # Dedektör kayıt defteri
-│   │   ├── detector.go         # Detector arayüzü
-│   │   ├── aws.go              # AWS dedektörleri
-│   │   ├── github.go           # GitHub dedektörleri
-│   │   ├── generic.go          # Genel dedektörler
-│   │   └── custom.go           # YAML tabanlı özel kurallar
-│   ├── source/                 # Tarama kaynakları
-│   │   ├── source.go           # Source arayüzü
-│   │   ├── git.go              # Git kaynağı
-│   │   ├── filesystem.go       # Dosya sistemi kaynağı
-│   │   └── container.go        # Container imaj kaynağı
-│   ├── verifier/               # Sır doğrulama modülleri
-│   │   ├── verifier.go         # Verifier arayüzü
-│   │   ├── aws.go              # AWS STS doğrulama
-│   │   └── github.go           # GitHub API doğrulama
-│   ├── entropy/                # Entropi hesaplama
-│   │   └── shannon.go          # Shannon entropi implementasyonu
-│   ├── matcher/                # Desen eşleştirme motoru
-│   │   ├── ahocorasick.go      # Aho-Corasick implementasyonu
-│   │   └── regex.go            # Regex doğrulama
-│   ├── output/                 # Çıktı formatlayıcıları
-│   │   ├── formatter.go        # Formatter arayüzü
-│   │   ├── json.go             # JSON çıktı
-│   │   ├── sarif.go            # SARIF çıktı
-│   │   └── csv.go              # CSV çıktı
-│   ├── config/                 # Yapılandırma yönetimi
-│   │   └── config.go           # Viper tabanlı config
-│   └── filter/                 # Filtreleme (.leakwatchignore vb.)
-│       └── filter.go           # Dosya/yol filtreleme
-├── pkg/                        # Dışa açık paketler (kütüphane kullanımı)
-│   └── finding/                # Finding veri yapısı
-│       └── finding.go          # Bulgu modeli
-├── rules/                      # Yerleşik kural tanımları
-│   ├── aws.yaml                # AWS sır desenleri
-│   ├── github.yaml             # GitHub sır desenleri
-│   ├── gcp.yaml                # GCP sır desenleri
-│   ├── generic.yaml            # Genel sır desenleri
+├── cmd/                        # CLI commands (Cobra)
+│   ├── root.go                 # Root command
+│   ├── scan.go                 # scan parent command
+│   ├── scan_git.go             # scan git subcommand
+│   ├── scan_fs.go              # scan fs subcommand
+│   ├── scan_image.go           # scan image subcommand
+│   └── verify.go               # verify command
+├── internal/                   # Internal packages (unexported)
+│   ├── engine/                 # Scan engine core
+│   │   ├── engine.go           # Worker pool and orchestration
+│   │   ├── worker.go           # Worker goroutines
+│   │   └── pipeline.go         # Scan pipeline
+│   ├── detector/               # Secret detectors
+│   │   ├── registry.go         # Detector registry
+│   │   ├── detector.go         # Detector interface
+│   │   ├── aws.go              # AWS detectors
+│   │   ├── github.go           # GitHub detectors
+│   │   ├── generic.go          # Generic detectors
+│   │   └── custom.go           # YAML-based custom rules
+│   ├── source/                 # Scan sources
+│   │   ├── source.go           # Source interface
+│   │   ├── git.go              # Git source
+│   │   ├── filesystem.go       # Filesystem source
+│   │   └── container.go        # Container image source
+│   ├── verifier/               # Secret verification modules
+│   │   ├── verifier.go         # Verifier interface
+│   │   ├── aws.go              # AWS STS verification
+│   │   └── github.go           # GitHub API verification
+│   ├── entropy/                # Entropy calculation
+│   │   └── shannon.go          # Shannon entropy implementation
+│   ├── matcher/                # Pattern matching engine
+│   │   ├── ahocorasick.go      # Aho-Corasick implementation
+│   │   └── regex.go            # Regex validation
+│   ├── output/                 # Output formatters
+│   │   ├── formatter.go        # Formatter interface
+│   │   ├── json.go             # JSON output
+│   │   ├── sarif.go            # SARIF output
+│   │   └── csv.go              # CSV output
+│   ├── config/                 # Configuration management
+│   │   └── config.go           # Viper-based config
+│   └── filter/                 # Filtering (.leakwatchignore etc.)
+│       └── filter.go           # File/path filtering
+├── pkg/                        # Public packages (library usage)
+│   └── finding/                # Finding data structure
+│       └── finding.go          # Finding model
+├── rules/                      # Built-in rule definitions
+│   ├── aws.yaml                # AWS secret patterns
+│   ├── github.yaml             # GitHub secret patterns
+│   ├── gcp.yaml                # GCP secret patterns
+│   ├── generic.yaml            # Generic secret patterns
 │   └── ...
-├── docs/                       # Proje dokümantasyonu
-├── .github/                    # GitHub Actions workflow'ları
+├── docs/                       # Project documentation
+├── .github/                    # GitHub Actions workflows
 │   └── workflows/
 │       ├── ci.yml
 │       └── release.yml
-├── .goreleaser.yml             # GoReleaser yapılandırması
-├── .golangci.yml               # Linter yapılandırması
-├── .pre-commit-hooks.yaml      # Pre-commit hook tanımı
-├── go.mod                      # Go modül tanımı
-├── go.sum                      # Bağımlılık checksum'ları
-├── main.go                     # Giriş noktası
-├── LICENSE                     # MIT Lisansı
-└── README.md                   # Proje açıklaması
+├── .goreleaser.yml             # GoReleaser configuration
+├── .golangci.yml               # Linter configuration
+├── .pre-commit-hooks.yaml      # Pre-commit hook definition
+├── go.mod                      # Go module definition
+├── go.sum                      # Dependency checksums
+├── main.go                     # Entry point
+├── LICENSE                     # MIT License
+└── README.md                   # Project description
 ```
 
 ---
 
-## 7. Performans Hedefleri
+## 7. Performance Targets
 
-| Metrik | Hedef | Referans |
-|--------|-------|---------|
-| Orta boy repo tarama (10K commit) | < 30 saniye | Gitleaks ~60s, TruffleHog ~120s |
-| Dosya sistemi tarama (10K dosya) | < 10 saniye | — |
-| Container imaj tarama (500MB) | < 60 saniye | — |
-| Bellek kullanımı (orta repo) | < 512MB | TruffleHog 1GB+ olabiliyor |
-| Binary boyutu | < 30MB | — |
-| Başlangıç süresi | < 100ms | — |
+| Metric | Target | Reference |
+|--------|--------|-----------|
+| Medium repo scan (10K commits) | < 30 seconds | Gitleaks ~60s, TruffleHog ~120s |
+| Filesystem scan (10K files) | < 10 seconds | — |
+| Container image scan (500MB) | < 60 seconds | — |
+| Memory usage (medium repo) | < 512MB | TruffleHog can exceed 1GB+ |
+| Binary size | < 30MB | — |
+| Startup time | < 100ms | — |
 
 ---
 
-## 8. Lisans Kararı: MIT
+## 8. License Decision: MIT
 
-**Gerekçe:**
-- Kurumsal benimseme için sıfır engel (AGPL'den kaçınan kullanıcıları hedefleme)
-- Gitleaks ile aynı lisans modeli — kanıtlanmış yaklaşım
-- Gelecekte ticari katman (SaaS/Enterprise) eklenebilir (open-core model)
-- Topluluk katkılarını teşvik eder
-- Embedding/entegrasyon senaryolarında kısıtlama yok
+**Rationale:**
+- Zero barrier for enterprise adoption (targeting users avoiding AGPL)
+- Same license model as Gitleaks — proven approach
+- Commercial tier (SaaS/Enterprise) can be added in the future (open-core model)
+- Encourages community contributions
+- No restrictions in embedding/integration scenarios

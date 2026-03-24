@@ -1,59 +1,59 @@
-# ADR-0004: Eklenti Mimarisi — Derleme Zamanı Kayıt
+# ADR-0004: Plugin Architecture — Compile-Time Registration
 
-- **Durum:** Kabul Edildi
-- **Tarih:** 2026-03-24
-- **Karar Verenler:** Proje ekibi
+- **Status:** Accepted
+- **Date:** 2026-03-24
+- **Decision Makers:** Project team
 
-## Bağlam
+## Context
 
-Leakwatch'ın yeni sır dedektörleri, tarama kaynakları ve doğrulayıcıları kolayca eklenebilir olması gerekmektedir. Go'da eklenti mimarisi için iki yaklaşım mevcuttur: çalışma zamanı (runtime) plugin'ler ve derleme zamanı (compile-time) kayıt.
+Leakwatch needs to allow easy addition of new secret detectors, scan sources, and verifiers. In Go, there are two approaches for plugin architecture: runtime plugins and compile-time registration.
 
-## Karar
+## Decision
 
-**Derleme zamanı kayıt modeli** (compile-time registration via `init()` + blank import) seçilmiştir.
+**Compile-time registration model** (via `init()` + blank import) has been selected.
 
-### Gerekçe
+### Rationale
 
-- Go'nun `init()` fonksiyonu ve blank import (`import _ "pkg"`) ile standart kayıt deseni
-- `database/sql` ve `image` paketlerinde kullanılan kanıtlanmış idiomik Go deseni
-- Statik binary felsefesiyle tam uyum
-- Kontrolsüz/kötü niyetli eklenti riski yok (güvenlik aracı için kritik)
-- Derleme zamanı tip güvenliği
+- Standard registration pattern using Go's `init()` function and blank import (`import _ "pkg"`)
+- Proven idiomatic Go pattern used in the `database/sql` and `image` packages
+- Full alignment with the static binary philosophy
+- No risk of uncontrolled/malicious plugins (critical for a security tool)
+- Compile-time type safety
 
-### Mekanizma
+### Mechanism
 
-1. Her eklenti paketi, belirli bir arayüzü (`Detector`, `Source`, `Verifier`) uygular
-2. Paketin `init()` fonksiyonu, kendisini merkezi bir registry'ye kaydeder
-3. Ana uygulama, eklenti paketlerini `import _ "pkg"` ile dahil eder
-4. Topluluk katkıları Pull Request ile yeni paketler ekleyerek yapılır
+1. Each plugin package implements a specific interface (`Detector`, `Source`, `Verifier`)
+2. The package's `init()` function registers itself with a central registry
+3. The main application includes plugin packages via `import _ "pkg"`
+4. Community contributions are made by adding new packages via Pull Requests
 
-## Değerlendirilen Alternatifler
+## Alternatives Considered
 
-### Çalışma zamanı plugin (Go plugin paketi)
+### Runtime plugin (Go plugin package)
 
-- **Artılar:** Kullanıcılar .so dosyalarını bırakarak eklenti ekleyebilir
-- **Eksiler:** Go sürümü, derleyici flag'leri ve C toolchain birebir eşleşmeli — son derece kırılgan. Sadece Linux'ta tam destek. Dağıtım ve bakım karmaşık.
-- **Karar:** Reddedildi. Go ekosisteminde fiilen kullanışsızdır.
+- **Pros:** Users can add plugins by dropping .so files
+- **Cons:** Go version, compiler flags, and C toolchain must match exactly — extremely fragile. Full support only on Linux. Distribution and maintenance are complex.
+- **Decision:** Rejected. Effectively impractical in the Go ecosystem.
 
-### YAML tabanlı kural tanımlama (ek olarak)
+### YAML-based rule definition (as a supplement)
 
-- **Artılar:** Kod yazmadan basit regex kuralları tanımlama
-- **Karar:** Kabul edildi — derleme zamanı modelin tamamlayıcısı olarak. Basit regex desenleri YAML ile, gelişmiş doğrulama mantığı Go arayüzü ile tanımlanır.
+- **Pros:** Define simple regex rules without writing code
+- **Decision:** Accepted — as a complement to the compile-time model. Simple regex patterns are defined via YAML, while advanced validation logic is implemented via Go interfaces.
 
-## Sonuçlar
+## Consequences
 
-### Olumlu
+### Positive
 
-- Güvenli: kontrol edilmemiş kod çalıştırılmaz
-- Basit: standart Go import mekanizması, ek araç gerektirmez
-- Tip güvenli: derleme zamanında hata yakalanır
-- İki katmanlı genişletilebilirlik: YAML (basit) + Go (gelişmiş)
+- Secure: no unvetted code is executed
+- Simple: standard Go import mechanism, no additional tooling required
+- Type safe: errors caught at compile time
+- Two-tier extensibility: YAML (simple) + Go (advanced)
 
-### Olumsuz
+### Negative
 
-- Üçüncü taraf eklentileri fork veya özel derleme gerektirir
-- Yeni eklenti eklemek recompile gerektirir (YAML kuralları hariç)
+- Third-party plugins require a fork or custom build
+- Adding new plugins requires recompilation (except YAML rules)
 
-## İlişkili Kararlar
+## Related Decisions
 
-- [ADR-0001: Programlama Dili](ADR-0001-programlama-dili.md) — Go'nun statik derleme felsefesi bu kararı destekler
+- [ADR-0001: Programming Language](ADR-0001-programlama-dili.md) — Go's static compilation philosophy supports this decision

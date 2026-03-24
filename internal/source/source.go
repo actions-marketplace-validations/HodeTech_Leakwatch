@@ -1,4 +1,4 @@
-// Package source, tarama kaynağı arayüzlerini tanımlar.
+// Package source defines scan source interfaces.
 package source
 
 import (
@@ -7,25 +7,25 @@ import (
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
-// Source, taranacak veri kaynağını temsil eder.
-// Her kaynak türü (Git, dosya sistemi, container) bu arayüzü uygular.
+// Source represents a data source to be scanned.
+// Each source type (Git, filesystem, container) implements this interface.
 type Source interface {
-	// Type, kaynağın türünü döndürür (örn: "git", "filesystem", "container").
+	// Type returns the source type identifier (e.g., "git", "filesystem", "container").
 	Type() string
 
-	// Chunks, taranacak veri parçalarını bir kanal üzerinden gönderir.
-	// Context iptal edildiğinde kanal kapatılır.
+	// Chunks sends scannable data chunks over a channel.
+	// The channel is closed when the context is cancelled.
 	Chunks(ctx context.Context) <-chan Chunk
 
-	// Validate, kaynağın erişilebilir ve geçerli olduğunu kontrol eder.
+	// Validate checks that the source is accessible and valid.
 	Validate() error
 }
 
-// Chunk, taranacak en küçük veri birimini temsil eder.
+// Chunk is the smallest unit of data to be scanned.
 type Chunk struct {
-	// Data, taranacak ham içerik.
+	// Data is the raw content to scan.
 	Data []byte
 
-	// SourceMetadata, bulgunun nereden geldiğini tanımlayan bağlam bilgisi.
+	// SourceMetadata describes where the chunk originated from.
 	SourceMetadata finding.SourceMetadata
 }

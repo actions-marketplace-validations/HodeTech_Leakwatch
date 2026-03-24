@@ -66,7 +66,7 @@ func TestAll_EmptyRegistry_ReturnsEmpty(t *testing.T) {
 func TestAll_MultipleDetectors_ReturnsSortedByID(t *testing.T) {
 	Reset()
 
-	// Kasıtlı olarak sırasız kaydet
+	// Intentionally register in non-alphabetical order
 	Register(&mockDetector{id: "zebra-detector"})
 	Register(&mockDetector{id: "alpha-detector"})
 	Register(&mockDetector{id: "middle-detector"})

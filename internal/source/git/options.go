@@ -2,45 +2,45 @@ package git
 
 import "time"
 
-// Option, GitSource yapılandırma seçeneği.
+// Option configures a GitSource.
 type Option func(*GitSource)
 
-// WithSince, belirtilen tarihten sonraki commit'leri tarar.
+// WithSince scans only commits after the specified date.
 func WithSince(t time.Time) Option {
 	return func(s *GitSource) {
 		s.since = &t
 	}
 }
 
-// WithSinceCommit, belirtilen commit'ten HEAD'e kadar olan değişiklikleri tarar.
+// WithSinceCommit scans only changes from the specified commit to HEAD.
 func WithSinceCommit(hash string) Option {
 	return func(s *GitSource) {
 		s.sinceCommit = hash
 	}
 }
 
-// WithBranch, belirtilen branch'ı tarar.
+// WithBranch scans only the specified branch.
 func WithBranch(branch string) Option {
 	return func(s *GitSource) {
 		s.branch = branch
 	}
 }
 
-// WithDepth, klonlama derinliğini ayarlar (sadece uzak depolar için).
+// WithDepth sets the clone depth (remote repositories only).
 func WithDepth(depth int) Option {
 	return func(s *GitSource) {
 		s.depth = depth
 	}
 }
 
-// WithMaxFileSize, maksimum dosya boyutunu ayarlar.
+// WithMaxFileSize sets the maximum file size to scan.
 func WithMaxFileSize(size int64) Option {
 	return func(s *GitSource) {
 		s.maxFileSize = size
 	}
 }
 
-// WithBufferSize, chunk kanalı tampon boyutunu ayarlar.
+// WithBufferSize sets the chunk channel buffer size.
 func WithBufferSize(size int) Option {
 	return func(s *GitSource) {
 		s.bufferSize = size

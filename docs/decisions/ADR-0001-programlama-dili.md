@@ -1,81 +1,81 @@
-# ADR-0001: Programlama Dili Seçimi — Go (Golang)
+# ADR-0001: Programming Language Selection — Go (Golang)
 
-- **Durum:** Kabul Edildi
-- **Tarih:** 2026-03-24
-- **Karar Verenler:** Proje ekibi
+- **Status:** Accepted
+- **Date:** 2026-03-24
+- **Decision Makers:** Project team
 
-## Bağlam
+## Context
 
-Leakwatch, çoklu kaynaklarda (Git geçmişi, dosya sistemi, container imajları) sır taraması yapan bir güvenlik aracıdır. Aracın temel gereksinimleri:
+Leakwatch is a security tool that performs secret scanning across multiple sources (Git history, file system, container images). The core requirements for the tool are:
 
-- Yüksek performanslı desen eşleştirme (binlerce regex deseni, gigabaytlarca veri)
-- Paralel I/O-bound tarama (eşzamanlılık)
-- Platformlar arası tek binary dağıtım (Linux, macOS, Windows)
-- Git, container imaj ve bulut hizmetleri ile programatik etkileşim
-- Güvenlik topluluğu tarafından benimseme potansiyeli
+- High-performance pattern matching (thousands of regex patterns, gigabytes of data)
+- Parallel I/O-bound scanning (concurrency)
+- Cross-platform single binary distribution (Linux, macOS, Windows)
+- Programmatic interaction with Git, container images, and cloud services
+- Adoption potential by the security community
 
-## Karar
+## Decision
 
-**Go (Golang)** birincil geliştirme dili olarak seçilmiştir.
+**Go (Golang)** has been selected as the primary development language.
 
-### Gerekçe
+### Rationale
 
-1. **Kanıtlanmış alan uygunluğu:** TruffleHog (~17K star) ve Gitleaks (~18K star) aynı problem alanında Go ile yazılmıştır. Mimari referanslar incelenip iyileştirilebilir.
+1. **Proven domain fit:** TruffleHog (~17K stars) and Gitleaks (~18K stars) are written in Go for the same problem domain. Architectural references can be studied and improved upon.
 
-2. **Eşsiz ekosistem birlikteliği:** `go-git` (saf Go git), `go-containerregistry` (OCI/Docker endüstri standardı) ve `cobra`+`viper` (CLI altın standardı) üçlüsü başka hiçbir dilde mevcut değildir.
+2. **Unmatched ecosystem synergy:** The trio of `go-git` (pure Go git), `go-containerregistry` (OCI/Docker industry standard), and `cobra`+`viper` (CLI gold standard) is not available in any other language.
 
-3. **Eşzamanlılık basitliği:** Goroutine + channel ile fan-out/fan-in desenleri doğal ve hata yapılması zordur.
+3. **Concurrency simplicity:** Fan-out/fan-in patterns with goroutines + channels are natural and hard to get wrong.
 
-4. **Dağıtım mükemmelliği:** `GOOS=linux GOARCH=amd64 go build` ile CGO'suz tek statik binary. CI/CD ortamlarında sıfır bağımlılık.
+4. **Distribution excellence:** A single static binary with no CGO via `GOOS=linux GOARCH=amd64 go build`. Zero dependencies in CI/CD environments.
 
-5. **Geliştirme hızı:** Hızlı derleme, basit dil semantiği, geniş geliştirici havuzu.
+5. **Development velocity:** Fast compilation, simple language semantics, large developer pool.
 
-### Bilinen zayıflık ve azaltma stratejisi
+### Known weakness and mitigation strategy
 
-Go'nun RE2 tabanlı `regexp` paketi Rust'ın regex crate'ine kıyasla 2-5x yavaştır. Bu, Aho-Corasick öncelikli hibrit strateji ile azaltılacaktır (bkz. [ADR-0005](ADR-0005-desen-eslestirme.md)). Regex iş yükü %90+ azaltılarak Go'nun regex dezavantajı pratikte ortadan kaldırılır.
+Go's RE2-based `regexp` package is 2-5x slower compared to Rust's regex crate. This will be mitigated with an Aho-Corasick-first hybrid strategy (see [ADR-0005](ADR-0005-desen-eslestirme.md)). By reducing regex workload by 90%+, Go's regex disadvantage is practically eliminated.
 
-## Değerlendirilen Alternatifler
+## Alternatives Considered
 
 ### Rust
 
-- **Artılar:** En iyi regex ve Aho-Corasick performansı, bellek güvenliği
-- **Eksiler:** Container imaj kütüphaneleri olgun değil, geliştirme hızı düşük, topluluk katkı bariyeri yüksek, referans mimari yok
-- **Karar:** Reddedildi. Gelecekte tarama hot path'i Rust FFI ile hızlandırılabilir.
+- **Pros:** Best regex and Aho-Corasick performance, memory safety
+- **Cons:** Container image libraries not mature, slower development velocity, high community contribution barrier, no reference architecture
+- **Decision:** Rejected. In the future, the scanning hot path could be accelerated via Rust FFI.
 
 ### Python
 
-- **Artılar:** En geniş geliştirici havuzu, detect-secrets referansı
-- **Eksiler:** CPU-bound taramada 10-100x yavaş (GIL), tek binary dağıtım zor, bellek verimsiz
-- **Karar:** Reddedildi. Sadece eklenti/kural katmanı için düşünülebilir.
+- **Pros:** Largest developer pool, detect-secrets as reference
+- **Cons:** 10-100x slower in CPU-bound scanning (GIL), single binary distribution difficult, memory inefficient
+- **Decision:** Rejected. Could only be considered for the plugin/rule layer.
 
 ### .NET (C#)
 
-- **Artılar:** İyi performans (AOT), güçlü SARIF desteği
-- **Eksiler:** `go-containerregistry` eşdeğeri yok, güvenlik OSS topluluğu zayıf, referans proje yok
-- **Karar:** Reddedildi.
+- **Pros:** Good performance (AOT), strong SARIF support
+- **Cons:** No `go-containerregistry` equivalent, weak security OSS community, no reference project
+- **Decision:** Rejected.
 
 ### TypeScript
 
-- **Artılar:** Geniş geliştirici havuzu
-- **Eksiler:** CPU-bound taramada yavaş, tek binary zor, container/git kütüphaneleri zayıf
-- **Karar:** Reddedildi.
+- **Pros:** Large developer pool
+- **Cons:** Slow in CPU-bound scanning, single binary difficult, weak container/git libraries
+- **Decision:** Rejected.
 
-## Sonuçlar
+## Consequences
 
-### Olumlu
+### Positive
 
-- Kanıtlanmış referans mimariler (TruffleHog, Gitleaks) incelenebilir
-- Go ekosisteminin tüm kritik kütüphaneleri mevcut
-- Platformlar arası tek binary dağıtım garanti
-- Geniş geliştirici havuzu, topluluk katkı potansiyeli
-- CI/CD entegrasyonu basit
+- Proven reference architectures (TruffleHog, Gitleaks) can be studied
+- All critical libraries available in the Go ecosystem
+- Cross-platform single binary distribution guaranteed
+- Large developer pool, community contribution potential
+- Simple CI/CD integration
 
-### Olumsuz
+### Negative
 
-- Regex performansı Rust'a kıyasla düşük (Aho-Corasick ile azaltılacak)
-- Generics desteği Go 1.18+ ile geldi, ancak hâlâ Rust/C# kadar olgun değil
-- Go'nun hata yönetimi (`if err != nil`) verbose olabilir
+- Regex performance lower compared to Rust (will be mitigated with Aho-Corasick)
+- Generics support arrived with Go 1.18+, but still not as mature as Rust/C#
+- Go's error handling (`if err != nil`) can be verbose
 
-## İlişkili Kararlar
+## Related Decisions
 
-- [ADR-0005: Desen Eşleştirme Stratejisi](ADR-0005-desen-eslestirme.md) — Go regex zayıflığının azaltılması
+- [ADR-0005: Pattern Matching Strategy](ADR-0005-desen-eslestirme.md) — Mitigation of Go's regex weakness

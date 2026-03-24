@@ -1,4 +1,4 @@
-// Package output, çıktı formatlayıcı arayüzlerini tanımlar.
+// Package output defines output formatter interfaces.
 package output
 
 import (
@@ -7,11 +7,11 @@ import (
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
-// Formatter, bulguları belirli bir formatta çıktılayan bileşeni temsil eder.
+// Formatter outputs findings in a specific format.
 type Formatter interface {
-	// Format, bulguları belirtilen writer'a yazar.
+	// Format writes findings to the given writer.
 	Format(w io.Writer, findings []finding.Finding) error
 
-	// FileExtension, bu formatın dosya uzantısını döndürür.
+	// FileExtension returns the file extension for this format.
 	FileExtension() string
 }

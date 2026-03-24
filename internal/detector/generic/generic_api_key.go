@@ -1,4 +1,4 @@
-// Package generic, genel sır dedektörlerini sağlar.
+// Package generic provides general-purpose secret detectors.
 package generic
 
 import (
@@ -12,7 +12,7 @@ import (
 
 var apiKeyPattern = regexp.MustCompile(`(?i)(api[_\-]?key|api[_\-]?secret|secret[_\-]?key)\s*[:=]\s*['"]?([a-zA-Z0-9/+=\-_]{16,64})['"]?`)
 
-// APIKeyDetector, genel API anahtarı dedektörü.
+// APIKeyDetector detects generic API key assignments.
 type APIKeyDetector struct{}
 
 func (d *APIKeyDetector) ID() string          { return "generic-api-key" }
@@ -26,9 +26,9 @@ func (d *APIKeyDetector) Keywords() []string {
 }
 func (d *APIKeyDetector) Severity() finding.Severity { return finding.SeverityMedium }
 
-// Scan, verilen veriyi genel API anahtarı kalıplarına karşı tarar.
-// Regex eşleşmesinden sonra Shannon entropi kontrolü uygular;
-// entropi değeri 3.0'ın altındaki eşleşmeler gerçek sır olmadığı kabul edilerek atlanır.
+// Scan searches the data for generic API key assignment patterns.
+// Applies Shannon entropy filtering after regex matching;
+// matches with entropy below 3.0 are skipped as unlikely to be real secrets.
 func (d *APIKeyDetector) Scan(_ context.Context, data []byte) []detector.RawFinding {
 	matches := apiKeyPattern.FindAllSubmatch(data, -1)
 	if len(matches) == 0 {
@@ -42,7 +42,7 @@ func (d *APIKeyDetector) Scan(_ context.Context, data []byte) []detector.RawFind
 		}
 		value := match[2]
 
-		// Düşük entropili değerleri atla — gerçek sır olma olasılığı düşük
+		// Skip low-entropy values — unlikely to be real secrets
 		if entropy.Calculate(value) < 3.0 {
 			continue
 		}

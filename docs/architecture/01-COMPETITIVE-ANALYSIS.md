@@ -1,341 +1,341 @@
-# Leakwatch - Rekabet Analizi ve Pazar Konumlandırma
+# Leakwatch - Competitive Analysis and Market Positioning
 
-> **Belge Versiyonu:** 1.0
-> **Tarih:** 2026-03-24
-> **Durum:** Taslak
-
----
-
-## 1. Yönetici Özeti
-
-Sır tarama (secret scanning) pazarı, yazılım tedarik zinciri güvenliğine artan odak, bulut-doğal (cloud-native) altyapının yaygınlaşması ve düzenleyici baskılar (SOC 2, PCI-DSS v4.0, GDPR) ile hızla büyümektedir. Uygulama güvenliği pazarı 2024 itibarıyla ~8-10 milyar USD değerindedir ve yıllık %15-20 büyüme göstermektedir. Sır tarama, bu pazarın ~500M-1B USD'lik bir alt segmentini oluşturmaktadır.
-
-Mevcut açık kaynak araçları (TruffleHog, Gitleaks) belirli alanlarda güçlü olsa da, hiçbiri **doğrulama + çoklu kaynak tarama + düşük yanlış pozitif** üçlüsünü birlikte sunan, kolay genişletilebilir bir platform sağlayamamaktadır. Leakwatch, bu boşluğu doldurmayı hedeflemektedir.
+> **Document Version:** 1.0
+> **Date:** 2026-03-24
+> **Status:** Draft
 
 ---
 
-## 2. Rakip Detay Analizi
+## 1. Executive Summary
+
+The secret scanning market is growing rapidly due to the increasing focus on software supply chain security, the proliferation of cloud-native infrastructure, and regulatory pressures (SOC 2, PCI-DSS v4.0, GDPR). The application security market is valued at ~8-10 billion USD as of 2024 and is growing at 15-20% annually. Secret scanning constitutes a ~500M-1B USD sub-segment of this market.
+
+While existing open-source tools (TruffleHog, Gitleaks) are strong in certain areas, none of them provides an easily extensible platform that combines **verification + multi-source scanning + low false positives**. Leakwatch aims to fill this gap.
+
+---
+
+## 2. Detailed Competitor Analysis
 
 ### 2.1 TruffleHog (Truffle Security Co.)
 
-| Özellik | Detay |
-|---------|-------|
-| **Dil/Teknoloji** | Go (Golang) |
-| **Lisans** | AGPL-3.0 (açık kaynak); Enterprise sürüm ticari |
+| Feature | Details |
+|---------|---------|
+| **Language/Technology** | Go (Golang) |
+| **License** | AGPL-3.0 (open source); Enterprise edition commercial |
 | **GitHub Stars** | ~17,000-18,000+ |
-| **Katkıda Bulunan** | ~100-130+ |
-| **Sürüm Sıklığı** | Her 1-2 haftada bir |
+| **Contributors** | ~100-130+ |
+| **Release Frequency** | Every 1-2 weeks |
 
-**Temel Özellikler:**
-- 800+ sır dedektörü (regex tabanlı)
-- **Canlı doğrulama (verification)** — ana farklılaştırıcı özellik. AWS STS, GitHub API, Stripe vb. üzerinden tespit edilen sırların aktif olup olmadığını kontrol eder
-- Pipeline mimarisi: Source → Chunking → Detection → Verification
-- Geniş kaynak desteği: Git, GitHub/GitLab/Bitbucket orgs, S3, GCS, Docker images, Slack, Jira, Confluence, Postman, Elasticsearch, Jenkins, CircleCI, Hugging Face
-- JSON, SARIF çıktı formatları
-- GitHub Actions entegrasyonu (tüm repolar için ücretsiz)
+**Key Features:**
+- 800+ secret detectors (regex-based)
+- **Live verification** — the main differentiating feature. Checks whether detected secrets are active via AWS STS, GitHub API, Stripe, etc.
+- Pipeline architecture: Source → Chunking → Detection → Verification
+- Wide source support: Git, GitHub/GitLab/Bitbucket orgs, S3, GCS, Docker images, Slack, Jira, Confluence, Postman, Elasticsearch, Jenkins, CircleCI, Hugging Face
+- JSON, SARIF output formats
+- GitHub Actions integration (free for all repos)
 
-**Güçlü Yönler:**
-- Sektördeki en kapsamlı doğrulama sistemi
-- En geniş kaynak çeşitliliği
-- `--only-verified` ile yanlış pozitifleri neredeyse sıfıra indirme
-- Aktif geliştirme ve güçlü topluluk
+**Strengths:**
+- The most comprehensive verification system in the industry
+- Widest source variety
+- `--only-verified` reduces false positives to nearly zero
+- Active development and strong community
 
-**Zayıf Yönler:**
-- AGPL-3.0 lisansı kurumsal benimsemeyi zorlaştırabilir
-- Büyük repolarla yüksek bellek tüketimi
-- Doğrulama API rate limit'lerine takılabilir
-- Doğrulanmamış sonuçlar hâlâ gürültülü
-- Özel dedektör ekleme Go kodu yazmayı ve yeniden derlemeyi gerektirir
-- `.secretsignore` / allowlist mekanizması rakiplerine kıyasla daha az olgun
+**Weaknesses:**
+- AGPL-3.0 license can hinder enterprise adoption
+- High memory consumption with large repositories
+- Verification can hit API rate limits
+- Unverified results are still noisy
+- Adding custom detectors requires writing Go code and recompiling
+- `.secretsignore` / allowlist mechanism is less mature compared to competitors
 
 ---
 
 ### 2.2 Gitleaks
 
-| Özellik | Detay |
-|---------|-------|
-| **Dil/Teknoloji** | Go (Golang) |
-| **Lisans** | MIT (CLI); GitHub Action v2 özel repolar için ticari |
+| Feature | Details |
+|---------|---------|
+| **Language/Technology** | Go (Golang) |
+| **License** | MIT (CLI); GitHub Action v2 commercial for private repos |
 | **GitHub Stars** | ~18,000-19,000+ |
-| **Katkıda Bulunan** | ~150+ |
-| **Ana Bakımcı** | Zachary Rice (@zricethezav) |
+| **Contributors** | ~150+ |
+| **Lead Maintainer** | Zachary Rice (@zricethezav) |
 
-**Temel Özellikler:**
-- ~150+ regex kuralı, anahtar kelime ön-filtreleme ile
-- `gitleaks detect` (tam geçmiş), `gitleaks protect` (pre-commit), `gitleaks dir` (dosya sistemi)
-- `.gitleaks.toml` ile esnek kural yapılandırması
-- Entropi eşiği desteği (regex eşleşmeleri üzerine filtre)
-- JSON, SARIF, CSV, JUnit XML çıktı formatları
-- Baseline desteği (mevcut bulgulara karşı diff)
+**Key Features:**
+- ~150+ regex rules with keyword pre-filtering
+- `gitleaks detect` (full history), `gitleaks protect` (pre-commit), `gitleaks dir` (filesystem)
+- Flexible rule configuration via `.gitleaks.toml`
+- Entropy threshold support (filter on top of regex matches)
+- JSON, SARIF, CSV, JUnit XML output formats
+- Baseline support (diff against existing findings)
 
-**Güçlü Yönler:**
-- Hız — keyword ön-filtreleme ile 10-100x performans artışı (v8+)
-- MIT lisansı — kurumsal entegrasyon için ideal
-- En esnek kural yapılandırma sistemi (`.gitleaks.toml`)
-- Pre-commit hook için en iyi seçenek
-- Hafif ve basit — tek binary, minimum karmaşıklık
+**Strengths:**
+- Speed — 10-100x performance improvement with keyword pre-filtering (v8+)
+- MIT license — ideal for enterprise integration
+- The most flexible rule configuration system (`.gitleaks.toml`)
+- Best option for pre-commit hooks
+- Lightweight and simple — single binary, minimal complexity
 
-**Zayıf Yönler:**
-- **Sır doğrulama yok** — tüm bulgular "potansiyel"
-- Bulut/SaaS kaynakları tarayamaz (sadece yerel repo/dosya)
-- GitHub Action'ın özel repolar için ücretli olması toplulukta tepki çekti
-- Entropi tek başına bir tespit modu değil, yalnızca regex filtresi
-- Düzeltme/remediation rehberliği yok
+**Weaknesses:**
+- **No secret verification** — all findings are "potential"
+- Cannot scan cloud/SaaS sources (local repo/file only)
+- GitHub Action being paid for private repos has drawn community criticism
+- Entropy is not a standalone detection mode, only a regex filter
+- No remediation guidance
 
 ---
 
 ### 2.3 detect-secrets (Yelp)
 
-| Özellik | Detay |
-|---------|-------|
-| **Dil/Teknoloji** | Python |
-| **Lisans** | Apache 2.0 |
+| Feature | Details |
+|---------|---------|
+| **Language/Technology** | Python |
+| **License** | Apache 2.0 |
 | **GitHub Stars** | ~3,500+ |
 
-**Temel Özellikler:**
-- Eklenti (plugin) tabanlı mimari
-- `.secrets.baseline` dosyası — mevcut sırların JSON anlık görüntüsü
-- Shannon entropi analizi (hex ve base64)
-- ~20+ yerleşik eklenti (AWS, Slack, private key vb.)
+**Key Features:**
+- Plugin-based architecture
+- `.secrets.baseline` file — JSON snapshot of existing secrets
+- Shannon entropy analysis (hex and base64)
+- ~20+ built-in plugins (AWS, Slack, private key, etc.)
 
-**Güçlü Yönler:**
-- Baseline modeli eski kod tabanlarına kademeli entegrasyon için mükemmel
-- Hafif ve hızlı pre-commit kullanımı
-- Kolay özelleştirilebilir eklenti sistemi
+**Strengths:**
+- Baseline model is excellent for gradual integration into legacy codebases
+- Lightweight and fast pre-commit usage
+- Easily customizable plugin system
 
-**Zayıf Yönler:**
-- Python — performans sınırlamaları (CPU-bound görevlerde 10-100x yavaş)
-- Git geçmişi taramıyor
-- Sır doğrulama yok
-- Sınırlı sır türü kapsamı
-- Dashboard/raporlama yok
+**Weaknesses:**
+- Python — performance limitations (10-100x slower on CPU-bound tasks)
+- Does not scan Git history
+- No secret verification
+- Limited secret type coverage
+- No dashboard/reporting
 
 ---
 
-### 2.4 GitHub Secret Scanning (Yerel)
+### 2.4 GitHub Secret Scanning (Native)
 
-| Özellik | Detay |
-|---------|-------|
-| **Platform** | GitHub entegre |
-| **Fiyatlandırma** | Public repolar: ücretsiz; Private: GHAS lisansı ($49/committer/ay) |
+| Feature | Details |
+|---------|---------|
+| **Platform** | GitHub integrated |
+| **Pricing** | Public repos: free; Private: GHAS license ($49/committer/month) |
 
-**Temel Özellikler:**
-- 200+ sır türü (partner programı ile)
-- Partner-side doğrulama ve otomatik iptal
-- Push Protection — sırları push aşamasında engeller
+**Key Features:**
+- 200+ secret types (via partner program)
+- Partner-side verification and automatic revocation
+- Push Protection — blocks secrets at the push stage
 
-**Güçlü Yönler:**
-- Sıfır yapılandırma (public repolar)
-- Çok düşük yanlış pozitif (desen tanımları token sağlayıcılarından)
-- Otomatik remediation (partner revocation)
-- Push Protection güçlü önleyici kontrol
+**Strengths:**
+- Zero configuration (public repos)
+- Very low false positives (pattern definitions from token providers)
+- Automatic remediation (partner revocation)
+- Push Protection is a strong preventive control
 
-**Zayıf Yönler:**
-- Sadece GitHub — GitLab, Bitbucket, yerel repo desteği yok
-- Private repolar için pahalı ($49/committer/ay)
-- Sadece partner desenleri — özel/dahili sırlar sınırlı
-- Entropi tabanlı tespit yok
-- Git dışı kaynaklar taranamaz
+**Weaknesses:**
+- GitHub only — no GitLab, Bitbucket, or local repo support
+- Expensive for private repos ($49/committer/month)
+- Partner patterns only — limited for custom/internal secrets
+- No entropy-based detection
+- Cannot scan non-Git sources
 
 ---
 
 ### 2.5 GitGuardian
 
-| Özellik | Detay |
-|---------|-------|
-| **Tür** | Ticari SaaS + ggshield CLI (açık kaynak) |
-| **Fiyatlandırma** | Free: bireysel; Teams: ~$40-50/dev/ay; Enterprise: özel |
-| **Kullanıcı** | 500K+ geliştirici |
+| Feature | Details |
+|---------|---------|
+| **Type** | Commercial SaaS + ggshield CLI (open source) |
+| **Pricing** | Free: individual; Teams: ~$40-50/dev/month; Enterprise: custom |
+| **Users** | 500K+ developers |
 
-**Temel Özellikler:**
-- 400+ dedektör — pazardaki en geniş kapsam
-- Sır doğrulama
-- ML tabanlı bağlamsal analiz
-- Public monitoring — kuruluşunuzun sırları herhangi bir public repoda göründüğünde algılama
-- Honeytokens (tuzak kimlik bilgileri)
-- Olay yönetimi dashboard'u
+**Key Features:**
+- 400+ detectors — widest coverage in the market
+- Secret verification
+- ML-based contextual analysis
+- Public monitoring — detects when your organization's secrets appear in any public repo
+- Honeytokens (decoy credentials)
+- Incident management dashboard
 
-**Güçlü Yönler:**
-- En geniş sır türü kapsamı
-- Public monitoring benzersiz bir özellik
-- Mükemmel geliştirici deneyimi
+**Strengths:**
+- Widest secret type coverage
+- Public monitoring is a unique feature
+- Excellent developer experience
 - Honeytokens
 
-**Zayıf Yönler:**
-- Ölçekte maliyet yüksek
-- SaaS bağımlılığı — sır metadata'sı buluta gönderilir
-- Free tier sınırlı
+**Weaknesses:**
+- High cost at scale
+- SaaS dependency — secret metadata is sent to the cloud
+- Limited free tier
 
 ---
 
-### 2.6 Diğer Araçlar
+### 2.6 Other Tools
 
-| Araç | Dil | Lisans | Öne Çıkan | Zayıf Yön |
-|------|-----|--------|-----------|-----------|
-| **SpectralOps** (Check Point) | Go | Ticari | 2000+ dedektör, IaC + PII tarama | Acquisition sonrası topluluk kaybı |
-| **Whispers** (Skyscanner) | Python | Apache 2.0 | Yapısal dosya ayrıştırma (YAML/JSON/XML) | Küçük topluluk (~200 star), sadece config dosyaları |
-| **Talisman** (ThoughtWorks) | Go | MIT | Dosya adı tespiti, pre-push odaklı | Sınırlı desen kütüphanesi, bypass edilebilir |
+| Tool | Language | License | Highlight | Weakness |
+|------|----------|---------|-----------|----------|
+| **SpectralOps** (Check Point) | Go | Commercial | 2000+ detectors, IaC + PII scanning | Community loss after acquisition |
+| **Whispers** (Skyscanner) | Python | Apache 2.0 | Structural file parsing (YAML/JSON/XML) | Small community (~200 stars), config files only |
+| **Talisman** (ThoughtWorks) | Go | MIT | Filename detection, pre-push focused | Limited pattern library, can be bypassed |
 
 ---
 
-## 3. Karşılaştırmalı Özellik Matrisi
+## 3. Comparative Feature Matrix
 
-| Özellik | TruffleHog | Gitleaks | detect-secrets | GitHub Native | GitGuardian | **Leakwatch (Hedef)** |
+| Feature | TruffleHog | Gitleaks | detect-secrets | GitHub Native | GitGuardian | **Leakwatch (Target)** |
 |---------|------------|----------|----------------|---------------|-------------|----------------------|
-| **Sır Doğrulama** | Evet (800+) | Hayır | Hayır | Evet (partner) | Evet | **Evet (modüler)** |
-| **Git Geçmişi** | Evet | Evet | Hayır | Evet | Evet | **Evet** |
-| **Dosya Sistemi** | Evet | Evet | Evet | Hayır | Evet | **Evet** |
-| **Container İmajları** | Evet | Hayır | Hayır | Hayır | Evet | **Evet** |
-| **Bulut Kaynakları** | Evet (S3, GCS) | Hayır | Hayır | Hayır | Hayır | **Evet (Faz 5)** |
-| **SaaS Tarama** | Evet (Slack, Jira) | Hayır | Hayır | Hayır | Public monitoring | **Planlanıyor** |
-| **Aho-Corasick** | Kısmen | Hayır | Hayır | Bilinmiyor | Bilinmiyor | **Evet** |
-| **Entropi Analizi** | Evet | Filtre olarak | Evet | Hayır | ML ile | **Evet (hibrit)** |
-| **SARIF Çıktı** | Evet | Evet | Hayır | Yerel | Evet | **Evet** |
-| **Pre-commit** | Evet | Evet (birincil) | Evet | Push Protection | Evet | **Evet** |
-| **Özel Kurallar** | Go kodu gerekir | TOML (kolay) | Plugin (Python) | Sınırlı | Enterprise | **YAML (kolay)** |
-| **Allowlist/Ignore** | Temel | Gelişmiş | Baseline | Yok | Evet | **Gelişmiş** |
-| **Lisans** | AGPL-3.0 | MIT* | Apache 2.0 | Ticari | Ticari | **MIT** |
-| **Tek Binary** | Evet | Evet | Hayır (Python) | N/A | Hayır (Python) | **Evet** |
-| **Remediation** | Hayır | Hayır | Hayır | Partner revoke | Dashboard | **Planlanıyor** |
+| **Secret Verification** | Yes (800+) | No | No | Yes (partner) | Yes | **Yes (modular)** |
+| **Git History** | Yes | Yes | No | Yes | Yes | **Yes** |
+| **Filesystem** | Yes | Yes | Yes | No | Yes | **Yes** |
+| **Container Images** | Yes | No | No | No | Yes | **Yes** |
+| **Cloud Sources** | Yes (S3, GCS) | No | No | No | No | **Yes (Phase 5)** |
+| **SaaS Scanning** | Yes (Slack, Jira) | No | No | No | Public monitoring | **Planned** |
+| **Aho-Corasick** | Partial | No | No | Unknown | Unknown | **Yes** |
+| **Entropy Analysis** | Yes | As filter | Yes | No | With ML | **Yes (hybrid)** |
+| **SARIF Output** | Yes | Yes | No | Native | Yes | **Yes** |
+| **Pre-commit** | Yes | Yes (primary) | Yes | Push Protection | Yes | **Yes** |
+| **Custom Rules** | Requires Go code | TOML (easy) | Plugin (Python) | Limited | Enterprise | **YAML (easy)** |
+| **Allowlist/Ignore** | Basic | Advanced | Baseline | None | Yes | **Advanced** |
+| **License** | AGPL-3.0 | MIT* | Apache 2.0 | Commercial | Commercial | **MIT** |
+| **Single Binary** | Yes | Yes | No (Python) | N/A | No (Python) | **Yes** |
+| **Remediation** | No | No | No | Partner revoke | Dashboard | **Planned** |
 
 ---
 
-## 4. Pazar Boşlukları ve Fırsatlar
+## 4. Market Gaps and Opportunities
 
-### 4.1 Birincil Fırsatlar (Leakwatch'ın Farklılaşma Alanları)
+### 4.1 Primary Opportunities (Leakwatch's Differentiation Areas)
 
-#### Fırsat 1: Doğrulama-Öncelikli Açık Kaynak
-**Durum:** TruffleHog doğrulama sunan tek büyük açık kaynak araç, ancak AGPL-3.0 lisansı kurumsal benimsemeyi engelliyor. Gitleaks MIT ama doğrulama yok.
+#### Opportunity 1: Verification-First Open Source
+**Situation:** TruffleHog is the only major open-source tool offering verification, but its AGPL-3.0 license hinders enterprise adoption. Gitleaks is MIT but has no verification.
 
-**Leakwatch Fırsatı:** MIT lisanslı, modüler doğrulama sistemi ile açık kaynak pazarında benzersiz bir konum.
+**Leakwatch Opportunity:** A unique position in the open-source market with an MIT-licensed, modular verification system.
 
-#### Fırsat 2: Kolay Genişletilebilirlik
-**Durum:** TruffleHog'da özel dedektör eklemek Go kodu yazmayı ve yeniden derlemeyi gerektiriyor. Gitleaks'in TOML kuralları basit ama doğrulama mantığı eklemeye izin vermiyor.
+#### Opportunity 2: Easy Extensibility
+**Situation:** Adding custom detectors in TruffleHog requires writing Go code and recompiling. Gitleaks' TOML rules are simple but do not allow adding verification logic.
 
-**Leakwatch Fırsatı:** YAML tabanlı kural tanımlama + Go plugin arayüzü ile iki katmanlı genişletilebilirlik. Basit regex kuralları için YAML yeterli; gelişmiş doğrulama için Go arayüzü.
+**Leakwatch Opportunity:** Two-tier extensibility with YAML-based rule definitions + Go plugin interface. YAML is sufficient for simple regex rules; Go interface for advanced verification.
 
-#### Fırsat 3: Akıllı Yanlış Pozitif Azaltma
-**Durum:** Tüm açık kaynak araçlar yüksek yanlış pozitif oranlarından muzdarip. Test dosyaları, placeholder'lar, dokümantasyon örnekleri sürekli işaretleniyor.
+#### Opportunity 3: Intelligent False Positive Reduction
+**Situation:** All open-source tools suffer from high false positive rates. Test files, placeholders, and documentation examples are constantly flagged.
 
-**Leakwatch Fırsatı:**
-- Bağlam-duyarlı analiz (test dosyası tespiti, placeholder pattern'leri)
-- Aho-Corasick + entropi + regex hibrit yaklaşımı
-- Akıllı filtreleme katmanı
+**Leakwatch Opportunity:**
+- Context-aware analysis (test file detection, placeholder patterns)
+- Aho-Corasick + entropy + regex hybrid approach
+- Intelligent filtering layer
 
-#### Fırsat 4: Birleşik Çoklu Kaynak Tarama
-**Durum:** Git + Dosya sistemi + Container imajları + Bulut depoları taramayı tek bir açık kaynak araçta sunan çözüm yok.
+#### Opportunity 4: Unified Multi-Source Scanning
+**Situation:** No single open-source tool offers Git + Filesystem + Container images + Cloud storage scanning.
 
-**Leakwatch Fırsatı:** Modüler `Source` arayüzü ile genişletilebilir kaynak desteği.
-
----
-
-### 4.2 İkincil Fırsatlar
-
-| Fırsat | Açıklama | Öncelik |
-|--------|----------|---------|
-| **Secrets Inventory** | Kuruluş genelinde tüm sırların merkezi envanteri | Yüksek |
-| **Remediation Rehberliği** | Tespit edilen sırlar için rotasyon talimatları | Orta |
-| **IDE Entegrasyonu** | VS Code, JetBrains eklentileri ile gerçek zamanlı tarama | Orta |
-| **Honeytokens** | Tuzak kimlik bilgileri dağıtma ve kullanımlarını izleme | Düşük |
-| **ML Tabanlı Tespit** | Bilinmeyen sır formatlarını makine öğrenmesi ile bulma | Gelecek |
+**Leakwatch Opportunity:** Extensible source support via the modular `Source` interface.
 
 ---
 
-## 5. Ürün Konumlandırma Stratejisi
+### 4.2 Secondary Opportunities
 
-### 5.1 Konumlandırma Bildirisi
+| Opportunity | Description | Priority |
+|-------------|-------------|----------|
+| **Secrets Inventory** | Centralized inventory of all secrets across the organization | High |
+| **Remediation Guidance** | Rotation instructions for detected secrets | Medium |
+| **IDE Integration** | Real-time scanning with VS Code, JetBrains plugins | Medium |
+| **Honeytokens** | Deploying decoy credentials and monitoring their usage | Low |
+| **ML-Based Detection** | Finding unknown secret formats using machine learning | Future |
 
-> **Leakwatch**, modern geliştirme ekipleri için tasarlanmış, **açık kaynak**, **yüksek performanslı** ve **doğrulama-öncelikli** bir sır tarama platformudur. Git geçmişinden container imajlarına kadar birden fazla kaynağı tarayan, bulunan sırları otomatik olarak doğrulayan ve yanlış pozitifleri en aza indiren Leakwatch, güvenlik ekiplerinin ve geliştiricilerin güvenebileceği eyleme geçirilebilir sonuçlar sunar.
+---
 
-### 5.2 Hedef Kullanıcı Segmentleri
+## 5. Product Positioning Strategy
 
-| Segment | İhtiyaç | Leakwatch Değer Önerisi |
-|---------|---------|------------------------|
-| **DevSecOps Mühendisleri** | CI/CD'ye entegre, güvenilir tarama | Pre-commit + CI pipeline entegrasyonu, SARIF çıktı |
-| **Güvenlik Ekipleri** | Kuruluş genelinde denetim, düşük gürültü | Doğrulama ile eyleme geçirilebilir sonuçlar |
-| **Açık Kaynak Geliştiriciler** | Ücretsiz, kolay kurulum, hızlı tarama | MIT lisansı, tek binary, sıfır bağımlılık |
-| **Kurumsal DevOps** | Geniş ölçekte tarama, özel kurallar | Modüler mimari, YAML kural tanımlama |
+### 5.1 Positioning Statement
 
-### 5.3 Rekabet Karşısında Konumlandırma
+> **Leakwatch** is an **open-source**, **high-performance**, and **verification-first** secret scanning platform designed for modern development teams. Scanning multiple sources from Git history to container images, automatically verifying discovered secrets, and minimizing false positives, Leakwatch delivers actionable results that security teams and developers can trust.
+
+### 5.2 Target User Segments
+
+| Segment | Need | Leakwatch Value Proposition |
+|---------|------|---------------------------|
+| **DevSecOps Engineers** | Reliable scanning integrated into CI/CD | Pre-commit + CI pipeline integration, SARIF output |
+| **Security Teams** | Organization-wide auditing, low noise | Actionable results with verification |
+| **Open Source Developers** | Free, easy setup, fast scanning | MIT license, single binary, zero dependencies |
+| **Enterprise DevOps** | Scanning at scale, custom rules | Modular architecture, YAML rule definitions |
+
+### 5.3 Competitive Positioning
 
 ```mermaid
 quadrantChart
-    title Sır Tarama Araçları Konumlandırma Matrisi
-    x-axis "Düşük Kapsam" --> "Yüksek Kapsam (Çoklu Kaynak)"
-    y-axis "Doğrulama Yok" --> "Güçlü Doğrulama"
-    quadrant-1 "Lider Konum"
-    quadrant-2 "Doğrulama Odaklı"
-    quadrant-3 "Temel Araçlar"
-    quadrant-4 "Kapsam Odaklı"
+    title Secret Scanning Tools Positioning Matrix
+    x-axis "Low Coverage" --> "High Coverage (Multi-Source)"
+    y-axis "No Verification" --> "Strong Verification"
+    quadrant-1 "Leader Position"
+    quadrant-2 "Verification Focused"
+    quadrant-3 "Basic Tools"
+    quadrant-4 "Coverage Focused"
     "TruffleHog (AGPL)": [0.80, 0.85]
-    "GitGuardian (Ticari)": [0.60, 0.90]
+    "GitGuardian (Commercial)": [0.60, 0.90]
     "LEAKWATCH (MIT)": [0.75, 0.78]
     "Gitleaks (MIT)": [0.55, 0.25]
     "detect-secrets": [0.30, 0.20]
     "GitHub Native": [0.40, 0.70]
 ```
 
-### 5.4 Ana Mesajlar
+### 5.4 Key Messages
 
-1. **"Doğrulanmış güvenlik, açık kaynak özgürlüğüyle"** — MIT lisansı + doğrulama
-2. **"Bir araç, her kaynak"** — Git, dosya sistemi, container, bulut
-3. **"Gürültü değil, sinyal"** — Hibrit tespit ile düşük yanlış pozitif
-4. **"Geliştirici dostu güvenlik"** — Hızlı, basit CLI, kolay entegrasyon
-
----
-
-## 6. SWOT Analizi
-
-### Güçlü Yönler (Strengths)
-- MIT lisansı ile kurumsal benimseme engeli yok
-- Doğrulama-öncelikli tasarım ile düşük yanlış pozitif
-- Modern Go mimarisi ile yüksek performans
-- Modüler eklenti sistemi ile kolay genişletilebilirlik
-- Tek binary dağıtım, sıfır bağımlılık
-
-### Zayıf Yönler (Weaknesses)
-- Yeni proje — topluluk ve dedektör sayısı düşük başlayacak
-- Mevcut araçların yerleşik kullanıcı tabanı ve marka bilinirliği
-- Tek geliştirici/küçük ekip ile başlangıç
-
-### Fırsatlar (Opportunities)
-- AGPL'den kaçınan kurumsal kullanıcılar için MIT alternatifi
-- Container güvenliği pazarının büyümesi
-- Supply chain güvenliği düzenlemelerinin artması
-- TruffleHog'un ticari yönelimi ile açık kaynak boşluk
-
-### Tehditler (Threats)
-- TruffleHog ve Gitleaks'in sürekli gelişimi
-- GitHub'ın native secret scanning'i genişletmesi
-- Büyük güvenlik firmalarının pazara girişi
-- GitGuardian'ın free tier genişletmesi
+1. **"Verified security with open-source freedom"** — MIT license + verification
+2. **"One tool, every source"** — Git, filesystem, container, cloud
+3. **"Signal, not noise"** — Low false positives with hybrid detection
+4. **"Developer-friendly security"** — Fast, simple CLI, easy integration
 
 ---
 
-## 7. Endüstri Standartları ve Uyumluluk
+## 6. SWOT Analysis
 
-| Standart | Açıklama | Leakwatch Uyumu |
-|----------|----------|-----------------|
-| **OWASP Top 10 (A07:2021)** | Tanımlama ve Kimlik Doğrulama Hataları | Doğrudan hedef — hardcoded credential tespiti |
-| **CWE-798** | Sabit Kodlanmış Kimlik Bilgileri | Birincil tespit hedefi |
-| **CWE-540** | Kaynak Kodda Hassas Bilgi | Kapsam dahilinde |
-| **SARIF (OASIS)** | Statik Analiz Sonuçları Değişim Formatı | Yerel destek planlanıyor |
-| **NIST SP 800-53 (IA-5)** | Kimlik Doğrulayıcı Yönetimi | Tespit ve raporlama desteği |
-| **SOC 2 Type II** | Kimlik bilgisi yönetimi kontrolleri | Denetim kanıtı olarak kullanılabilir |
-| **PCI-DSS v4.0 (Req. 8)** | Kimlik doğrulama gereksinimleri | Uyumluluk raporlaması |
+### Strengths
+- No enterprise adoption barrier with MIT license
+- Low false positives with verification-first design
+- High performance with modern Go architecture
+- Easy extensibility with modular plugin system
+- Single binary distribution, zero dependencies
+
+### Weaknesses
+- New project — community and detector count will start low
+- Established user base and brand recognition of existing tools
+- Starting with a single developer/small team
+
+### Opportunities
+- MIT alternative for enterprise users avoiding AGPL
+- Growth of the container security market
+- Increasing supply chain security regulations
+- Open-source gap due to TruffleHog's commercial direction
+
+### Threats
+- Continuous evolution of TruffleHog and Gitleaks
+- GitHub expanding its native secret scanning
+- Entry of major security firms into the market
+- GitGuardian expanding its free tier
 
 ---
 
-## 8. Sonuç
+## 7. Industry Standards and Compliance
 
-Sır tarama pazarı olgunlaşmakta ancak henüz **tek bir araç tüm ihtiyaçları karşılamamaktadır**:
+| Standard | Description | Leakwatch Alignment |
+|----------|-------------|-------------------|
+| **OWASP Top 10 (A07:2021)** | Identification and Authentication Failures | Direct target — hardcoded credential detection |
+| **CWE-798** | Use of Hard-coded Credentials | Primary detection target |
+| **CWE-540** | Inclusion of Sensitive Information in Source Code | Within scope |
+| **SARIF (OASIS)** | Static Analysis Results Interchange Format | Native support planned |
+| **NIST SP 800-53 (IA-5)** | Authenticator Management | Detection and reporting support |
+| **SOC 2 Type II** | Credential management controls | Can be used as audit evidence |
+| **PCI-DSS v4.0 (Req. 8)** | Authentication requirements | Compliance reporting |
 
-- TruffleHog doğrulama konusunda lider ama AGPL lisansı ve bellek sorunları var
-- Gitleaks hız ve basitlik konusunda lider ama doğrulama ve çoklu kaynak desteği yok
-- GitGuardian en kapsamlı ama ticari ve pahalı
-- detect-secrets baseline modeli ile benzersiz ama Python performans sınırlamaları var
+---
 
-**Leakwatch**, bu rakiplerin güçlü yönlerini birleştiren ve zayıf yönlerini gideren bir platform olarak konumlanmaktadır:
-- TruffleHog'un doğrulama gücü + Gitleaks'in hızı ve MIT lisansı
-- Modüler mimari ile GitGuardian'ın kapsamına ulaşma potansiyeli
-- detect-secrets'in baseline konseptinden ilham alan akıllı filtreleme
+## 8. Conclusion
+
+The secret scanning market is maturing, but **no single tool addresses all needs** yet:
+
+- TruffleHog leads in verification but has AGPL license and memory issues
+- Gitleaks leads in speed and simplicity but lacks verification and multi-source support
+- GitGuardian is the most comprehensive but commercial and expensive
+- detect-secrets is unique with its baseline model but has Python performance limitations
+
+**Leakwatch** is positioned as a platform that combines the strengths and addresses the weaknesses of these competitors:
+- TruffleHog's verification power + Gitleaks' speed and MIT license
+- Potential to reach GitGuardian's coverage with modular architecture
+- Intelligent filtering inspired by detect-secrets' baseline concept

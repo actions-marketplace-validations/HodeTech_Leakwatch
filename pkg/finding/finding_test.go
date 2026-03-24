@@ -194,16 +194,16 @@ func TestFinding_JSONMarshalUnmarshal_SeverityAsString(t *testing.T) {
 	data, err := json.Marshal(f)
 	require.NoError(t, err)
 
-	// Severity JSON'da string olarak "critical" görünmeli, integer 3 değil
+	// Severity should serialize as "critical" string, not integer 3
 	var rawJSON map[string]interface{}
 	err = json.Unmarshal(data, &rawJSON)
 	require.NoError(t, err)
-	assert.Equal(t, "critical", rawJSON["severity"], "Severity JSON'da string olarak serileştirilmeli")
+	assert.Equal(t, "critical", rawJSON["severity"], "Severity should serialize as string in JSON")
 
-	// Verification status da string olarak görünmeli
+	// Verification status should also appear as string
 	verification, ok := rawJSON["verification"].(map[string]interface{})
 	require.True(t, ok)
-	assert.Equal(t, "unverified", verification["status"], "VerificationStatus JSON'da string olarak serileştirilmeli")
+	assert.Equal(t, "unverified", verification["status"], "VerificationStatus should serialize as string in JSON")
 
 	var decoded Finding
 	err = json.Unmarshal(data, &decoded)
@@ -216,7 +216,7 @@ func TestFinding_JSONMarshalUnmarshal_SeverityAsString(t *testing.T) {
 	assert.Equal(t, f.SourceMetadata.FilePath, decoded.SourceMetadata.FilePath)
 	assert.Equal(t, f.SourceMetadata.Line, decoded.SourceMetadata.Line)
 	assert.Equal(t, f.Verification.Status, decoded.Verification.Status)
-	assert.Empty(t, decoded.Raw) // Raw omitempty ile boş
+	assert.Empty(t, decoded.Raw) // Raw is empty via omitempty
 }
 
 func TestFinding_JSONOmitsEmptyRaw(t *testing.T) {
@@ -233,5 +233,5 @@ func TestFinding_JSONOmitsEmptyRaw(t *testing.T) {
 	require.NoError(t, err)
 
 	_, hasRaw := m["raw"]
-	assert.False(t, hasRaw, "raw alanı boşken JSON çıktısında olmamalı")
+	assert.False(t, hasRaw, "raw field should not appear in JSON when empty")
 }

@@ -10,9 +10,9 @@ var (
 	detectors = make(map[string]Detector)
 )
 
-// Register, bir dedektörü merkezi kayıt defterine kaydeder.
-// Her dedektör paketi, init() fonksiyonunda bu fonksiyonu çağırır.
-// Aynı ID ile tekrar kayıt yapılırsa panic oluşur.
+// Register adds a detector to the central registry.
+// Each detector package calls this in its init() function.
+// Panics if a duplicate ID is registered.
 func Register(d Detector) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -22,7 +22,7 @@ func Register(d Detector) {
 	detectors[d.ID()] = d
 }
 
-// All, kayıtlı tüm dedektörleri ID'ye göre sıralı şekilde döndürür.
+// All returns all registered detectors sorted by ID.
 func All() []Detector {
 	mu.RLock()
 	defer mu.RUnlock()
@@ -36,7 +36,7 @@ func All() []Detector {
 	return result
 }
 
-// Get, belirtilen ID'ye sahip dedektörü döndürür.
+// Get returns the detector with the given ID.
 func Get(id string) (Detector, bool) {
 	mu.RLock()
 	defer mu.RUnlock()
@@ -44,7 +44,7 @@ func Get(id string) (Detector, bool) {
 	return d, ok
 }
 
-// Reset, tüm kayıtlı dedektörleri temizler. Sadece testlerde kullanılır.
+// Reset clears all registered detectors. For testing only.
 func Reset() {
 	mu.Lock()
 	defer mu.Unlock()

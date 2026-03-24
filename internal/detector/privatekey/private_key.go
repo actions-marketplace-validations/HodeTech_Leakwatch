@@ -1,4 +1,4 @@
-// Package privatekey, özel anahtar dedektörlerini sağlar.
+// Package privatekey provides private key detectors.
 package privatekey
 
 import (
@@ -11,7 +11,7 @@ import (
 
 var privateKeyPattern = regexp.MustCompile(`-----BEGIN\s+(RSA |OPENSSH |DSA |EC |PGP )?PRIVATE KEY( BLOCK)?-----`)
 
-// Detector, özel anahtar (private key) dedektörü.
+// Detector detects PEM-encoded private keys.
 type Detector struct{}
 
 func (d *Detector) ID() string          { return "private-key" }
@@ -28,7 +28,7 @@ func (d *Detector) Keywords() []string {
 }
 func (d *Detector) Severity() finding.Severity { return finding.SeverityCritical }
 
-// Scan, verilen veriyi PEM formatındaki özel anahtar başlıklarına karşı tarar.
+// Scan searches the data for PEM private key headers.
 func (d *Detector) Scan(_ context.Context, data []byte) []detector.RawFinding {
 	matches := privateKeyPattern.FindAll(data, -1)
 	if len(matches) == 0 {
@@ -37,7 +37,7 @@ func (d *Detector) Scan(_ context.Context, data []byte) []detector.RawFinding {
 
 	findings := make([]detector.RawFinding, 0, len(matches))
 	for _, match := range matches {
-		// Private key header'ını redact et
+		// Redact the private key header
 		redacted := "-----BEGIN [REDACTED] PRIVATE KEY-----"
 		findings = append(findings, detector.RawFinding{
 			DetectorID: d.ID(),

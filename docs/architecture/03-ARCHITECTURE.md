@@ -1,39 +1,39 @@
-# Leakwatch - Detaylı Mimari Tasarım
+# Leakwatch - Detailed Architecture Design
 
-> **Belge Versiyonu:** 1.0
-> **Tarih:** 2026-03-24
-> **Durum:** Taslak
+> **Document Version:** 1.0
+> **Date:** 2026-03-24
+> **Status:** Draft
 
 ---
 
-## 1. Mimari Genel Bakış
+## 1. Architecture Overview
 
-Leakwatch, pipeline tabanlı bir mimari üzerine inşa edilmiştir. Veriler, kaynaktan (Source) çıktıya (Output) kadar bir dizi iyi tanımlanmış aşamadan geçer. Her aşama bağımsız olarak test edilebilir, ölçeklenebilir ve değiştirilebilir.
+Leakwatch is built on a pipeline-based architecture. Data flows through a series of well-defined stages from source (Source) to output (Output). Each stage can be independently tested, scaled, and replaced.
 
 ```mermaid
 flowchart LR
-    subgraph Sources["Kaynaklar"]
+    subgraph Sources["Sources"]
         S1[Git]
-        S2[Dosya Sistemi]
+        S2[Filesystem]
         S3[Container]
         S4["S3 (v2)"]
     end
 
-    subgraph Engine["Tespit Motoru"]
+    subgraph Engine["Detection Engine"]
         E1[Aho-Corasick]
-        E2[Regex Doğrulama]
-        E3[Entropi Analizi]
-        E4[Özel Kurallar]
+        E2[Regex Validation]
+        E3[Entropy Analysis]
+        E4[Custom Rules]
     end
 
-    subgraph Verifiers["Doğrulayıcılar"]
+    subgraph Verifiers["Verifiers"]
         V1[AWS STS]
         V2[GitHub API]
         V3[Slack API]
         V4[...]
     end
 
-    subgraph Output["Çıktı"]
+    subgraph Output["Output"]
         O1[JSON]
         O2[SARIF]
         O3[CSV]
@@ -43,15 +43,15 @@ flowchart LR
     Sources -->|Chunks| Chunker[Chunker]
     Chunker --> Engine
     Engine --> Verifiers
-    Verifiers --> Filter["Filtre & Çıktı"]
+    Verifiers --> Filter["Filter & Output"]
     Filter --> Output
 ```
 
 ---
 
-## 2. Temel Arayüzler (Interfaces)
+## 2. Core Interfaces
 
-Leakwatch'ın genişletilebilirliği, iyi tanımlanmış Go arayüzleri üzerine kuruludur. Bu arayüzler, sistemin "sözleşmeleri"dir.
+Leakwatch's extensibility is built on well-defined Go interfaces. These interfaces are the "contracts" of the system.
 
 ```mermaid
 classDiagram
@@ -104,11 +104,11 @@ classDiagram
         +Entropy float64
     }
 
-    Source --> Chunk : üretir
-    Detector --> RawFinding : üretir
-    Verifier --> Finding : zenginleştirir
-    Formatter --> Finding : formatlar
-    RawFinding --> Finding : dönüşür
+    Source --> Chunk : produces
+    Detector --> RawFinding : produces
+    Verifier --> Finding : enriches
+    Formatter --> Finding : formats
+    RawFinding --> Finding : transforms into
 
     GitSource ..|> Source
     FilesystemSource ..|> Source
@@ -126,38 +126,38 @@ classDiagram
     CSVFormatter ..|> Formatter
 ```
 
-### 2.1 Source Arayüzü
+### 2.1 Source Interface
 
 ```go
-// Source, taranacak veri kaynağını temsil eder.
-// Her kaynak türü (Git, dosya sistemi, container) bu arayüzü uygular.
+// Source represents a data source to be scanned.
+// Each source type (Git, filesystem, container) implements this interface.
 type Source interface {
-    // Type, kaynağın türünü döndürür (örn: "git", "filesystem", "container").
+    // Type returns the source type (e.g., "git", "filesystem", "container").
     Type() string
 
-    // Chunks, taranacak veri parçalarını bir kanal üzerinden gönderir.
-    // Context iptal edildiğinde kanal kapatılır.
+    // Chunks sends data chunks to be scanned over a channel.
+    // The channel is closed when the context is cancelled.
     Chunks(ctx context.Context) <-chan Chunk
 
-    // Validate, kaynağın erişilebilir ve geçerli olduğunu kontrol eder.
+    // Validate checks that the source is accessible and valid.
     Validate() error
 }
 
-// Chunk, taranacak en küçük veri birimini temsil eder.
+// Chunk represents the smallest unit of data to be scanned.
 type Chunk struct {
-    // Data, taranacak ham içerik.
+    // Data is the raw content to be scanned.
     Data []byte
 
-    // SourceMetadata, bulgunun nereden geldiğini tanımlayan bağlam bilgisi.
+    // SourceMetadata is the context information identifying where the finding came from.
     SourceMetadata SourceMetadata
 }
 
-// SourceMetadata, bir chunk'ın kökenini tanımlar.
+// SourceMetadata describes the origin of a chunk.
 type SourceMetadata struct {
-    // Source türüne özgü alanlar
+    // Fields specific to the source type
     SourceType string // "git", "filesystem", "container"
 
-    // Git'e özgü
+    // Git-specific
     Repository string
     Commit     string
     Author     string
@@ -165,125 +165,125 @@ type SourceMetadata struct {
     Date       time.Time
     Branch     string
 
-    // Dosyaya özgü
+    // File-specific
     FilePath string
     Line     int
 
-    // Container'a özgü
+    // Container-specific
     Image    string
     Layer    string
     LayerIdx int
 }
 ```
 
-### 2.2 Detector Arayüzü
+### 2.2 Detector Interface
 
 ```go
-// Detector, belirli bir sır türünü tespit eden bileşeni temsil eder.
+// Detector represents a component that detects a specific secret type.
 type Detector interface {
-    // ID, dedektörün benzersiz tanımlayıcısını döndürür (örn: "aws-access-key-id").
+    // ID returns the detector's unique identifier (e.g., "aws-access-key-id").
     ID() string
 
-    // Description, dedektörün insan tarafından okunabilir açıklamasını döndürür.
+    // Description returns the detector's human-readable description.
     Description() string
 
-    // Keywords, Aho-Corasick ön-filtreleme için anahtar kelimeleri döndürür.
-    // Boş döndürürse, ön-filtreleme atlanır ve her chunk'a regex uygulanır.
+    // Keywords returns keywords for Aho-Corasick pre-filtering.
+    // If empty, pre-filtering is skipped and regex is applied to every chunk.
     Keywords() []string
 
-    // Scan, verilen veriyi tarar ve bulunan potansiyel sırları döndürür.
+    // Scan scans the given data and returns potential secrets found.
     Scan(ctx context.Context, data []byte) []RawFinding
 
-    // Severity, bu dedektörün bulguları için varsayılan önem derecesini döndürür.
+    // Severity returns the default severity level for this detector's findings.
     Severity() Severity
 }
 
-// RawFinding, doğrulanmamış bir ham bulguyu temsil eder.
+// RawFinding represents an unverified raw finding.
 type RawFinding struct {
     DetectorID string
-    Raw        []byte   // Bulunan sır verisi
-    RawV2      []byte   // Opsiyonel: sırrın ikinci parçası (örn: secret key)
-    Redacted   string   // Maskelenmiş versiyon (loglama için)
-    ExtraData  map[string]string // Ek bağlam bilgisi
+    Raw        []byte   // The discovered secret data
+    RawV2      []byte   // Optional: second part of the secret (e.g., secret key)
+    Redacted   string   // Masked version (for logging)
+    ExtraData  map[string]string // Additional context information
 }
 ```
 
-### 2.3 Verifier Arayüzü
+### 2.3 Verifier Interface
 
 ```go
-// Verifier, bir sırrın geçerliliğini doğrulayan bileşeni temsil eder.
+// Verifier represents a component that validates a secret's authenticity.
 type Verifier interface {
-    // Type, doğrulayıcının hangi dedektör türüyle eşleştiğini döndürür.
+    // Type returns which detector type this verifier matches with.
     Type() string
 
-    // Verify, bulunan sırrın geçerli/aktif olup olmadığını kontrol eder.
-    // Ağ çağrıları yapabilir, bu nedenle context ile iptal edilebilir.
+    // Verify checks whether the found secret is valid/active.
+    // May make network calls, so it can be cancelled via context.
     Verify(ctx context.Context, finding RawFinding) VerificationResult
 }
 
-// VerificationResult, doğrulama sonucunu temsil eder.
+// VerificationResult represents the verification outcome.
 type VerificationResult struct {
     Status    VerificationStatus
-    Message   string           // İnsan tarafından okunabilir açıklama
-    ExtraData map[string]string // Doğrulama sırasında elde edilen ek bilgi
+    Message   string           // Human-readable description
+    ExtraData map[string]string // Additional information obtained during verification
 }
 
-// VerificationStatus, doğrulama durumu.
+// VerificationStatus represents the verification state.
 type VerificationStatus int
 
 const (
-    StatusUnverified      VerificationStatus = iota // Doğrulama yapılmadı
-    StatusVerifiedActive                             // Doğrulandı: sır aktif
-    StatusVerifiedInactive                           // Doğrulandı: sır devre dışı
-    StatusVerifyError                                // Doğrulama sırasında hata
+    StatusUnverified      VerificationStatus = iota // Verification not performed
+    StatusVerifiedActive                             // Verified: secret is active
+    StatusVerifiedInactive                           // Verified: secret is inactive
+    StatusVerifyError                                // Error during verification
 )
 ```
 
-### 2.4 Formatter Arayüzü
+### 2.4 Formatter Interface
 
 ```go
-// Formatter, bulguları belirli bir formatta çıktılayan bileşeni temsil eder.
+// Formatter represents a component that outputs findings in a specific format.
 type Formatter interface {
-    // Format, bulguları belirtilen writer'a yazar.
+    // Format writes findings to the specified writer.
     Format(w io.Writer, findings []Finding) error
 
-    // FileExtension, bu formatın dosya uzantısını döndürür.
+    // FileExtension returns the file extension for this format.
     FileExtension() string
 }
 ```
 
-### 2.5 Birleştirilmiş Bulgu Modeli
+### 2.5 Unified Finding Model
 
 ```go
-// Finding, tam olarak zenginleştirilmiş bir bulguyu temsil eder.
-// Pipeline'ın son çıktısıdır.
+// Finding represents a fully enriched finding.
+// It is the final output of the pipeline.
 type Finding struct {
-    // Kimlik
+    // Identity
     ID         string    `json:"id"`
     DetectorID string    `json:"detector_id"`
     Severity   Severity  `json:"severity"`
 
-    // Sır verisi
-    Raw      string `json:"raw,omitempty"`     // Sadece --show-raw ile
-    Redacted string `json:"redacted"`           // Maskelenmiş
+    // Secret data
+    Raw      string `json:"raw,omitempty"`     // Only with --show-raw
+    Redacted string `json:"redacted"`           // Masked
 
-    // Konum
+    // Location
     SourceMetadata SourceMetadata `json:"source"`
 
-    // Doğrulama
+    // Verification
     Verification VerificationResult `json:"verification"`
 
-    // Zaman
+    // Timestamp
     DetectedAt time.Time `json:"detected_at"`
 
-    // Entropi
+    // Entropy
     Entropy float64 `json:"entropy,omitempty"`
 
-    // Ek bağlam
+    // Additional context
     ExtraData map[string]string `json:"extra_data,omitempty"`
 }
 
-// Severity, bulgu önem derecesi.
+// Severity represents the finding severity level.
 type Severity int
 
 const (
@@ -296,9 +296,9 @@ const (
 
 ---
 
-### 2.6 Bileşen Etkileşim Sırası
+### 2.6 Component Interaction Sequence
 
-Aşağıdaki sıra diyagramı, tek bir tarama işleminde bileşenlerin nasıl etkileştiğini gösterir:
+The following sequence diagram shows how components interact during a single scan operation:
 
 ```mermaid
 sequenceDiagram
@@ -312,30 +312,30 @@ sequenceDiagram
 
     CLI->>Engine: Scan(config)
     Engine->>Source: Chunks(ctx)
-    loop Her chunk için
+    loop For each chunk
         Source-->>Engine: Chunk{data, metadata}
-        Engine->>Worker: jobs channel'a gönder
-        Worker->>Worker: Aho-Corasick ön-filtreleme
-        alt Keyword eşleşti
+        Engine->>Worker: Send to jobs channel
+        Worker->>Worker: Aho-Corasick pre-filtering
+        alt Keyword matched
             Worker->>Detector: Scan(ctx, data)
             Detector-->>Worker: []RawFinding
-            Worker->>Worker: Entropi kontrolü
-            Worker-->>Engine: results channel'a yaz
+            Worker->>Worker: Entropy check
+            Worker-->>Engine: Write to results channel
         end
     end
-    opt Doğrulama aktif
+    opt Verification enabled
         Engine->>Verifier: Verify(ctx, finding)
         Verifier-->>Engine: VerificationResult
     end
     Engine->>Formatter: Format(w, findings)
-    Formatter-->>CLI: Çıktı (JSON/SARIF/CSV)
+    Formatter-->>CLI: Output (JSON/SARIF/CSV)
 ```
 
 ---
 
-## 3. Tarama Motoru (Engine) Detaylı Tasarım
+## 3. Scan Engine Detailed Design
 
-### 3.1 İşçi Havuzu (Worker Pool) Modeli
+### 3.1 Worker Pool Model
 
 ```mermaid
 flowchart TD
@@ -346,93 +346,93 @@ flowchart TD
     W1 --> Results["RESULTS CHANNEL\n(buffered chan)"]
     W2 --> Results
     WN --> Results
-    Results --> Verify["VERIFICATION\n(opsiyonel, async)"]
+    Results --> Verify["VERIFICATION\n(optional, async)"]
     Verify --> Output["FILTER & OUTPUT"]
 ```
 
-### 3.2 Engine Yapılandırması
+### 3.2 Engine Configuration
 
 ```go
 type EngineConfig struct {
-    // Eşzamanlılık
-    Concurrency int // İşçi sayısı (varsayılan: runtime.NumCPU())
-    ChunkSize   int // Chunk buffer boyutu (varsayılan: 1024)
+    // Concurrency
+    Concurrency int // Number of workers (default: runtime.NumCPU())
+    ChunkSize   int // Chunk buffer size (default: 1024)
 
-    // Tespit
+    // Detection
     Detectors      []Detector
     EnableEntropy  bool
-    EntropyThreshold float64 // Varsayılan: 4.0
+    EntropyThreshold float64 // Default: 4.0
 
-    // Doğrulama
+    // Verification
     EnableVerification bool
     Verifiers         []Verifier
-    VerifyTimeout     time.Duration // Varsayılan: 10s
-    VerifyConcurrency int           // Doğrulama işçi sayısı
+    VerifyTimeout     time.Duration // Default: 10s
+    VerifyConcurrency int           // Number of verification workers
 
-    // Filtreleme
-    IncludePatterns []string // Glob desenleri
-    ExcludePatterns []string // Glob desenleri
-    MaxFileSize     int64    // Varsayılan: 10MB
+    // Filtering
+    IncludePatterns []string // Glob patterns
+    ExcludePatterns []string // Glob patterns
+    MaxFileSize     int64    // Default: 10MB
 
-    // Çıktı
+    // Output
     Formatter   Formatter
-    ShowRaw     bool // Sır içeriğini göster
-    OnlyVerified bool // Sadece doğrulanmış bulguları göster
+    ShowRaw     bool // Show secret content
+    OnlyVerified bool // Show only verified findings
 }
 ```
 
-### 3.3 Engine Yaşam Döngüsü
+### 3.3 Engine Lifecycle
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Başlatma
+    [*] --> Initialization
 
-    state Başlatma {
-        [*] --> DedektörleriYükle: Registry'den yükle
-        DedektörleriYükle --> ACDerle: Aho-Corasick otomatonunu derle
-        ACDerle --> HavuzOluştur: İşçi havuzunu oluştur
-        HavuzOluştur --> KanallarOluştur: Kanalları oluştur
+    state Initialization {
+        [*] --> LoadDetectors: Load from registry
+        LoadDetectors --> CompileAC: Compile Aho-Corasick automaton
+        CompileAC --> CreatePool: Create worker pool
+        CreatePool --> CreateChannels: Create channels
     }
 
-    Başlatma --> Tarama
+    Initialization --> Scanning
 
-    state Tarama {
-        [*] --> ChunkOku: Source.Chunks() kanalından oku
-        ChunkOku --> JobsGönder: Jobs kanalına gönder
-        JobsGönder --> ParalelTarama
-        state ParalelTarama {
-            [*] --> ACÖnFiltre: Aho-Corasick ön-filtreleme
-            ACÖnFiltre --> DetectorScan: Eşleşen dedektörlerin Scan() çağır
-            DetectorScan --> EntropiKontrol: Entropi kontrolü
-            EntropiKontrol --> SonuçYaz: Results kanalına yaz
+    state Scanning {
+        [*] --> ReadChunk: Read from Source.Chunks() channel
+        ReadChunk --> SendToJobs: Send to jobs channel
+        SendToJobs --> ParallelScan
+        state ParallelScan {
+            [*] --> ACPreFilter: Aho-Corasick pre-filtering
+            ACPreFilter --> DetectorScan: Call matching detectors' Scan()
+            DetectorScan --> EntropyCheck: Entropy check
+            EntropyCheck --> WriteResult: Write to results channel
         }
     }
 
-    Tarama --> Doğrulama: Opsiyonel
+    Scanning --> Verification: Optional
 
-    state Doğrulama {
-        [*] --> VerifierBul: Eşleşen Verifier'ı bul
-        VerifierBul --> VerifyÇağır: Verify() çağır (rate-limited)
-        VerifyÇağır --> Zenginleştir: Finding'i zenginleştir
+    state Verification {
+        [*] --> FindVerifier: Find matching Verifier
+        FindVerifier --> CallVerify: Call Verify() (rate-limited)
+        CallVerify --> Enrich: Enrich Finding
     }
 
-    Doğrulama --> Çıktı
+    Verification --> Output
 
-    state Çıktı {
-        [*] --> AllowlistFiltre: Allowlist/ignore uygula
-        AllowlistFiltre --> VerifiedFiltre: --only-verified filtresi
-        VerifiedFiltre --> SeverityFiltre: Severity filtresi
-        SeverityFiltre --> Format: Formatter.Format() ile çıktıla
+    state Output {
+        [*] --> AllowlistFilter: Apply allowlist/ignore
+        AllowlistFilter --> VerifiedFilter: --only-verified filter
+        VerifiedFilter --> SeverityFilter: Severity filter
+        SeverityFilter --> Format: Output via Formatter.Format()
     }
 
-    Çıktı --> [*]
+    Output --> [*]
 ```
 
 ---
 
-## 4. Eklenti (Plugin) Kayıt Mekanizması
+## 4. Plugin Registration Mechanism
 
-### 4.1 Derleme Zamanı Kayıt Deseni
+### 4.1 Compile-Time Registration Pattern
 
 ```go
 // internal/detector/registry.go
@@ -442,8 +442,8 @@ var (
     detectors = make(map[string]Detector)
 )
 
-// Register, bir dedektörü merkezi kayıt defterine kaydeder.
-// Her dedektör paketi, init() fonksiyonunda bu fonksiyonu çağırır.
+// Register registers a detector in the central registry.
+// Each detector package calls this function in its init() function.
 func Register(d Detector) {
     mu.Lock()
     defer mu.Unlock()
@@ -453,7 +453,7 @@ func Register(d Detector) {
     detectors[d.ID()] = d
 }
 
-// All, kayıtlı tüm dedektörleri döndürür.
+// All returns all registered detectors.
 func All() []Detector {
     mu.RLock()
     defer mu.RUnlock()
@@ -465,7 +465,7 @@ func All() []Detector {
 }
 ```
 
-### 4.2 Dedektör Kaydı Örneği
+### 4.2 Detector Registration Example
 
 ```go
 // internal/detector/aws.go
@@ -483,7 +483,7 @@ func (d *AWSAccessKeyID) Keywords() []string   { return []string{"AKIA", "ABIA",
 func (d *AWSAccessKeyID) Severity() Severity   { return SeverityCritical }
 
 func (d *AWSAccessKeyID) Scan(ctx context.Context, data []byte) []RawFinding {
-    // AWS Access Key ID deseni: AKIA[0-9A-Z]{16}
+    // AWS Access Key ID pattern: AKIA[0-9A-Z]{16}
     re := regexp.MustCompile(`(AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}`)
     matches := re.FindAll(data, -1)
 
@@ -499,25 +499,25 @@ func (d *AWSAccessKeyID) Scan(ctx context.Context, data []byte) []RawFinding {
 }
 ```
 
-### 4.3 Boş Import ile Aktivasyon
+### 4.3 Activation via Blank Import
 
 ```go
-// main.go veya cmd/root.go
+// main.go or cmd/root.go
 
 import (
-    // Dedektörleri kaydet
+    // Register detectors
     _ "github.com/cemililik/leakwatch/internal/detector/aws"
     _ "github.com/cemililik/leakwatch/internal/detector/github"
     _ "github.com/cemililik/leakwatch/internal/detector/gcp"
     _ "github.com/cemililik/leakwatch/internal/detector/generic"
     _ "github.com/cemililik/leakwatch/internal/detector/privatekey"
 
-    // Kaynakları kaydet
+    // Register sources
     _ "github.com/cemililik/leakwatch/internal/source/git"
     _ "github.com/cemililik/leakwatch/internal/source/filesystem"
     _ "github.com/cemililik/leakwatch/internal/source/container"
 
-    // Doğrulayıcıları kaydet
+    // Register verifiers
     _ "github.com/cemililik/leakwatch/internal/verifier/aws"
     _ "github.com/cemililik/leakwatch/internal/verifier/github"
 )
@@ -525,27 +525,27 @@ import (
 
 ---
 
-## 5. Kaynak (Source) İmplementasyonları
+## 5. Source Implementations
 
-### 5.1 Git Kaynağı Akış Şeması
+### 5.1 Git Source Flow Diagram
 
 ```mermaid
 flowchart TD
-    A["git.PlainOpen(path)\nveya git.Clone(url)"] --> B["repo.Log(LogOptions{\n  Since: sinceFlag,\n  Order: CommitterTime\n})"]
-    B --> C{"Her commit\niçin"}
+    A["git.PlainOpen(path)\nor git.Clone(url)"] --> B["repo.Log(LogOptions{\n  Since: sinceFlag,\n  Order: CommitterTime\n})"]
+    B --> C{"For each\ncommit"}
     C --> D["commit.Tree()"]
     D --> E["tree.Files()"]
-    E --> F{"Her dosya\niçin"}
+    E --> F{"For each\nfile"}
     F --> G["file.Contents()"]
     G --> H["Chunk{\n  Data: contents,\n  SourceMetadata: {repo, commit, author, date, filePath}\n}"]
     H --> I[("chunks channel")]
     I --> C
 ```
 
-### 5.2 Dosya Sistemi Kaynağı
+### 5.2 Filesystem Source
 
 ```go
-// filepath.WalkDir ile io/fs tabanlı tarama
+// filepath.WalkDir based scanning with io/fs
 func (s *FilesystemSource) Chunks(ctx context.Context) <-chan Chunk {
     ch := make(chan Chunk, s.bufferSize)
     go func() {
@@ -561,7 +561,7 @@ func (s *FilesystemSource) Chunks(ctx context.Context) <-chan Chunk {
                 return nil
             }
 
-            // Filtreleme: boyut, uzantı, .leakwatchignore
+            // Filtering: size, extension, .leakwatchignore
             if s.shouldSkip(path, d) {
                 return nil
             }
@@ -585,15 +585,15 @@ func (s *FilesystemSource) Chunks(ctx context.Context) <-chan Chunk {
 }
 ```
 
-### 5.3 Container İmaj Kaynağı
+### 5.3 Container Image Source
 
 ```mermaid
 flowchart TD
     A["crane.Pull(imageName)"] --> B["img.Layers()"]
-    B --> C{"Her katman\niçin"}
+    B --> C{"For each\nlayer"}
     C --> D["layer.Uncompressed()"]
     D --> E["tar.NewReader(reader)"]
-    E --> F{"Her dosya\n(tar entry)"}
+    E --> F{"For each file\n(tar entry)"}
     F --> G["Chunk{\n  Data: fileContents,\n  SourceMetadata: {image, layer, layerIdx, filePath}\n}"]
     G --> H[("chunks channel")]
     H --> C
@@ -601,43 +601,43 @@ flowchart TD
 
 ---
 
-## 6. Tespit Motoru Detayı
+## 6. Detection Engine Detail
 
-### 6.1 Aho-Corasick + Regex Hibrit Stratejisi
+### 6.1 Aho-Corasick + Regex Hybrid Strategy
 
 ```mermaid
 flowchart TD
-    A["Gelen Chunk (veri)"] --> B["Aho-Corasick Ön-Filtreleme\nO(n) — tek geçiş"]
-    B --> C{"Eşleşme\nvar mı?"}
-    C -->|"Hayır"| D["Atla\n(%90+ chunk burada elenir)"]
-    C -->|"Evet"| E["Hangi keyword(ler) eşleşti?"]
-    E --> F["Sadece eşleşen dedektörlerin\nScan() metodunu çağır (regex)"]
-    F --> G{"Bulgu\nvar mı?"}
-    G -->|"Hayır"| H[Atla]
-    G -->|"Evet"| I{"Entropi >= eşik?"}
-    I -->|"Hayır"| J["Düşük güven\nolarak işaretle"]
-    I -->|"Evet"| K["Yüksek güven bulgu\n→ Results"]
+    A["Incoming Chunk (data)"] --> B["Aho-Corasick Pre-Filtering\nO(n) — single pass"]
+    B --> C{"Match\nfound?"}
+    C -->|"No"| D["Skip\n(90%+ chunks eliminated here)"]
+    C -->|"Yes"| E["Which keyword(s) matched?"]
+    E --> F["Call only matching detectors'\nScan() method (regex)"]
+    F --> G{"Finding\nexists?"}
+    G -->|"No"| H[Skip]
+    G -->|"Yes"| I{"Entropy >= threshold?"}
+    I -->|"No"| J["Mark as\nlow confidence"]
+    I -->|"Yes"| K["High confidence finding\n→ Results"]
 ```
 
-### 6.2 Shannon Entropisi Hesaplama
+### 6.2 Shannon Entropy Calculation
 
 ```go
 // entropy/shannon.go
 
-// Calculate, verilen byte dizisinin Shannon entropisini hesaplar.
-// Sonuç 0.0 (tamamen düzgün) ile ~8.0 (tamamen rastgele) arasındadır.
+// Calculate computes the Shannon entropy of the given byte slice.
+// The result ranges from 0.0 (perfectly uniform) to ~8.0 (perfectly random).
 func Calculate(data []byte) float64 {
     if len(data) == 0 {
         return 0.0
     }
 
-    // Karakter frekanslarını say
+    // Count character frequencies
     freq := make(map[byte]float64)
     for _, b := range data {
         freq[b]++
     }
 
-    // Shannon entropisi formülü: H = -Σ p(x) * log2(p(x))
+    // Shannon entropy formula: H = -Σ p(x) * log2(p(x))
     length := float64(len(data))
     entropy := 0.0
     for _, count := range freq {
@@ -649,17 +649,17 @@ func Calculate(data []byte) float64 {
     return entropy
 }
 
-// Önerilen eşik değerleri:
-// - Hex karakter seti:    > 3.0 (yüksek entropi)
-// - Base64 karakter seti: > 4.5 (yüksek entropi)
-// - Genel:                > 4.0 (yüksek entropi)
+// Recommended threshold values:
+// - Hex character set:    > 3.0 (high entropy)
+// - Base64 character set: > 4.5 (high entropy)
+// - General:              > 4.0 (high entropy)
 ```
 
 ---
 
-## 7. Doğrulama (Verification) Alt Sistemi
+## 7. Verification Subsystem
 
-### 7.1 Rate Limiting ve Güvenlik
+### 7.1 Rate Limiting and Security
 
 ```go
 type VerificationEngine struct {
@@ -670,15 +670,15 @@ type VerificationEngine struct {
     enabled      bool
 }
 
-// Güvenlik kuralları:
-// 1. Doğrulanan kimlik bilgileri ASLA loglanmaz
-// 2. Rate limiting zorunlu — API'leri aşırı yüklememek
-// 3. Timeout zorunlu — yanıt vermeyen API'leri beklememe
-// 4. Kullanıcı tarafından devre dışı bırakılabilir (--no-verify)
-// 5. Doğrulama sonuçları önbelleğe alınabilir (aynı sır tekrar doğrulanmaz)
+// Security rules:
+// 1. Verified credentials are NEVER logged
+// 2. Rate limiting is mandatory — to avoid overloading APIs
+// 3. Timeout is mandatory — to avoid waiting on unresponsive APIs
+// 4. Can be disabled by the user (--no-verify)
+// 5. Verification results can be cached (same secret is not re-verified)
 ```
 
-### 7.2 AWS Doğrulama Örneği
+### 7.2 AWS Verification Example
 
 ```go
 // verifier/aws.go
@@ -690,11 +690,11 @@ func (v *AWSVerifier) Verify(ctx context.Context, finding RawFinding) Verificati
     if secretKey == "" {
         return VerificationResult{
             Status:  StatusUnverified,
-            Message: "Secret Access Key bulunamadı, doğrulanamıyor",
+            Message: "Secret Access Key not found, cannot verify",
         }
     }
 
-    // AWS STS GetCallerIdentity — IAM izni gerektirmez
+    // AWS STS GetCallerIdentity — does not require IAM permissions
     cfg, err := config.LoadDefaultConfig(ctx,
         config.WithCredentialsProvider(
             credentials.NewStaticCredentialsProvider(accessKeyID, secretKey, ""),
@@ -709,13 +709,13 @@ func (v *AWSVerifier) Verify(ctx context.Context, finding RawFinding) Verificati
     if err != nil {
         return VerificationResult{
             Status:  StatusVerifiedInactive,
-            Message: "Anahtar geçersiz veya devre dışı",
+            Message: "Key is invalid or disabled",
         }
     }
 
     return VerificationResult{
         Status:  StatusVerifiedActive,
-        Message: fmt.Sprintf("Aktif anahtar: hesap=%s, ARN=%s", *result.Account, *result.Arn),
+        Message: fmt.Sprintf("Active key: account=%s, ARN=%s", *result.Account, *result.Arn),
         ExtraData: map[string]string{
             "account": *result.Account,
             "arn":     *result.Arn,
@@ -726,52 +726,52 @@ func (v *AWSVerifier) Verify(ctx context.Context, finding RawFinding) Verificati
 
 ---
 
-## 8. Yapılandırma Hiyerarşisi
+## 8. Configuration Hierarchy
 
-Viper ile yönetilen yapılandırma, aşağıdaki öncelik sırasına göre uygulanır (yukarıdan aşağıya azalan öncelik):
+Configuration managed by Viper is applied according to the following priority order (descending priority from top to bottom):
 
 ```
-1. Komut satırı flag'leri        (en yüksek öncelik)
+1. Command-line flags               (highest priority)
    --concurrency=8
 
-2. Ortam değişkenleri
+2. Environment variables
    LEAKWATCH_CONCURRENCY=8
 
-3. Proje yapılandırma dosyası
-   .leakwatch.yaml (çalışma dizininde)
+3. Project configuration file
+   .leakwatch.yaml (in working directory)
 
-4. Global yapılandırma dosyası
+4. Global configuration file
    ~/.leakwatch.yaml
 
-5. Varsayılan değerler            (en düşük öncelik)
+5. Default values                    (lowest priority)
    concurrency: runtime.NumCPU()
 ```
 
-### 8.1 Yapılandırma Dosyası Şeması (.leakwatch.yaml)
+### 8.1 Configuration File Schema (.leakwatch.yaml)
 
 ```yaml
-# Tarama yapılandırması
+# Scan configuration
 scan:
-  concurrency: 8              # İşçi sayısı
+  concurrency: 8              # Number of workers
   max-file-size: 10485760     # 10MB
-  chunk-size: 1024            # Chunk buffer boyutu
+  chunk-size: 1024            # Chunk buffer size
 
-# Tespit yapılandırması
+# Detection configuration
 detection:
   entropy:
     enabled: true
     threshold: 4.0
   detectors:
-    enabled: ["*"]             # Tümü aktif
-    disabled: []               # Devre dışı bırakılanlar
+    enabled: ["*"]             # All active
+    disabled: []               # Disabled ones
 
-# Doğrulama yapılandırması
+# Verification configuration
 verification:
   enabled: true
   timeout: 10s
   concurrency: 4
 
-# Filtreleme
+# Filtering
 filter:
   exclude-paths:
     - "vendor/**"
@@ -781,17 +781,17 @@ filter:
   exclude-detectors: []
   only-verified: false
 
-# Çıktı yapılandırması
+# Output configuration
 output:
   format: json                 # json, sarif, csv, table
-  file: ""                     # Boşsa stdout'a yaz
-  show-raw: false              # Sır içeriğini göster
-  severity-threshold: low      # Minimum önem derecesi
+  file: ""                     # If empty, write to stdout
+  show-raw: false              # Show secret content
+  severity-threshold: low      # Minimum severity level
 
-# Özel kurallar
+# Custom rules
 custom-rules:
   - id: "internal-api-key"
-    description: "Dahili API Anahtarı"
+    description: "Internal API Key"
     regex: 'INTERNAL_[A-Z0-9]{32}'
     keywords: ["INTERNAL_"]
     severity: high
@@ -800,43 +800,43 @@ custom-rules:
 
 ---
 
-## 9. Filtreleme Sistemi
+## 9. Filtering System
 
 ### 9.1 .leakwatchignore
 
-Git'in `.gitignore` formatıyla uyumlu, sır taramadan hariç tutulacak dosya ve yolları tanımlar:
+Compatible with Git's `.gitignore` format, defines files and paths to exclude from secret scanning:
 
 ```
-# Test dosyaları
+# Test files
 *_test.go
 test/**
 tests/**
 __tests__/**
 
-# Bağımlılıklar
+# Dependencies
 vendor/
 node_modules/
 go.sum
 package-lock.json
 yarn.lock
 
-# Dokümantasyon
+# Documentation
 docs/**
 *.md
 
-# Derleme çıktıları
+# Build outputs
 dist/
 build/
 bin/
 
-# Belirli dosyalar
+# Specific files
 .env.example
 config.example.yaml
 ```
 
-### 9.2 Satır İçi Yoksayma (Inline Ignore)
+### 9.2 Inline Ignore
 
-Belirli satırları tarama dışında bırakmak için:
+To exclude specific lines from scanning:
 
 ```python
 API_KEY = "AKIA1234EXAMPLE567890"  # leakwatch:ignore
@@ -845,31 +845,31 @@ PASSWORD = "test123"  # leakwatch:ignore:aws-access-key-id
 
 ---
 
-## 10. Hata Yönetimi ve Dayanıklılık
+## 10. Error Handling and Resilience
 
-### 10.1 Hata Stratejisi
+### 10.1 Error Strategy
 
-| Hata Türü | Strateji |
+| Error Type | Strategy |
 |-----------|----------|
-| Kaynak erişilemez (repo/dosya bulunamadı) | Fatal — hemen çık |
-| Tek dosya okunamadı | Uyar, atla, devam et |
-| Doğrulama hatası (ağ/timeout) | VerifyError olarak işaretle, devam et |
-| Rate limit aşıldı | Exponential backoff ile yeniden dene |
-| Bellek yetersiz | Chunk boyutunu küçült, uyar |
+| Source inaccessible (repo/file not found) | Fatal — exit immediately |
+| Single file unreadable | Warn, skip, continue |
+| Verification error (network/timeout) | Mark as VerifyError, continue |
+| Rate limit exceeded | Retry with exponential backoff |
+| Insufficient memory | Reduce chunk size, warn |
 
-### 10.2 Yapılandırılmış Loglama (Structured Logging)
+### 10.2 Structured Logging
 
 ```go
-// Go 1.21+ log/slog paketi
-slog.Info("tarama başlatıldı",
+// Go 1.21+ log/slog package
+slog.Info("scan started",
     "source", "git",
     "repository", repoPath,
     "concurrency", config.Concurrency,
 )
 
-slog.Warn("dosya atlanıyor",
+slog.Warn("skipping file",
     "path", filePath,
-    "reason", "boyut limiti aşıldı",
+    "reason", "size limit exceeded",
     "size", fileSize,
     "limit", config.MaxFileSize,
 )
@@ -877,11 +877,11 @@ slog.Warn("dosya atlanıyor",
 
 ---
 
-## 11. Güvenlik Tasarım İlkeleri
+## 11. Security Design Principles
 
-1. **Sırlar asla loglanmaz** — Bulunan sırlar sadece maskelenmiş (redacted) formda loglanır
-2. **Minimum yetki** — Doğrulama için sadece salt-okunur API çağrıları kullanılır (örn: STS GetCallerIdentity)
-3. **Sır önbelleğe alınmaz** — Doğrulanmış sırlar diske yazılmaz
-4. **Güvenli çıkış kodları** — Sır bulunduğunda non-zero çıkış kodu (CI/CD entegrasyonu)
-5. **Bağımlılık güvenliği** — `govulncheck` ile düzenli güvenlik açığı taraması
-6. **Rate limiting** — Doğrulama API çağrılarında zorunlu hız sınırlama
+1. **Secrets are never logged** — Discovered secrets are only logged in redacted form
+2. **Least privilege** — Only read-only API calls are used for verification (e.g., STS GetCallerIdentity)
+3. **Secrets are not cached** — Verified secrets are not written to disk
+4. **Secure exit codes** — Non-zero exit code when secrets are found (CI/CD integration)
+5. **Dependency security** — Regular vulnerability scanning with `govulncheck`
+6. **Rate limiting** — Mandatory rate limiting on verification API calls

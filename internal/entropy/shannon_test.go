@@ -33,26 +33,26 @@ func TestCalculate_All256UniqueBytes_ReturnsMaxEntropy(t *testing.T) {
 
 func TestCalculate_TwoCharactersEqualDistribution_ReturnsOne(t *testing.T) {
 	h := Calculate([]byte("ababababab"))
-	assert.GreaterOrEqual(t, h, 0.9, "entropi alt sınırın altında")
-	assert.LessOrEqual(t, h, 1.1, "entropi üst sınırın üstünde")
+	assert.GreaterOrEqual(t, h, 0.9, "entropy below lower bound")
+	assert.LessOrEqual(t, h, 1.1, "entropy above upper bound")
 }
 
 func TestCalculate_LowEntropyWord_ReturnsBetween2And4(t *testing.T) {
 	h := Calculate([]byte("password"))
-	assert.GreaterOrEqual(t, h, 2.5, "entropi alt sınırın altında")
-	assert.LessOrEqual(t, h, 3.5, "entropi üst sınırın üstünde")
+	assert.GreaterOrEqual(t, h, 2.5, "entropy below lower bound")
+	assert.LessOrEqual(t, h, 3.5, "entropy above upper bound")
 }
 
 func TestCalculate_AWSAccessKeyFormat_ReturnsMediumEntropy(t *testing.T) {
 	h := Calculate([]byte("AKIAIOSFODNN7EXAMPLE"))
-	assert.GreaterOrEqual(t, h, 3.5, "entropi alt sınırın altında")
-	assert.LessOrEqual(t, h, 4.5, "entropi üst sınırın üstünde")
+	assert.GreaterOrEqual(t, h, 3.5, "entropy below lower bound")
+	assert.LessOrEqual(t, h, 4.5, "entropy above upper bound")
 }
 
 func TestCalculate_HighEntropyString_ReturnsAbove4(t *testing.T) {
 	h := Calculate([]byte("aB3$kL9@mN2!pQ7&rT4^"))
-	assert.GreaterOrEqual(t, h, 4.0, "entropi alt sınırın altında")
-	assert.LessOrEqual(t, h, 5.0, "entropi üst sınırın üstünde")
+	assert.GreaterOrEqual(t, h, 4.0, "entropy below lower bound")
+	assert.LessOrEqual(t, h, 5.0, "entropy above upper bound")
 }
 
 func BenchmarkCalculate(b *testing.B) {

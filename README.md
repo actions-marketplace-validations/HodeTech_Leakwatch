@@ -2,33 +2,33 @@
 
 > Next-generation secret scanning platform — fast, accurate, open source.
 
-**Leakwatch**, kod tabanlarında, Git geçmişlerinde ve container imajlarında sızan sırları (API anahtarları, parolalar, sertifikalar) tespit eden, doğrulayan ve raporlayan yüksek performanslı bir güvenlik aracıdır.
+**Leakwatch** is a high-performance security tool that detects, verifies, and reports leaked secrets (API keys, passwords, certificates) in codebases, Git histories, and container images.
 
 ---
 
-## Neden Leakwatch?
+## Why Leakwatch?
 
-| Özellik | Leakwatch | TruffleHog | Gitleaks |
+| Feature | Leakwatch | TruffleHog | Gitleaks |
 |---------|-----------|------------|----------|
-| **Lisans** | MIT | AGPL-3.0 | MIT* |
-| **Sır Doğrulama** | Evet | Evet | Hayır |
-| **Container Tarama** | Evet | Evet | Hayır |
-| **Aho-Corasick** | Evet | Kısmen | Hayır |
-| **Entropi Analizi** | Hibrit | Evet | Filtre |
-| **YAML Özel Kurallar** | Evet | Hayır (Go) | TOML |
-| **SARIF Çıktı** | Evet | Evet | Evet |
+| **License** | MIT | AGPL-3.0 | MIT* |
+| **Secret Verification** | Yes | Yes | No |
+| **Container Scanning** | Yes | Yes | No |
+| **Aho-Corasick** | Yes | Partial | No |
+| **Entropy Analysis** | Hybrid | Yes | Filter |
+| **YAML Custom Rules** | Yes | No (Go) | TOML |
+| **SARIF Output** | Yes | Yes | Yes |
 
-**Leakwatch'ın farkı:**
-- **Doğrulama + MIT lisansı** — Açık kaynak dünyasında benzersiz kombinasyon
-- **Hibrit tespit motoru** — Aho-Corasick + Regex + Entropi ile düşük yanlış pozitif
-- **Kolay genişletilebilirlik** — Basit kurallar için YAML, gelişmiş için Go plugin
-- **Tek binary, sıfır bağımlılık** — Her platformda çalışır
+**What makes Leakwatch different:**
+- **Verification + MIT license** — A unique combination in the open source world
+- **Hybrid detection engine** — Low false positives with Aho-Corasick + Regex + Entropy
+- **Easy extensibility** — YAML for simple rules, Go plugin for advanced ones
+- **Single binary, zero dependencies** — Runs on every platform
 
 ---
 
-## Hızlı Başlangıç
+## Quick Start
 
-### Kurulum
+### Installation
 
 ```bash
 # Homebrew (macOS/Linux)
@@ -37,51 +37,51 @@ brew install cemililik/tap/leakwatch
 # Go install
 go install github.com/cemililik/leakwatch@latest
 
-# Binary indirme
+# Binary download
 curl -sSfL https://github.com/cemililik/Leakwatch/releases/latest/download/leakwatch_$(uname -s)_$(uname -m).tar.gz | tar xz
 ```
 
-### Kullanım
+### Usage
 
 ```bash
-# Dosya sistemi tara
+# Scan filesystem
 leakwatch scan fs /path/to/project
 
-# Git deposu tara (tüm geçmiş)
+# Scan Git repository (full history)
 leakwatch scan git /path/to/repo
 leakwatch scan git https://github.com/org/repo.git
 
-# Container imajı tara
+# Scan container image
 leakwatch scan image nginx:latest
 
-# Sadece doğrulanmış sırları göster
+# Show only verified secrets
 leakwatch scan git . --only-verified
 
-# SARIF formatında çıktı
+# Output in SARIF format
 leakwatch scan fs . --format sarif --output results.sarif
 
-# Son commit'ten beri tara (CI/CD için)
+# Scan since last commit (for CI/CD)
 leakwatch scan git . --since-commit HEAD~1
 ```
 
 ---
 
-## Desteklenen Sır Türleri
+## Supported Secret Types
 
-| Kategori | Örnekler | Doğrulama |
-|----------|----------|-----------|
-| **AWS** | Access Key ID, Secret Access Key | Evet |
-| **GitHub** | Personal Access Token, OAuth | Evet |
-| **GCP** | Service Account Key, API Key | Planlanıyor |
-| **Azure** | Storage Key, Connection String | Planlanıyor |
-| **Slack** | Bot Token, Webhook URL | Evet |
-| **Stripe** | API Key (live/test) | Planlanıyor |
-| **Genel** | Private Key (RSA/SSH/PGP), JWT, Generic API Key | — |
-| **Veritabanı** | Connection String (Postgres, MySQL, MongoDB) | Planlanıyor |
+| Category | Examples | Verification |
+|----------|----------|--------------|
+| **AWS** | Access Key ID, Secret Access Key | Yes |
+| **GitHub** | Personal Access Token, OAuth | Yes |
+| **GCP** | Service Account Key, API Key | Planned |
+| **Azure** | Storage Key, Connection String | Planned |
+| **Slack** | Bot Token, Webhook URL | Yes |
+| **Stripe** | API Key (live/test) | Planned |
+| **Generic** | Private Key (RSA/SSH/PGP), JWT, Generic API Key | — |
+| **Database** | Connection String (Postgres, MySQL, MongoDB) | Planned |
 
 ---
 
-## CI/CD Entegrasyonu
+## CI/CD Integration
 
 ### GitHub Actions
 
@@ -106,7 +106,7 @@ repos:
 
 ---
 
-## Yapılandırma
+## Configuration
 
 ```yaml
 # .leakwatch.yaml
@@ -136,23 +136,23 @@ output:
 
 ---
 
-## Mimari
+## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph Sources["Kaynaklar"]
+    subgraph Sources["Sources"]
         S1["Git (go-git)"]
         S2["Filesystem (io/fs)"]
         S3["Container (crane)"]
     end
 
-    subgraph Engine["Tespit Motoru"]
+    subgraph Engine["Detection Engine"]
         E1[Aho-Corasick]
         E2[Regex]
         E3[Entropy]
     end
 
-    subgraph Verify["Doğrulama"]
+    subgraph Verify["Verification"]
         V1[AWS STS]
         V2[GitHub API]
         V3[Slack API]
@@ -163,52 +163,63 @@ flowchart LR
     Verify --> Output["JSON / SARIF / CSV"]
 ```
 
-Detaylı mimari: [docs/architecture/03-ARCHITECTURE.md](docs/architecture/03-ARCHITECTURE.md)
+Detailed architecture: [docs/architecture/03-ARCHITECTURE.md](docs/architecture/03-ARCHITECTURE.md)
 
 ---
 
-## Dokümantasyon
+## Documentation
 
-### Mimari & Tasarım
+### Architecture & Design
 
-| Belge | Açıklama |
-|-------|----------|
-| [Rekabet Analizi](docs/architecture/01-COMPETITIVE-ANALYSIS.md) | Pazar analizi ve konumlandırma |
-| [Teknoloji Kararları](docs/architecture/02-TECHNOLOGY-DECISIONS.md) | Teknoloji seçimleri ve gerekçeleri |
-| [Mimari Tasarım](docs/architecture/03-ARCHITECTURE.md) | Detaylı mimari ve arayüzler |
+| Document | Description |
+|----------|-------------|
+| [Competitive Analysis](docs/architecture/01-COMPETITIVE-ANALYSIS.md) | Market analysis and positioning |
+| [Technology Decisions](docs/architecture/02-TECHNOLOGY-DECISIONS.md) | Technology choices and rationale |
+| [Architecture Design](docs/architecture/03-ARCHITECTURE.md) | Detailed architecture and interfaces |
 
-### Standartlar
+### Standards
 
-| Belge | Açıklama |
-|-------|----------|
-| [Dokümantasyon Standartları](docs/standards/00-DOCUMENTATION-STANDARDS.md) | Diyagram, format ve belge kuralları |
-| [Kod İnceleme Standartları](docs/standards/01-CODE-REVIEW-STANDARDS.md) | İnceleme süreci, kontrol listeleri, bulgu sınıflandırması |
-| [Sürüm ve Dağıtım Standartları](docs/standards/02-RELEASE-STANDARDS.md) | Sürüm yönetimi, CI/CD, release checklist |
-| [Geliştirme Standartları](docs/standards/04-DEVELOPMENT-STANDARDS.md) | Kod standartları, test ve CI/CD |
+| Document | Description |
+|----------|-------------|
+| [Documentation Standards](docs/standards/00-DOCUMENTATION-STANDARDS.md) | Diagrams, formatting, and document rules |
+| [Code Review Standards](docs/standards/01-CODE-REVIEW-STANDARDS.md) | Review process, checklists, finding classification |
+| [Release and Distribution Standards](docs/standards/02-RELEASE-STANDARDS.md) | Version management, CI/CD, release checklist |
+| [Development Standards](docs/standards/04-DEVELOPMENT-STANDARDS.md) | Code standards, testing, and CI/CD |
 
-### Kararlar (ADR)
+### Decisions (ADR)
 
-| Belge | Açıklama |
-|-------|----------|
-| [ADR Dizini](docs/decisions/README.md) | Tüm mimari kararlar |
-| [ADR-0001](docs/decisions/ADR-0001-programlama-dili.md) | Programlama dili: Go |
-| [ADR-0005](docs/decisions/ADR-0005-desen-eslestirme.md) | Desen eşleştirme: Aho-Corasick hibrit |
-| [ADR-0007](docs/decisions/ADR-0007-lisans.md) | Lisans: MIT |
+| Document | Description |
+|----------|-------------|
+| [ADR Index](docs/decisions/README.md) | All architecture decisions |
+| [ADR-0001](docs/decisions/ADR-0001-programlama-dili.md) | Programming language: Go |
+| [ADR-0005](docs/decisions/ADR-0005-desen-eslestirme.md) | Pattern matching: Aho-Corasick hybrid |
+| [ADR-0007](docs/decisions/ADR-0007-lisans.md) | License: MIT |
 
-### Planlama
+### Guides
 
-| Belge | Açıklama |
-|-------|----------|
-| [Yol Haritası](docs/05-ROADMAP.md) | Fazlandırılmış geliştirme planı |
+| Document | Description |
+|----------|-------------|
+| [Getting Started](docs/guides/getting-started.md) | Installation, first scan, understanding output |
+| [Configuration](docs/guides/configuration.md) | .leakwatch.yaml, environment variables, ignore files |
+| [CI/CD Integration](docs/guides/ci-cd-integration.md) | GitHub Actions, GitLab CI, Jenkins, pre-commit |
+| [Custom Rules](docs/guides/custom-rules.md) | YAML rule definitions, regex, entropy, keyword |
+| [Container Scanning](docs/guides/container-scanning.md) | Docker/OCI image scanning, registry authentication |
+| [Cloud Scanning](docs/guides/cloud-scanning.md) | AWS S3, GCS, parallel repo scanning |
+
+### Planning
+
+| Document | Description |
+|----------|-------------|
+| [Roadmap](docs/05-ROADMAP.md) | Phased development plan |
 
 ---
 
-## Katkıda Bulunma
+## Contributing
 
-Katkılarınızı bekliyoruz! Lütfen [CONTRIBUTING.md](CONTRIBUTING.md) dosyasını inceleyin.
+We welcome your contributions! Please see the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 
 ```bash
-# Geliştirme ortamını kurun
+# Set up the development environment
 git clone https://github.com/cemililik/Leakwatch.git
 cd Leakwatch
 go mod download
@@ -217,14 +228,14 @@ go test ./...
 
 ---
 
-## Lisans
+## License
 
-MIT License — detaylar için [LICENSE](LICENSE) dosyasına bakın.
+MIT License — see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## Durum
+## Status
 
-> **Proje geliştirme aşamasındadır.** Faz 1 (MVP) üzerinde çalışılmaktadır.
+> **The project is under active development.** Phase 1 (MVP) is currently in progress.
 
-Projenin gidişatını takip etmek için [Yol Haritası](docs/05-ROADMAP.md) belgesine bakın.
+To track the project's progress, see the [Roadmap](docs/05-ROADMAP.md) document.

@@ -1,168 +1,168 @@
-# Leakwatch - Dokümantasyon Standartları
+# Leakwatch - Documentation Standards
 
-> **Belge Versiyonu:** 1.0
-> **Tarih:** 2026-03-24
-> **Durum:** Onaylandı
-
----
-
-## 1. Genel İlkeler
-
-1. **Dil:** Tüm belgeler Türkçe yazılır. Teknik terimler (interface, pipeline, chunk vb.) İngilizce bırakılabilir.
-2. **Format:** Tüm belgeler GitHub-Flavored Markdown (GFM) formatında yazılır.
-3. **Kodlama:** UTF-8, satır sonu LF (`\n`).
-4. **Satır uzunluğu:** Markdown dosyalarında zorunlu satır sonu sınırı yoktur; doğal paragraf akışı kullanılır.
+> **Document Version:** 1.0
+> **Date:** 2026-03-24
+> **Status:** Approved
 
 ---
 
-## 2. Dizin Yapısı
+## 1. General Principles
+
+1. **Language:** All documents must be written in English. Technical terms (interface, pipeline, chunk, etc.) remain in English.
+2. **Format:** All documents are written in GitHub-Flavored Markdown (GFM) format.
+3. **Encoding:** UTF-8, line endings LF (`\n`).
+4. **Line length:** No mandatory line length limit in Markdown files; use natural paragraph flow.
+
+---
+
+## 2. Directory Structure
 
 ```
 docs/
-├── architecture/       # Mimari ve teknik tasarım belgeleri
+├── architecture/       # Architecture and technical design documents
 │   ├── 01-COMPETITIVE-ANALYSIS.md
 │   ├── 02-TECHNOLOGY-DECISIONS.md
 │   └── 03-ARCHITECTURE.md
 ├── decisions/          # Architecture Decision Records (ADR)
-│   ├── README.md       # ADR dizini ve açıklama
+│   ├── README.md       # ADR index and description
 │   ├── ADR-0001-programlama-dili.md
 │   ├── ADR-0002-cli-cercevesi.md
 │   └── ...
-├── standards/          # Standartlar ve kurallar
-│   ├── 00-DOCUMENTATION-STANDARDS.md   (bu belge)
+├── standards/          # Standards and rules
+│   ├── 00-DOCUMENTATION-STANDARDS.md   (this document)
 │   ├── 01-CODE-REVIEW-STANDARDS.md
 │   ├── 02-RELEASE-STANDARDS.md
 │   └── 04-DEVELOPMENT-STANDARDS.md
-├── 05-ROADMAP.md       # Yol haritası (kök docs/ altında)
-└── guides/             # Kullanım rehberleri (gelecekte)
+├── 05-ROADMAP.md       # Roadmap (under root docs/)
+└── guides/             # Usage guides (future)
     ├── getting-started.md
     ├── custom-rules.md
     └── ci-cd-integration.md
 ```
 
-### 2.1 Dizin Sorumlulukları
+### 2.1 Directory Responsibilities
 
-| Dizin | İçerik | Hedef Kitle |
-|-------|--------|-------------|
-| `architecture/` | Mimari kararlar, teknik tasarım, rakip analizi | Geliştirici, mimar |
-| `decisions/` | ADR — mimari kararların bağlamı ve gerekçesi | Geliştirici, mimar |
-| `standards/` | Kodlama, test, dokümantasyon, CI/CD standartları | Geliştirici, katkıda bulunan |
-| `guides/` | Kurulum, kullanım, entegrasyon rehberleri | Son kullanıcı |
-| Kök `docs/` | Yol haritası, genel belgeler | Herkes |
+| Directory | Content | Target Audience |
+|-----------|---------|-----------------|
+| `architecture/` | Architecture decisions, technical design, competitive analysis | Developer, architect |
+| `decisions/` | ADR — context and rationale of architecture decisions | Developer, architect |
+| `standards/` | Coding, testing, documentation, CI/CD standards | Developer, contributor |
+| `guides/` | Installation, usage, integration guides | End user |
+| Root `docs/` | Roadmap, general documents | Everyone |
 
 ---
 
-## 3. Belge Şablonu
+## 3. Document Template
 
-Her belge aşağıdaki başlık bloğu ile başlamalıdır:
+Every document should begin with the following header block:
 
 ```markdown
-# Leakwatch - <Belge Başlığı>
+# Leakwatch - <Document Title>
 
-> **Belge Versiyonu:** X.Y
-> **Tarih:** YYYY-MM-DD
-> **Durum:** Taslak | İncelemede | Onaylandı | Arşivlenmiş
+> **Document Version:** X.Y
+> **Date:** YYYY-MM-DD
+> **Status:** Draft | In Review | Approved | Archived
 
 ---
 ```
 
-### 3.1 Belge Durumları
+### 3.1 Document Statuses
 
-| Durum | Açıklama |
-|-------|----------|
-| **Taslak** | İlk yazım aşamasında, değişikliğe açık |
-| **İncelemede** | İnceleme sürecinde, geri bildirim bekleniyor |
-| **Onaylandı** | Onaylanmış, referans olarak kullanılabilir |
-| **Arşivlenmiş** | Güncelliğini yitirmiş, tarihsel referans |
+| Status | Description |
+|--------|-------------|
+| **Draft** | In initial writing phase, open to changes |
+| **In Review** | Under review, awaiting feedback |
+| **Approved** | Approved, can be used as a reference |
+| **Archived** | Outdated, kept as historical reference |
 
-### 3.2 ADR (Architecture Decision Record) Şablonu
+### 3.2 ADR (Architecture Decision Record) Template
 
-Mimari kararlar `docs/decisions/` altında aşağıdaki formatta belgelenir:
+Architecture decisions are documented under `docs/decisions/` in the following format:
 
 ```markdown
-# ADR-NNNN: <Karar Başlığı>
+# ADR-NNNN: <Decision Title>
 
-- **Durum:** Önerilen | Kabul Edildi | Değiştirildi | Reddedildi | Kullanımdan Kaldırıldı
-- **Tarih:** YYYY-MM-DD
-- **Karar Verenler:** <İsimler veya ekip>
+- **Status:** Proposed | Accepted | Superseded | Rejected | Deprecated
+- **Date:** YYYY-MM-DD
+- **Decision Makers:** <Names or team>
 
-## Bağlam
-Kararın alınmasına yol açan durum, sorun veya ihtiyaç.
+## Context
+The situation, problem, or need that led to the decision.
 
-## Karar
-Alınan karar ve gerekçesi.
+## Decision
+The decision made and its rationale.
 
-## Değerlendirilen Alternatifler
-İncelenen seçenekler ve reddedilme gerekçeleri.
+## Evaluated Alternatives
+Options considered and reasons for rejection.
 
-## Sonuçlar
-Kararın olumlu ve olumsuz etkileri.
+## Consequences
+Positive and negative impacts of the decision.
 
-## İlişkili Kararlar
-Bağlantılı diğer ADR'lar (varsa).
+## Related Decisions
+Related ADRs (if any).
 ```
 
-**ADR Kuralları:**
+**ADR Rules:**
 
-- Dosya adı: `ADR-NNNN-kisa-baslik.md` (küçük harf, tire ile ayrılmış)
-- Sıra numarası 4 hane, sıfır dolgulu: `0001`, `0002`, ...
-- Her ADR `docs/decisions/README.md` dizinine eklenir
-- Kabul edilen ADR'lar değiştirilmez — geçersiz kılmak için yeni ADR yazılır ve eski "Kullanımdan Kaldırıldı" yapılır
-- ADR'lar `CLAUDE.md` referans tablosuna da eklenir
+- File name: `ADR-NNNN-short-title.md` (lowercase, hyphen-separated)
+- Sequence number is 4 digits, zero-padded: `0001`, `0002`, ...
+- Each ADR is added to the `docs/decisions/README.md` index
+- Accepted ADRs are not modified — to override, write a new ADR and mark the old one as "Deprecated"
+- ADRs are also added to the `CLAUDE.md` reference table
 
 ---
 
-## 4. Diyagram ve Görselleştirme Standartları
+## 4. Diagram and Visualization Standards
 
-### 4.1 Mermaid Kullanımı (Zorunlu)
+### 4.1 Mermaid Usage (Mandatory)
 
-Tüm diyagramlar **Mermaid** sözdizimi ile çizilmelidir. ASCII art veya harici imaj dosyaları kullanılmamalıdır.
+All diagrams must be drawn using **Mermaid** syntax. ASCII art or external image files must not be used.
 
-**Gerekçe:**
-- GitHub, GitLab, VS Code ve birçok Markdown görüntüleyici Mermaid'i yerel olarak render eder
-- Versiyon kontrolü ile uyumlu (metin tabanlı, diff alınabilir)
-- Tutarlı görünüm
-- Bakımı kolay
+**Rationale:**
+- GitHub, GitLab, VS Code, and many Markdown viewers render Mermaid natively
+- Compatible with version control (text-based, diffable)
+- Consistent appearance
+- Easy to maintain
 
-### 4.2 Desteklenen Diyagram Türleri
+### 4.2 Supported Diagram Types
 
-| Tür | Kullanım Alanı | Mermaid Sözdizimi |
-|-----|----------------|-------------------|
-| **Akış Diyagramı (Flowchart)** | Pipeline, veri akışı, karar ağacı | `flowchart TD` veya `flowchart LR` |
-| **Sıra Diyagramı (Sequence)** | Bileşen etkileşimleri, API çağrıları | `sequenceDiagram` |
-| **Sınıf Diyagramı (Class)** | Arayüzler, tip ilişkileri | `classDiagram` |
-| **Durum Diyagramı (State)** | Yaşam döngüleri, durum geçişleri | `stateDiagram-v2` |
-| **Gantt Şeması** | Zaman çizelgeleri, yol haritası | `gantt` |
-| **Pasta/Çubuk Grafik** | İstatistikler, karşılaştırmalar | `pie` / `xychart-beta` |
-| **Blok Diyagramı** | Mimari blok şemaları | `block-beta` |
-| **Git Grafiği** | Branching stratejisi | `gitgraph` |
-| **Quadrant Chart** | Konumlandırma matrisleri | `quadrantChart` |
+| Type | Use Case | Mermaid Syntax |
+|------|----------|----------------|
+| **Flowchart** | Pipeline, data flow, decision tree | `flowchart TD` or `flowchart LR` |
+| **Sequence Diagram** | Component interactions, API calls | `sequenceDiagram` |
+| **Class Diagram** | Interfaces, type relationships | `classDiagram` |
+| **State Diagram** | Lifecycles, state transitions | `stateDiagram-v2` |
+| **Gantt Chart** | Timelines, roadmap | `gantt` |
+| **Pie/Bar Chart** | Statistics, comparisons | `pie` / `xychart-beta` |
+| **Block Diagram** | Architecture block diagrams | `block-beta` |
+| **Git Graph** | Branching strategy | `gitgraph` |
+| **Quadrant Chart** | Positioning matrices | `quadrantChart` |
 
-### 4.3 Mermaid Stil Kuralları
+### 4.3 Mermaid Style Rules
 
-1. **Yön:** Varsayılan olarak yukarıdan aşağıya (`TD`). Yatay akış gerekiyorsa `LR` kullanılır.
-2. **Renk:** Mermaid'in varsayılan teması kullanılır; özel renkler yalnızca anlamsal farklılık gerektiğinde eklenir.
-3. **Etiketler:** Kısa ve açıklayıcı. Uzun açıklamalar için diyagram dışında metin kullanılır.
-4. **Karmaşıklık:** Tek bir diyagram 15-20 düğümü aşmamalıdır. Daha karmaşık yapılar alt diyagramlara bölünmelidir.
-5. **Alt graflar (subgraph):** İlişkili bileşenleri gruplamak için kullanılır.
+1. **Direction:** Top-down (`TD`) by default. Use `LR` when horizontal flow is needed.
+2. **Color:** Use Mermaid's default theme; custom colors only when semantic distinction is needed.
+3. **Labels:** Short and descriptive. Use text outside the diagram for longer explanations.
+4. **Complexity:** A single diagram should not exceed 15-20 nodes. More complex structures should be split into sub-diagrams.
+5. **Subgraphs:** Use to group related components.
 
-### 4.4 Mermaid Örnekleri
+### 4.4 Mermaid Examples
 
-**Akış diyagramı:**
+**Flowchart:**
 
 ````markdown
 ```mermaid
 flowchart LR
-    A[Kaynak] --> B[Chunker]
-    B --> C[Tespit Motoru]
-    C --> D{Doğrulama?}
-    D -->|Evet| E[Verifier]
-    D -->|Hayır| F[Çıktı]
+    A[Source] --> B[Chunker]
+    B --> C[Detection Engine]
+    C --> D{Verification?}
+    D -->|Yes| E[Verifier]
+    D -->|No| F[Output]
     E --> F
 ```
 ````
 
-**Sıra diyagramı:**
+**Sequence diagram:**
 
 ````markdown
 ```mermaid
@@ -181,7 +181,7 @@ sequenceDiagram
 ```
 ````
 
-**Sınıf diyagramı:**
+**Class diagram:**
 
 ````markdown
 ```mermaid
@@ -199,22 +199,22 @@ classDiagram
 
 ---
 
-## 5. Kod Örnekleri Standartları
+## 5. Code Example Standards
 
-### 5.1 Kod Blokları
+### 5.1 Code Blocks
 
-- Her kod bloğunda dil belirtilmelidir: ` ```go `, ` ```yaml `, ` ```bash `
-- Kod örnekleri derlenebilir ve çalışabilir olmalıdır (mümkün olduğunca)
-- Uzun kod blokları (>50 satır) parçalara bölünüp arada açıklama eklenmeli
+- Every code block must specify the language: ` ```go `, ` ```yaml `, ` ```bash `
+- Code examples should be compilable and runnable (whenever possible)
+- Long code blocks (>50 lines) should be split into sections with explanations in between
 
-### 5.2 Komut Satırı Örnekleri
+### 5.2 Command Line Examples
 
 ```markdown
-# ✅ DOĞRU: Her komutun önünde açıklama
-# Dosya sistemi tara
+# CORRECT: Each command has an explanation before it
+# Scan filesystem
 leakwatch scan fs /path/to/project
 
-# ❌ YANLIŞ: Açıklamasız komut dizisi
+# INCORRECT: Command sequence without explanations
 leakwatch scan fs /path
 leakwatch scan git /path
 leakwatch verify aws
@@ -222,61 +222,61 @@ leakwatch verify aws
 
 ---
 
-## 6. Tablo Standartları
+## 6. Table Standards
 
-- Tablolar GFM tablo sözdizimi ile yazılır
-- Sütun başlıkları **kalın** (`| **Başlık** |`) veya GFM varsayılan kalın
-- Tablolar 5-6 sütunu aşmamalı; daha geniş veriler için birden fazla tablo kullanılmalı
-- Hücrelerde uzun metin yerine kısa ifadeler ve linkler tercih edilmeli
-
----
-
-## 7. Bağlantı (Link) Standartları
-
-### 7.1 Dahili Bağlantılar
-
-- Belge içi bağlantılar **göreceli yol** kullanır:
-  ```markdown
-  Detaylar için [Mimari Tasarım](../architecture/03-ARCHITECTURE.md) belgesine bakın.
-  ```
-- Aynı belge içi bağlantılar anchor kullanır:
-  ```markdown
-  Bkz. [Diyagram Standartları](#4-diyagram-ve-görselleştirme-standartları)
-  ```
-
-### 7.2 Harici Bağlantılar
-
-- Harici bağlantılar tam URL ile yazılır
-- Bağlantı metni açıklayıcı olmalıdır:
-  ```markdown
-  # ✅ DOĞRU
-  [Go Effective Go rehberi](https://go.dev/doc/effective_go)
-
-  # ❌ YANLIŞ
-  [buraya tıklayın](https://go.dev/doc/effective_go)
-  ```
+- Tables are written using GFM table syntax
+- Column headers may be **bold** (`| **Header** |`) or use GFM default bold
+- Tables should not exceed 5-6 columns; for wider data use multiple tables
+- Prefer short phrases and links over long text in cells
 
 ---
 
-## 8. Değişiklik Yönetimi
+## 7. Link Standards
 
-1. Belge güncellemeleri PR ile yapılır
-2. Belge versiyonu semantik olarak artırılır (X.Y)
-   - **X** — Yapısal veya kapsamlı içerik değişikliği
-   - **Y** — Küçük düzeltmeler, eklemeler
-3. Her güncelleme commit mesajında `docs(<kapsam>):` ön eki kullanır
-4. Eskiyen belgeler "Arşivlenmiş" durumuna alınır, silinmez
+### 7.1 Internal Links
+
+- Internal document links use **relative paths**:
+  ```markdown
+  For details, see the [Architecture Design](../architecture/03-ARCHITECTURE.md) document.
+  ```
+- Same-document links use anchors:
+  ```markdown
+  See [Diagram Standards](#4-diagram-and-visualization-standards)
+  ```
+
+### 7.2 External Links
+
+- External links use full URLs
+- Link text should be descriptive:
+  ```markdown
+  # CORRECT
+  [Go Effective Go guide](https://go.dev/doc/effective_go)
+
+  # INCORRECT
+  [click here](https://go.dev/doc/effective_go)
+  ```
 
 ---
 
-## 9. Gözden Geçirme Kontrol Listesi
+## 8. Change Management
 
-Bir belge PR'ı açılmadan önce aşağıdaki kontrol listesi tamamlanmalıdır:
+1. Document updates are made via PR
+2. Document version is incremented semantically (X.Y)
+   - **X** — Structural or major content change
+   - **Y** — Minor corrections, additions
+3. Each update uses the `docs(<scope>):` prefix in the commit message
+4. Outdated documents are moved to "Archived" status, not deleted
 
-- [ ] Başlık bloğu (versiyon, tarih, durum) mevcut
-- [ ] Tüm diyagramlar Mermaid formatında
-- [ ] Kod blokları dil etiketi içeriyor
-- [ ] Dahili bağlantılar göreceli yol kullanıyor
-- [ ] Tablolar 6 sütunu aşmıyor
-- [ ] Yazım hataları kontrol edildi
-- [ ] Mermaid diyagramları GitHub'da doğru render ediliyor (preview)
+---
+
+## 9. Review Checklist
+
+The following checklist must be completed before opening a document PR:
+
+- [ ] Header block (version, date, status) is present
+- [ ] All diagrams are in Mermaid format
+- [ ] Code blocks include a language tag
+- [ ] Internal links use relative paths
+- [ ] Tables do not exceed 6 columns
+- [ ] Spelling has been checked
+- [ ] Mermaid diagrams render correctly on GitHub (preview)

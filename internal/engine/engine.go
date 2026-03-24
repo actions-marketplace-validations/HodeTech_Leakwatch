@@ -1,4 +1,4 @@
-// Package engine, Leakwatch tarama motorunu sağlar.
+// Package engine provides the Leakwatch scan engine.
 package engine
 
 import (
@@ -18,13 +18,13 @@ import (
 )
 
 const (
-	// defaultEntropyThreshold, varsayılan Shannon entropi eşik değeri.
+	// defaultEntropyThreshold is the default Shannon entropy threshold.
 	defaultEntropyThreshold = 4.0
 
-	// channelBufferMultiplier, kanal buffer boyutu çarpanı.
+	// channelBufferMultiplier is the channel buffer size multiplier.
 	channelBufferMultiplier = 2
 
-	// hashTruncateLen, Finding ID hash kesme uzunluğu (byte).
+	// hashTruncateLen is the Finding ID hash truncation length in bytes.
 	// 16 bytes = 128 bits provides sufficient collision resistance.
 	hashTruncateLen = 16
 )
@@ -77,7 +77,7 @@ func New(cfg Config) *Engine {
 	}
 }
 
-// Scan, verilen kaynağı tarar ve sonuçları döndürür.
+// Scan scans the given source and returns results.
 func (e *Engine) Scan(ctx context.Context, src source.Source) (*ScanResult, error) {
 	if err := src.Validate(); err != nil {
 		return nil, fmt.Errorf("source validation failed: %w", err)
@@ -115,7 +115,7 @@ func (e *Engine) Scan(ctx context.Context, src source.Source) (*ScanResult, erro
 		}
 	}()
 
-	// Chunk'ları jobs kanalına gönder.
+	// Send chunks to the jobs channel.
 	// NOTE: Context cancellation during this loop depends on the source implementation
 	// closing its Chunks channel promptly when ctx is cancelled. If a source blocks
 	// indefinitely on send, this loop may not exit until the source returns.
@@ -131,11 +131,11 @@ loop:
 	}
 	close(jobs)
 
-	// Worker'ların bitmesini bekle
+	// Wait for workers to finish
 	wg.Wait()
 	close(results)
 
-	// Toplamanın bitmesini bekle
+	// Wait for collector to finish
 	collectWg.Wait()
 
 	// Run verification on collected pairs.
@@ -199,8 +199,8 @@ func (e *Engine) worker(ctx context.Context, jobs <-chan source.Chunk, results c
 	}
 }
 
-// rawToFinding, ham dedektör bulgusunu zenginleştirilmiş Finding'e dönüştürür.
-// Deterministik bir ID oluşturur ve opsiyonel olarak entropi hesaplar.
+// rawToFinding converts a raw detector finding to an enriched Finding.
+// Generates a deterministic ID and optionally calculates entropy.
 func (e *Engine) rawToFinding(raw detector.RawFinding, chunk source.Chunk, det detector.Detector) finding.Finding {
 	f := finding.Finding{
 		DetectorID:     det.ID(),

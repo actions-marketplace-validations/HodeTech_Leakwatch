@@ -1,10 +1,10 @@
-// Package entropy, Shannon entropi hesaplama fonksiyonlarını sağlar.
+// Package entropy provides Shannon entropy calculation functions.
 package entropy
 
 import "math"
 
 // Calculate, verilen byte dizisinin Shannon entropisini hesaplar.
-// Sonuç 0.0 (tamamen düzgün) ile ~8.0 (tamamen rastgele) arasındadır.
+// Returns 0.0 (perfectly uniform) to ~8.0 (perfectly random).
 func Calculate(data []byte) float64 {
 	if len(data) == 0 {
 		return 0.0

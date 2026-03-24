@@ -1,341 +1,341 @@
-# Leakwatch - Kod İnceleme (Code Review) Standartları
+# Leakwatch - Code Review Standards
 
-> **Belge Versiyonu:** 1.0
-> **Tarih:** 2026-03-24
-> **Durum:** Taslak
-
----
-
-## 1. Amaç ve Kapsam
-
-Kod incelemeleri, `main` dalına giren kodun kalite kapısıdır. Her pull request birleştirilmeden önce en az bir geliştirici tarafından incelenmelidir. Bu belge, inceleme sürecini, kontrol listelerini, bulgu sınıflandırmasını ve inceleme çıktı formatını tanımlar.
-
-Leakwatch bir **güvenlik aracı** olduğundan, kod incelemeleri standart yazılım kalitesinin ötesinde güvenlik, performans ve eşzamanlılık odaklı ek kontroller içerir.
+> **Document Version:** 1.0
+> **Date:** 2026-03-24
+> **Status:** Draft
 
 ---
 
-## 2. İnceleme İlkeleri
+## 1. Purpose and Scope
 
-| İlke | Açıklama |
-|------|----------|
-| **Standart Odaklı** | Her bulgu belgelenmiş bir standarda referans vermelidir, kişisel tercih değil |
-| **Önem Doğruluğu** | Bulgular etkiye göre sınıflandırılır, düzeltme çabasına göre değil |
-| **Eyleme Dönüştürülebilir** | Her bulgu somut bir düzeltme önerisi veya yön içermelidir |
-| **Yanlış Pozitif Yok** | Her bulgu gerçek koda karşı doğrulanmalıdır |
-| **Regresyon Farkındalığı** | Düzeltme commit'leri incelenirken, yeni hata kaynağı olarak değerlendirilmelidir |
-| **Eksiksizlik** | Değişen tüm dosyalar incelenmelidir |
+Code reviews are the quality gate for code entering the `main` branch. Every pull request must be reviewed by at least one developer before merging. This document defines the review process, checklists, finding classification, and review output format.
+
+Since Leakwatch is a **security tool**, code reviews include additional checks focused on security, performance, and concurrency beyond standard software quality.
 
 ---
 
-## 3. Bulgu Sınıflandırması
+## 2. Review Principles
 
-### 3.1 Önem Seviyeleri
+| Principle | Description |
+|-----------|-------------|
+| **Standards-Focused** | Every finding should reference a documented standard, not personal preference |
+| **Severity Accuracy** | Findings are classified by impact, not by effort to fix |
+| **Actionable** | Every finding includes a concrete fix suggestion or direction |
+| **No False Positives** | Every finding must be verified against the actual code |
+| **Regression Awareness** | Fix commits should be evaluated as potential sources of new bugs |
+| **Completeness** | All changed files must be reviewed |
 
-| Seviye | Etiket | Birleştirme | Açıklama |
-|--------|--------|-------------|----------|
-| **KRİTİK** | `🔴 CRITICAL` | Engeller | Güvenlik açığı, veri kaybı riski, sır sızıntısı |
-| **BÜYÜK** | `🟠 MAJOR` | Engeller | Mimari ihlal, hata, test eksikliği |
-| **KÜÇÜK** | `🟡 MINOR` | Engellemez | Stil, adlandırma, küçük iyileştirmeler |
-| **ÖNERİ** | `🔵 SUGGESTION` | Engellemez | Alternatif yaklaşım, gelecek iyileştirme |
+---
 
-### 3.2 Sıfır Tolerans Kuralları (Her Zaman KRİTİK)
+## 3. Finding Classification
 
-Aşağıdaki durumlar tespit edildiğinde bulgu **her zaman KRİTİK** olarak sınıflandırılır:
+### 3.1 Severity Levels
 
-| # | Kural | Referans |
+| Level | Label | Merge | Description |
+|-------|-------|-------|-------------|
+| **CRITICAL** | `🔴 CRITICAL` | Blocks | Security vulnerability, data loss risk, secret leakage |
+| **MAJOR** | `🟠 MAJOR` | Blocks | Architecture violation, bug, missing tests |
+| **MINOR** | `🟡 MINOR` | Does not block | Style, naming, minor improvements |
+| **SUGGESTION** | `🔵 SUGGESTION` | Does not block | Alternative approach, future improvement |
+
+### 3.2 Zero Tolerance Rules (Always CRITICAL)
+
+When the following conditions are detected, the finding is **always classified as CRITICAL**:
+
+| # | Rule | Reference |
+|---|------|-----------|
+| ZT-01 | Logging, printing to console, or saving discovered secret content to disk | CLAUDE.md, Security Principles |
+| ZT-02 | Using real secret content in test fixtures | CLAUDE.md |
+| ZT-03 | Adding a dependency that requires CGO | ADR-0001 |
+| ZT-04 | Business logic inside the `cmd/` package | CLAUDE.md, Package Rules |
+| ZT-05 | Making architectural decisions that contradict ADRs | CLAUDE.md |
+| ZT-06 | Using `fmt.Println` or `log.Printf` (instead of `log/slog`) | 04-DEVELOPMENT-STANDARDS §2.5 |
+| ZT-07 | Race condition: unsynchronized access to shared state | Go Concurrency |
+| ZT-08 | Goroutine leak: unclosed channel or uncancelled context | ADR-0008 |
+| ZT-09 | Error swallowing: silently continuing in `if err != nil` block | 04-DEVELOPMENT-STANDARDS §2.4 |
+| ZT-10 | Manually editing `go.sum` or `vendor/` directory | CLAUDE.md |
+| ZT-11 | Skipping git hooks with `--no-verify` | CLAUDE.md |
+| ZT-12 | Using ASCII art diagrams (instead of Mermaid) | 00-DOCUMENTATION-STANDARDS |
+
+---
+
+## 4. Review Checklist
+
+### 4.1 Security (SEC)
+
+Since Leakwatch is a security tool, this section has the **highest priority**.
+
+| # | Check | Severity |
 |---|-------|----------|
-| ZT-01 | Bulunan sır içeriğinin loglanması, konsola yazılması veya diske kaydedilmesi | CLAUDE.md, Güvenlik İlkeleri |
-| ZT-02 | Test fixture'larında gerçek sır içeriği kullanılması | CLAUDE.md |
-| ZT-03 | CGO gerektiren bağımlılık eklenmesi | ADR-0001 |
-| ZT-04 | `cmd/` paketi içinde iş mantığı bulunması | CLAUDE.md, Paket Kuralları |
-| ZT-05 | ADR'lara aykırı mimari karar alınması | CLAUDE.md |
-| ZT-06 | `fmt.Println` veya `log.Printf` kullanımı (`log/slog` yerine) | 04-DEVELOPMENT-STANDARDS §2.5 |
-| ZT-07 | Race condition: paylaşılan duruma senkronizasyonsuz erişim | Go Concurrency |
-| ZT-08 | Goroutine sızıntısı: kapatılmayan kanal veya iptal edilmeyen context | ADR-0008 |
-| ZT-09 | Hata yutma: `if err != nil` bloğunda sessizce devam etme | 04-DEVELOPMENT-STANDARDS §2.4 |
-| ZT-10 | `go.sum` veya `vendor/` dizininin manuel düzenlenmesi | CLAUDE.md |
-| ZT-11 | `--no-verify` ile git hook'larının atlanması | CLAUDE.md |
-| ZT-12 | ASCII art diyagram kullanımı (Mermaid yerine) | 00-DOCUMENTATION-STANDARDS |
+| SEC-01 | Is discovered secret data masked via the `Redacted` field? Is `Raw` content never logged? | CRITICAL |
+| SEC-02 | Do verification API calls use only read-only endpoints? (e.g., STS GetCallerIdentity) | CRITICAL |
+| SEC-03 | Are user inputs (file paths, URLs, regex patterns) validated? | MAJOR |
+| SEC-04 | Is path traversal protection in place? (`filepath.Clean`, `filepath.Rel`) | MAJOR |
+| SEC-05 | Are regex patterns safe against ReDoS? (Go's RE2 engine guarantee is sufficient, but performance should be checked for complex patterns) | MAJOR |
+| SEC-06 | Is the newly added dependency trustworthy? Is its license MIT/Apache/BSD compatible? | MAJOR |
+| SEC-07 | Is secret content hidden from output without the `--show-raw` flag? | CRITICAL |
+| SEC-08 | Are verification results not being written to disk or cache? | MAJOR |
+
+### 4.2 Concurrency and Performance (CONC)
+
+| # | Check | Severity |
+|---|-------|----------|
+| CONC-01 | Are shared variables accessed with `sync.Mutex` or `sync.RWMutex`? | CRITICAL |
+| CONC-02 | Are channels properly closed? Is close responsibility on the sender side? | CRITICAL |
+| CONC-03 | Is `context.Context` cancellation checked in every goroutine? (`select` with `ctx.Done()`) | MAJOR |
+| CONC-04 | Is `sync.WaitGroup` used correctly? (`Add` before goroutine start, `Done` with `defer`) | MAJOR |
+| CONC-05 | Is there a goroutine leak risk? Could channel writes block? | CRITICAL |
+| CONC-06 | Are buffered channel sizes reasonable? Has memory consumption been checked? | MINOR |
+| CONC-07 | Does the worker pool support graceful shutdown? | MAJOR |
+| CONC-08 | Are tests run with the `-race` flag? | MAJOR |
+
+### 4.3 Architecture (ARCH)
+
+| # | Check | Severity |
+|---|-------|----------|
+| ARCH-01 | Is business logic in `internal/` packages? Is `cmd/` only a thin layer? | CRITICAL |
+| ARCH-02 | Are public types under `pkg/`? | MAJOR |
+| ARCH-03 | Are new detectors/formatters registered using the `init()` + blank import pattern? (ADR-0004) | MAJOR |
+| ARCH-04 | Does the code depend on interfaces, not concrete types? | MAJOR |
+| ARCH-05 | Is the package dependency direction correct? (`internal/` → `pkg/`, never the reverse) | CRITICAL |
+| ARCH-06 | Are there circular dependencies? | CRITICAL |
+| ARCH-07 | If a new architectural decision is being made, has an ADR been written? | MAJOR |
+| ARCH-08 | Has the standard library been preferred? Have unnecessary dependencies been avoided? | MINOR |
+
+### 4.4 Error Handling (ERR)
+
+| # | Check | Severity |
+|---|-------|----------|
+| ERR-01 | Are errors wrapped with `fmt.Errorf("context: %w", err)`? | MAJOR |
+| ERR-02 | Are sentinel errors defined with `errors.New`? | MINOR |
+| ERR-03 | Are error checks not skipped? (every `err` should be checked) | MAJOR |
+| ERR-04 | Are fatal errors (resource unreachable) properly distinguished from transient errors (file unreadable)? | MAJOR |
+| ERR-05 | If panic is used, is there justification? (only for programming errors or init) | MAJOR |
+
+### 4.5 Testing (TEST)
+
+| # | Check | Severity |
+|---|-------|----------|
+| TEST-01 | Have tests been written for new code? | MAJOR |
+| TEST-02 | Is the table-driven test pattern used? | MINOR |
+| TEST-03 | Does test naming follow the `Test<Function>_<Scenario>_<ExpectedResult>` format? | MINOR |
+| TEST-04 | Are edge cases tested? (empty input, nil, large data, context cancellation) | MAJOR |
+| TEST-05 | Are mocks written against interfaces? | MINOR |
+| TEST-06 | Do detector tests use format patterns, not real secret content? | CRITICAL |
+| TEST-07 | Is `fstest.MapFS` preferred for in-memory filesystem tests? | SUGGESTION |
+| TEST-08 | Are test coverage targets met? (detectors 95%, engine 85%, overall 80%) | MAJOR |
+| TEST-09 | Are tests deterministic? Are there dependencies on time, filesystem, or network? | MAJOR |
+| TEST-10 | Do tests pass with the race detector (`-race`)? | MAJOR |
+
+### 4.6 Code Quality (CQ)
+
+| # | Check | Severity |
+|---|-------|----------|
+| CQ-01 | Are naming conventions followed? (PascalCase exported, camelCase internal, snake_case files) | MINOR |
+| CQ-02 | Is there dead code? Unused variables, functions, or imports? | MINOR |
+| CQ-03 | Is there code duplication (DRY violation)? | MINOR |
+| CQ-04 | Do functions follow the single responsibility principle? | MINOR |
+| CQ-05 | Do exported functions and types have godoc comments? | MINOR |
+| CQ-06 | Are there magic numbers/strings? Should they be defined as constants? | MINOR |
+| CQ-07 | Has `gofumpt` formatting been applied? | MINOR |
+| CQ-08 | Are there `golangci-lint` warnings? | MAJOR |
+
+### 4.7 Logging and Observability (OBS)
+
+| # | Check | Severity |
+|---|-------|----------|
+| OBS-01 | Is `log/slog` structured logging being used? | MAJOR |
+| OBS-02 | Are log messages in English? Are structured parameters (key-value) used? | MINOR |
+| OBS-03 | Are log levels correct? (Debug: development detail, Info: business events, Warn: recoverable issues, Error: errors) | MINOR |
+| OBS-04 | Does secret content never appear in log messages? | CRITICAL |
+| OBS-05 | Is there unnecessary logging in performance-critical paths? | MINOR |
+
+### 4.8 Detector-Specific Checks (DET)
+
+| # | Check | Severity |
+|---|-------|----------|
+| DET-01 | Is the regex compiled once at package level with `regexp.MustCompile`? (not inside `Scan()`) | MAJOR |
+| DET-02 | Does `Keywords()` return the correct keywords? (for Aho-Corasick pre-filtering) | MAJOR |
+| DET-03 | Does the `Redacted` field sufficiently mask secret content? | CRITICAL |
+| DET-04 | Is the false positive rate acceptable? Do test scenarios cover this? | MAJOR |
+| DET-05 | Is the detector ID unique and in a consistent format? (`kebab-case`) | MINOR |
+| DET-06 | Is severity assigned correctly? (real secret=Critical, possible secret=Medium, informational=Low) | MAJOR |
 
 ---
 
-## 4. İnceleme Kontrol Listesi
+## 5. Review Process
 
-### 4.1 Güvenlik (SEC)
-
-Leakwatch bir güvenlik aracı olduğundan bu bölüm **en yüksek önceliğe** sahiptir.
-
-| # | Kontrol | Önem |
-|---|---------|------|
-| SEC-01 | Bulunan sır verileri `Redacted` alan üzerinden maskeleniyor mu? `Raw` içerik asla loglanmıyor mu? | KRİTİK |
-| SEC-02 | Doğrulama (verification) API çağrılarında sadece salt-okunur endpoint'ler mi kullanılıyor? (örn: STS GetCallerIdentity) | KRİTİK |
-| SEC-03 | Kullanıcı girdileri (dosya yolları, URL'ler, regex desenleri) doğrulanıyor mu? | BÜYÜK |
-| SEC-04 | Path traversal koruması var mı? (`filepath.Clean`, `filepath.Rel`) | BÜYÜK |
-| SEC-05 | Regex desenleri ReDoS'a karşı güvenli mi? (Go'nun RE2 motoru garantisi yeterli, ancak karmaşık desenlerde performans kontrol edilmeli) | BÜYÜK |
-| SEC-06 | Yeni eklenen bağımlılık güvenilir mi? Lisansı MIT/Apache/BSD uyumlu mu? | BÜYÜK |
-| SEC-07 | `--show-raw` flag'i olmadan sır içeriği çıktıda görünmüyor mu? | KRİTİK |
-| SEC-08 | Doğrulama sonuçları diske veya önbelleğe yazılmıyor mu? | BÜYÜK |
-
-### 4.2 Eşzamanlılık ve Performans (CONC)
-
-| # | Kontrol | Önem |
-|---|---------|------|
-| CONC-01 | Paylaşılan değişkenlere `sync.Mutex` veya `sync.RWMutex` ile erişiliyor mu? | KRİTİK |
-| CONC-02 | Channel'lar uygun şekilde kapatılıyor mu? Kapatma sorumluluğu gönderici tarafta mı? | KRİTİK |
-| CONC-03 | `context.Context` iptali her goroutine'de kontrol ediliyor mu? (`select` ile `ctx.Done()`) | BÜYÜK |
-| CONC-04 | `sync.WaitGroup` doğru kullanılıyor mu? (`Add` goroutine başlatılmadan önce, `Done` `defer` ile) | BÜYÜK |
-| CONC-05 | Goroutine sızıntısı riski var mı? Kanal yazımında bloklama olabilir mi? | KRİTİK |
-| CONC-06 | Buffered channel boyutları makul mü? Bellek tüketimi kontrol edilmiş mi? | KÜÇÜK |
-| CONC-07 | Worker pool graceful shutdown destekliyor mu? | BÜYÜK |
-| CONC-08 | `-race` flag'i ile testler çalıştırılıyor mu? | BÜYÜK |
-
-### 4.3 Mimari (ARCH)
-
-| # | Kontrol | Önem |
-|---|---------|------|
-| ARCH-01 | İş mantığı `internal/` paketlerinde mi? `cmd/` sadece ince katman mı? | KRİTİK |
-| ARCH-02 | Dışa açık tipler `pkg/` altında mı? | BÜYÜK |
-| ARCH-03 | Yeni dedektör/formatter `init()` + blank import deseniyle mi kayıt ediliyor? (ADR-0004) | BÜYÜK |
-| ARCH-04 | Arayüzlere (interface) bağımlılık mı var, somut tiplere mi? | BÜYÜK |
-| ARCH-05 | Paket bağımlılık yönü doğru mu? (`internal/` → `pkg/`, tersi asla) | KRİTİK |
-| ARCH-06 | Döngüsel bağımlılık (circular dependency) var mı? | KRİTİK |
-| ARCH-07 | Yeni bir mimari karar alınıyorsa ADR yazılmış mı? | BÜYÜK |
-| ARCH-08 | Standart kütüphane tercih edilmiş mi? Gereksiz bağımlılık eklenmemiş mi? | KÜÇÜK |
-
-### 4.4 Hata Yönetimi (ERR)
-
-| # | Kontrol | Önem |
-|---|---------|------|
-| ERR-01 | Hatalar `fmt.Errorf("bağlam: %w", err)` ile sarmalanıyor mu? | BÜYÜK |
-| ERR-02 | Sentinel hatalar `errors.New` ile mi tanımlanıyor? | KÜÇÜK |
-| ERR-03 | Hata kontrolleri atlanmamış mı? (her `err` kontrol edilmeli) | BÜYÜK |
-| ERR-04 | Fatal hatalar (kaynak erişilemez) ile geçici hatalar (dosya okunamadı) doğru ayrıştırılmış mı? | BÜYÜK |
-| ERR-05 | Panic kullanılıyorsa gerekçesi var mı? (sadece programlama hatası veya init) | BÜYÜK |
-
-### 4.5 Test (TEST)
-
-| # | Kontrol | Önem |
-|---|---------|------|
-| TEST-01 | Yeni kod için testler yazılmış mı? | BÜYÜK |
-| TEST-02 | Table-driven test deseni kullanılmış mı? | KÜÇÜK |
-| TEST-03 | Test adlandırması `Test<Fonksiyon>_<Senaryo>_<BeklenenSonuç>` formatında mı? | KÜÇÜK |
-| TEST-04 | Kenar durumlar (edge cases) test edilmiş mi? (boş girdi, nil, büyük veri, context iptali) | BÜYÜK |
-| TEST-05 | Mock'lar arayüzlere karşı mı yazılmış? | KÜÇÜK |
-| TEST-06 | Dedektör testleri gerçek sır içeriği değil, format deseni mi kullanıyor? | KRİTİK |
-| TEST-07 | `fstest.MapFS` ile bellek içi dosya sistemi testi tercih edilmiş mi? | ÖNERİ |
-| TEST-08 | Test kapsamı hedefleri karşılanıyor mu? (dedektörler %95, engine %85, genel %80) | BÜYÜK |
-| TEST-09 | Testler deterministik mi? Zamana, dosya sistemine veya ağa bağımlılık var mı? | BÜYÜK |
-| TEST-10 | Race detector (`-race`) ile testler geçiyor mu? | BÜYÜK |
-
-### 4.6 Kod Kalitesi (CQ)
-
-| # | Kontrol | Önem |
-|---|---------|------|
-| CQ-01 | Adlandırma kurallarına uyuluyor mu? (PascalCase dışa açık, camelCase dahili, snake_case dosya) | KÜÇÜK |
-| CQ-02 | Ölü kod (dead code) var mı? Kullanılmayan değişken, fonksiyon veya import? | KÜÇÜK |
-| CQ-03 | Kod tekrarı (DRY ihlali) var mı? | KÜÇÜK |
-| CQ-04 | Fonksiyonlar tek sorumluluk ilkesine uyuyor mu? | KÜÇÜK |
-| CQ-05 | Dışa açık fonksiyon ve tiplerde godoc yorumu var mı? | KÜÇÜK |
-| CQ-06 | Magic number/string var mı? Sabit olarak tanımlanmalı mı? | KÜÇÜK |
-| CQ-07 | `gofumpt` formatlaması uygulanmış mı? | KÜÇÜK |
-| CQ-08 | `golangci-lint` uyarısı var mı? | BÜYÜK |
-
-### 4.7 Loglama ve Gözlemlenebilirlik (OBS)
-
-| # | Kontrol | Önem |
-|---|---------|------|
-| OBS-01 | `log/slog` yapılandırılmış loglama kullanılıyor mu? | BÜYÜK |
-| OBS-02 | Log mesajları İngilizce mi? Yapılandırılmış parametreler (key-value) kullanılıyor mu? | KÜÇÜK |
-| OBS-03 | Log seviyeleri doğru mu? (Debug: geliştirme detayı, Info: iş olayları, Warn: kurtarılabilir sorunlar, Error: hatalar) | KÜÇÜK |
-| OBS-04 | Sır içeriği log mesajlarında asla yer almıyor mu? | KRİTİK |
-| OBS-05 | Performans açısından kritik yollarda gereksiz loglama var mı? | KÜÇÜK |
-
-### 4.8 Dedektör Özel Kontrolleri (DET)
-
-| # | Kontrol | Önem |
-|---|---------|------|
-| DET-01 | Regex, paket düzeyinde `regexp.MustCompile` ile bir kez mi derleniyor? (`Scan()` içinde değil) | BÜYÜK |
-| DET-02 | `Keywords()` doğru anahtar kelimeleri döndürüyor mu? (Aho-Corasick ön-filtreleme için) | BÜYÜK |
-| DET-03 | `Redacted` alan sır içeriğini yeterince maskeliyor mu? | KRİTİK |
-| DET-04 | Yanlış pozitif oranı kabul edilebilir düzeyde mi? Test senaryoları bunu kapsıyor mu? | BÜYÜK |
-| DET-05 | Dedektör ID'si benzersiz ve tutarlı formatta mı? (`kebab-case`) | KÜÇÜK |
-| DET-06 | Severity doğru atanmış mı? (gerçek sır=Critical, olası sır=Medium, bilgilendirme=Low) | BÜYÜK |
-
----
-
-## 5. İnceleme Süreci
-
-### 5.1 İş Akışı
+### 5.1 Workflow
 
 ```mermaid
 flowchart TD
-    A["Yazar: Öz-inceleme"] --> B["PR Oluştur"]
-    B --> C["Otomatik Kontroller\n(CI: test + lint + build)"]
-    C --> D{"CI Başarılı?"}
-    D -->|Hayır| E["Yazar: Hataları Düzelt"]
+    A["Author: Self-review"] --> B["Create PR"]
+    B --> C["Automated Checks\n(CI: test + lint + build)"]
+    C --> D{"CI Passed?"}
+    D -->|No| E["Author: Fix Errors"]
     E --> C
-    D -->|Evet| F["İncelemeci Atanır"]
-    F --> G["İnceleme Yapılır"]
-    G --> H{"Karar"}
-    H -->|"APPROVED\n(0 KRİTİK/BÜYÜK)"| I["Birleştir (Squash Merge)"]
-    H -->|"CHANGES_REQUESTED\n(KRİTİK veya BÜYÜK var)"| J["Yazar: Düzelt"]
-    J --> K["Yeniden İnceleme"]
+    D -->|Yes| F["Reviewer Assigned"]
+    F --> G["Review Performed"]
+    G --> H{"Decision"}
+    H -->|"APPROVED\n(0 CRITICAL/MAJOR)"| I["Merge (Squash Merge)"]
+    H -->|"CHANGES_REQUESTED\n(CRITICAL or MAJOR exists)"| J["Author: Fix"]
+    J --> K["Re-review"]
     K --> H
-    H -->|"COMMENT\n(Sadece KÜÇÜK/ÖNERİ)"| L["Yazar: İsteğe Bağlı Düzelt"]
+    H -->|"COMMENT\n(Only MINOR/SUGGESTION)"| L["Author: Optional Fix"]
     L --> I
 ```
 
-### 5.2 Yazar Sorumlulukları
+### 5.2 Author Responsibilities
 
-- PR oluşturmadan önce **öz-inceleme** yap
-- Değişiklik **400 satırı** aşmamalı (aşıyorsa bölünmeli)
-- PR açıklamasında şunlar bulunmalı:
-  - Ne yapıldı ve neden
-  - Test planı
-  - Kırılma değişikliği (breaking change) varsa belirtilmeli
-- CI'ın geçtiğinden emin ol
+- Perform a **self-review** before creating the PR
+- Changes should not exceed **400 lines** (split if they do)
+- PR description must include:
+  - What was done and why
+  - Test plan
+  - Breaking changes must be noted if applicable
+- Ensure CI passes
 
-### 5.3 İncelemeci Sorumlulukları
+### 5.3 Reviewer Responsibilities
 
-- PR açıklamasını oku
-- Değişen **tüm dosyaları** incele
-- Bulguları önem seviyesine göre sınıflandır
-- Her bulgu için **somut düzeltme** öner
-- Önemsiz olmayan değişikliklerde kodu yerel olarak çalıştır
+- Read the PR description
+- Review **all changed files**
+- Classify findings by severity level
+- Suggest a **concrete fix** for each finding
+- For non-trivial changes, run the code locally
 
-### 5.4 Güvenlik Hassas Değişiklikler
+### 5.4 Security-Sensitive Changes
 
-Aşağıdaki değişiklikler **2 incelemeci** gerektirir:
+The following changes require **2 reviewers**:
 
-- Doğrulama (verifier) kodu — API anahtarlarıyla etkileşim
-- Tarama motoru (engine) değişiklikleri — eşzamanlılık ve veri akışı
-- Çıktı formatlayıcıları — sır içeriğinin sızma riski
-- Yapılandırma sistemi — güvenlik parametreleri
-- Yeni bağımlılık eklenmesi
-
----
-
-## 6. Yazar Öz-İnceleme Kapısı
-
-PR oluşturmadan önce yazar şu listeyi kontrol etmelidir:
-
-### Go Kodu
-
-- [ ] `go test -race ./...` başarılı
-- [ ] `golangci-lint run ./...` uyarısız
-- [ ] Sır içeriği loglanmıyor, diske yazılmıyor
-- [ ] Hatalar `fmt.Errorf("bağlam: %w", err)` ile sarmalanıyor
-- [ ] Yeni dışa açık fonksiyon/tipler için godoc yorumu var
-- [ ] Context iptali goroutine'lerde kontrol ediliyor
-
-### Test
-
-- [ ] Yeni kod için testler yazıldı
-- [ ] Kenar durumlar kapsanıyor
-- [ ] Test kapsamı hedefin altına düşmedi
-
-### Genel
-
-- [ ] Commit mesajları Conventional Commits formatında
-- [ ] PR açıklaması ne yapıldığını ve neden yapıldığını belirtiyor
-- [ ] Kırılma değişikliği varsa açıkça belirtiliyor
+- Verification (verifier) code — interaction with API keys
+- Scan engine changes — concurrency and data flow
+- Output formatters — risk of secret content leakage
+- Configuration system — security parameters
+- Adding new dependencies
 
 ---
 
-## 7. İnceleme Bulgu Formatı
+## 6. Author Self-Review Gate
 
-### 7.1 Satır İçi Yorum Şablonu
+Before creating a PR, the author should check this list:
+
+### Go Code
+
+- [ ] `go test -race ./...` passes
+- [ ] `golangci-lint run ./...` has no warnings
+- [ ] Secret content is not logged or written to disk
+- [ ] Errors are wrapped with `fmt.Errorf("context: %w", err)`
+- [ ] New exported functions/types have godoc comments
+- [ ] Context cancellation is checked in goroutines
+
+### Testing
+
+- [ ] Tests are written for new code
+- [ ] Edge cases are covered
+- [ ] Test coverage has not dropped below target
+
+### General
+
+- [ ] Commit messages follow Conventional Commits format
+- [ ] PR description states what was done and why
+- [ ] Breaking changes are explicitly noted if applicable
+
+---
+
+## 7. Review Finding Format
+
+### 7.1 Inline Comment Template
 
 ```
 🔴 **CRITICAL** | SEC-01
 
-**Sorun:** Bulunan sır içeriği `slog.Info` ile loglanıyor.
+**Issue:** Discovered secret content is being logged with `slog.Info`.
 
-**Düzeltme:**
-Sadece `Redacted` alanını kullanın:
+**Fix:**
+Use only the `Redacted` field:
 ​```go
-slog.Info("sır bulundu", "redacted", finding.Redacted)
+slog.Info("secret found", "redacted", finding.Redacted)
 ​```
 
-**Referans:** CLAUDE.md — Güvenlik İlkeleri
+**Reference:** CLAUDE.md — Security Principles
 ```
 
-### 7.2 İnceleme Özet Şablonu
+### 7.2 Review Summary Template
 
 ```markdown
-## İnceleme Özeti
+## Review Summary
 
-| Seviye | Sayı |
-|--------|------|
-| 🔴 KRİTİK | 0 |
-| 🟠 BÜYÜK | 1 |
-| 🟡 KÜÇÜK | 2 |
-| 🔵 ÖNERİ | 1 |
+| Level | Count |
+|-------|-------|
+| 🔴 CRITICAL | 0 |
+| 🟠 MAJOR | 1 |
+| 🟡 MINOR | 2 |
+| 🔵 SUGGESTION | 1 |
 
-**Karar:** CHANGES_REQUESTED
+**Decision:** CHANGES_REQUESTED
 
-### Bulgular
+### Findings
 
-1. 🟠 **MAJOR** | CONC-03 — `worker.go:45` — Context iptali kontrol edilmiyor
-2. 🟡 **MINOR** | CQ-01 — `detector.go:12` — Fonksiyon adı camelCase olmalı
-3. 🟡 **MINOR** | OBS-02 — `engine.go:78` — Log mesajı Türkçe, İngilizce olmalı
-4. 🔵 **SUGGESTION** | TEST-07 — `filesystem_test.go` — `fstest.MapFS` kullanılabilir
+1. 🟠 **MAJOR** | CONC-03 — `worker.go:45` — Context cancellation not checked
+2. 🟡 **MINOR** | CQ-01 — `detector.go:12` — Function name should be camelCase
+3. 🟡 **MINOR** | OBS-02 — `engine.go:78` — Log message should be in English
+4. 🔵 **SUGGESTION** | TEST-07 — `filesystem_test.go` — Consider using `fstest.MapFS`
 ```
 
 ---
 
-## 8. İnceleme Öncelik Sırası
+## 8. Review Priority Order
 
-İnceleme sırasında aşağıdaki öncelik sırasına göre ilerleyin:
+Follow this priority order during review:
 
 ```
-1. Güvenlik (SEC)           ← En yüksek öncelik
-2. Sıfır Tolerans (ZT)
-3. Eşzamanlılık (CONC)
-4. Mimari (ARCH)
-5. Hata Yönetimi (ERR)
-6. Test (TEST)
-7. Dedektör Özel (DET)
-8. Loglama (OBS)
-9. Kod Kalitesi (CQ)        ← En düşük öncelik
+1. Security (SEC)           ← Highest priority
+2. Zero Tolerance (ZT)
+3. Concurrency (CONC)
+4. Architecture (ARCH)
+5. Error Handling (ERR)
+6. Testing (TEST)
+7. Detector-Specific (DET)
+8. Logging (OBS)
+9. Code Quality (CQ)        ← Lowest priority
 ```
 
-> **Kural:** 3 veya daha fazla KRİTİK bulgu tespit edildiğinde incelemeyi durdurun ve `CHANGES_REQUESTED` verin. Geri kalan sorunlar düzeltme commit'i sonrasında yakalanacaktır.
+> **Rule:** If 3 or more CRITICAL findings are detected, stop the review and issue `CHANGES_REQUESTED`. The remaining issues will be caught after the fix commit.
 
 ---
 
-## 9. Yaygın Anti-Paternler
+## 9. Common Anti-Patterns
 
-### 9.1 Go Anti-Paternleri
+### 9.1 Go Anti-Patterns
 
-| Anti-Patern | Doğru Yaklaşım |
-|-------------|----------------|
-| `go func() { ... }()` context olmadan | `go func(ctx context.Context) { ... }(ctx)` |
-| `select {}` ile sonsuz bekleme | `select { case <-ctx.Done(): return }` |
-| `sync.Mutex` yerine `sync.RWMutex` gereken yerde Mutex | Okuma ağırlıklı erişimde `RWMutex` |
-| Channel gönderiminde bloklama riski | Buffered channel veya `select` ile timeout |
-| `regexp.Compile` her çağrıda | Paket düzeyinde `regexp.MustCompile` |
-| `err != nil` kontrolünde hata yutma | Her zaman `return fmt.Errorf("bağlam: %w", err)` |
-| `log.Fatal` üretim kodunda | `slog.Error` + uygun çıkış kodu |
-| `interface{}` veya `any` gereksiz kullanımı | Somut tip veya generic |
+| Anti-Pattern | Correct Approach |
+|--------------|------------------|
+| `go func() { ... }()` without context | `go func(ctx context.Context) { ... }(ctx)` |
+| `select {}` for infinite wait | `select { case <-ctx.Done(): return }` |
+| `sync.Mutex` where `sync.RWMutex` is needed | Use `RWMutex` for read-heavy access |
+| Blocking risk on channel send | Buffered channel or `select` with timeout |
+| `regexp.Compile` on every call | Package-level `regexp.MustCompile` |
+| Error swallowing in `err != nil` check | Always `return fmt.Errorf("context: %w", err)` |
+| `log.Fatal` in production code | `slog.Error` + appropriate exit code |
+| Unnecessary use of `interface{}` or `any` | Concrete type or generic |
 
-### 9.2 Dedektör Anti-Paternleri
+### 9.2 Detector Anti-Patterns
 
-| Anti-Patern | Doğru Yaklaşım |
-|-------------|----------------|
-| Regex'i `Scan()` içinde derleme | Paket düzeyinde `var re = regexp.MustCompile(...)` |
-| `Raw` alanını maskelemeden döndürme | Her zaman `Redacted` alanını doldur |
-| Çok geniş regex (yanlış pozitif) | Daha spesifik desen + entropi kontrolü |
-| Keyword'sız dedektör (her chunk'a regex) | Uygun `Keywords()` ile Aho-Corasick filtreleme |
-| Test'te gerçek API anahtarı kullanma | Format deseni + rastgele karakterler |
+| Anti-Pattern | Correct Approach |
+|--------------|------------------|
+| Compiling regex inside `Scan()` | Package-level `var re = regexp.MustCompile(...)` |
+| Returning `Raw` field without masking | Always populate the `Redacted` field |
+| Overly broad regex (false positives) | More specific pattern + entropy check |
+| Detector without keywords (regex on every chunk) | Proper `Keywords()` for Aho-Corasick filtering |
+| Using real API keys in tests | Format pattern + random characters |
 
 ---
 
-## 10. İnceleme Metrikleri
+## 10. Review Metrics
 
-| Metrik | Hedef |
-|--------|-------|
-| İlk inceleme süresi | < 24 saat |
-| İnceleme döngüsü | ≤ 2 tur |
-| PR boyutu | < 400 satır değişiklik |
-| KRİTİK bulgu / PR | 0 (hedef) |
+| Metric | Target |
+|--------|--------|
+| Time to first review | < 24 hours |
+| Review cycles | ≤ 2 rounds |
+| PR size | < 400 lines changed |
+| CRITICAL findings / PR | 0 (target) |

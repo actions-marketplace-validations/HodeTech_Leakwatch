@@ -1,67 +1,67 @@
-# ADR-0005: Desen Eşleştirme Stratejisi — Aho-Corasick Hibrit
+# ADR-0005: Pattern Matching Strategy — Aho-Corasick Hybrid
 
-- **Durum:** Kabul Edildi
-- **Tarih:** 2026-03-24
-- **Karar Verenler:** Proje ekibi
+- **Status:** Accepted
+- **Date:** 2026-03-24
+- **Decision Makers:** Project team
 
-## Bağlam
+## Context
 
-Sır tarama, binlerce farklı desen (regex) ile potansiyel olarak gigabaytlarca veriyi eşleştirmeyi gerektirir. Go'nun RE2 tabanlı `regexp` paketi, Rust'ın regex crate'ine kıyasla 2-5x yavaştır. Her desen için metni tekrar tekrar tarayan naif yaklaşım pratik değildir.
+Secret scanning requires matching thousands of different patterns (regex) against potentially gigabytes of data. Go's RE2-based `regexp` package is 2-5x slower compared to Rust's regex crate. A naive approach of scanning the text repeatedly for each pattern is impractical.
 
-## Karar
+## Decision
 
-**Aho-Corasick öncelikli hibrit strateji** seçilmiştir:
+**Aho-Corasick-first hybrid strategy** has been selected:
 
-1. **Birincil:** Aho-Corasick algoritması ile sabit keyword ön-filtreleme (tek geçiş, O(n))
-2. **İkincil:** Yalnızca Aho-Corasick eşleşmesi olan chunk'larda, sadece eşleşen dedektörlerin regex doğrulaması
-3. **Üçüncül:** Shannon entropisi ile ek güven skorlaması
+1. **Primary:** Fixed keyword pre-filtering with the Aho-Corasick algorithm (single pass, O(n))
+2. **Secondary:** Regex validation only on chunks where Aho-Corasick matches occur, and only for the matching detectors
+3. **Tertiary:** Shannon entropy for additional confidence scoring
 
-### Gerekçe
+### Rationale
 
-- Aho-Corasick, tüm desenleri tek bir geçişte eşleştirir — desen sayısından bağımsız O(n)
-- Sır desenlerin %90+'ı sabit ön-eklerle başlar (`AKIA`, `ghp_`, `sk-live-`, `xoxb-`)
-- Eşleşme olmayan chunk'lar (%90+ olması beklenir) hiç regex çalıştırmadan atlanır
-- Bu yaklaşım, Go'nun regex dezavantajını pratikte ortadan kaldırır
-- CPU cache dostu — metin üzerinde tek geçiş
+- Aho-Corasick matches all patterns in a single pass — O(n) regardless of pattern count
+- 90%+ of secret patterns start with fixed prefixes (`AKIA`, `ghp_`, `sk-live-`, `xoxb-`)
+- Chunks with no matches (expected to be 90%+) are skipped without running any regex
+- This approach practically eliminates Go's regex disadvantage
+- CPU cache friendly — single pass over the text
 
-### Kütüphane
+### Library
 
-`cloudflare/ahocorasick` — Cloudflare üretiminde kanıtlanmış implementasyon.
+`cloudflare/ahocorasick` — Implementation proven in Cloudflare production.
 
-## Değerlendirilen Alternatifler
+## Alternatives Considered
 
-### Her desen için ayrı regex (naif)
+### Separate regex for each pattern (naive)
 
-- **Artılar:** Basit implementasyon
-- **Eksiler:** O(n * m) karmaşıklık (n=metin, m=desen sayısı), ölçeklenmez
-- **Karar:** Reddedildi.
+- **Pros:** Simple implementation
+- **Cons:** O(n * m) complexity (n=text, m=pattern count), does not scale
+- **Decision:** Rejected.
 
-### Rust FFI ile regex hot path
+### Rust FFI for regex hot path
 
-- **Artılar:** En yüksek ham regex performansı
-- **Eksiler:** CGO gerektirir, çapraz derleme karmaşıklaşır, bakım yükü artar
-- **Karar:** Ertelendi. Aho-Corasick stratejisi yetersiz kalırsa gelecekte değerlendirilecek.
+- **Pros:** Highest raw regex performance
+- **Cons:** Requires CGO, cross-compilation becomes complex, increases maintenance burden
+- **Decision:** Deferred. Will be evaluated in the future if the Aho-Corasick strategy proves insufficient.
 
 ### Hyperscan (Intel)
 
-- **Artılar:** SIMD-hızlandırılmış çoklu desen eşleştirme
-- **Eksiler:** C kütüphanesi (CGO gerekir), Intel'e özgü SIMD, lisans kısıtlamaları
-- **Karar:** Reddedildi. Platform bağımlılığı kabul edilemez.
+- **Pros:** SIMD-accelerated multi-pattern matching
+- **Cons:** C library (requires CGO), Intel-specific SIMD, license restrictions
+- **Decision:** Rejected. Platform dependency is unacceptable.
 
-## Sonuçlar
+## Consequences
 
-### Olumlu
+### Positive
 
-- Regex iş yükü %90+ azaltılır
-- Desen sayısı arttıkça performans sabit kalır (binlerce dedektör eklenebilir)
-- CPU cache verimli kullanılır
-- Saf Go — CGO gerekmez
+- Regex workload reduced by 90%+
+- Performance remains constant as pattern count grows (thousands of detectors can be added)
+- Efficient CPU cache utilization
+- Pure Go — no CGO required
 
-### Olumsuz
+### Negative
 
-- Aho-Corasick otomatonunun derlenmesi başlangıçta ek süre gerektirir (ihmal edilebilir)
-- Keyword'ü olmayan dedektörler (salt entropi tabanlı) Aho-Corasick ön-filtrelemeden yararlanamaz
+- Compiling the Aho-Corasick automaton requires additional startup time (negligible)
+- Detectors without keywords (purely entropy-based) cannot benefit from Aho-Corasick pre-filtering
 
-## İlişkili Kararlar
+## Related Decisions
 
-- [ADR-0001: Programlama Dili](ADR-0001-programlama-dili.md) — Go regex zayıflığının bu kararı tetiklemesi
+- [ADR-0001: Programming Language](ADR-0001-programlama-dili.md) — Go's regex weakness triggering this decision

@@ -101,7 +101,7 @@ func TestAPIKeyDetector_Scan_RedactsValue(t *testing.T) {
 
 func TestAPIKeyDetector_Scan_LowEntropy_SkipsMatch(t *testing.T) {
 	d := &APIKeyDetector{}
-	// Düşük entropili değer: tekrar eden karakter dizisi
+	// Low entropy value: repeating character sequence
 	input := `api_key = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"`
 
 	findings := d.Scan(context.Background(), []byte(input))

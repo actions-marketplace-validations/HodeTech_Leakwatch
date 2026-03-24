@@ -70,7 +70,7 @@ func TestFormatter_Format_OmitsRawWhenEmpty(t *testing.T) {
 	require.NoError(t, err)
 
 	_, hasRaw := rawJSON[0]["raw"]
-	assert.False(t, hasRaw, "raw boşken JSON çıktısında olmamalı")
+	assert.False(t, hasRaw, "raw field should not appear in JSON when empty")
 }
 
 func TestFormatter_Format_ShowRawFalse_StripsRawFromOutput(t *testing.T) {
@@ -93,7 +93,7 @@ func TestFormatter_Format_ShowRawFalse_StripsRawFromOutput(t *testing.T) {
 	require.NoError(t, err)
 
 	_, hasRaw := rawJSON[0]["raw"]
-	assert.False(t, hasRaw, "ShowRaw=false iken Raw alanı JSON çıktısında olmamalı")
+	assert.False(t, hasRaw, "Raw field should not appear when ShowRaw=false")
 }
 
 func TestFormatter_Format_ShowRawTrue_IncludesRawInOutput(t *testing.T) {
@@ -116,7 +116,7 @@ func TestFormatter_Format_ShowRawTrue_IncludesRawInOutput(t *testing.T) {
 	require.NoError(t, err)
 
 	rawVal, hasRaw := rawJSON[0]["raw"]
-	assert.True(t, hasRaw, "ShowRaw=true iken Raw alanı JSON çıktısında olmalı")
+	assert.True(t, hasRaw, "Raw field should appear when ShowRaw=true")
 	assert.Equal(t, "AKIAIOSFODNN7EXAMPLE", rawVal)
 }
 
@@ -134,7 +134,7 @@ func TestFormatter_Format_ShowRawFalse_DoesNotMutateOriginal(t *testing.T) {
 	err := f.Format(&buf, findings)
 	require.NoError(t, err)
 
-	assert.Equal(t, "AKIAIOSFODNN7EXAMPLE", findings[0].Raw, "Format orijinal slice'ı değiştirmemeli")
+	assert.Equal(t, "AKIAIOSFODNN7EXAMPLE", findings[0].Raw, "Format should not mutate the original slice")
 }
 
 func TestFormatter_FileExtension_ReturnsJSON(t *testing.T) {
@@ -142,7 +142,7 @@ func TestFormatter_FileExtension_ReturnsJSON(t *testing.T) {
 	assert.Equal(t, ".json", f.FileExtension())
 }
 
-// errWriter, yazım hatası simüle eden writer.
+// errWriter simulates a write error.
 type errWriter struct{}
 
 func (w *errWriter) Write(_ []byte) (int, error) {

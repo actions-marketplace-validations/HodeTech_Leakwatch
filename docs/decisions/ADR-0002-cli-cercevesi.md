@@ -1,43 +1,43 @@
-# ADR-0002: CLI Çerçevesi — Cobra + Viper
+# ADR-0002: CLI Framework — Cobra + Viper
 
-- **Durum:** Kabul Edildi
-- **Tarih:** 2026-03-24
-- **Karar Verenler:** Proje ekibi
+- **Status:** Accepted
+- **Date:** 2026-03-24
+- **Decision Makers:** Project team
 
-## Bağlam
+## Context
 
-Leakwatch, zengin bir komut yapısına sahip bir CLI aracıdır: `scan git`, `scan fs`, `scan image`, `verify aws` gibi iç içe komutlar gereklidir. Yapılandırma; dosya (.leakwatch.yaml), ortam değişkenleri ve komut satırı flag'lerinden hiyerarşik öncelikle okunmalıdır.
+Leakwatch is a CLI tool with a rich command structure: nested commands such as `scan git`, `scan fs`, `scan image`, `verify aws` are required. Configuration must be read with hierarchical precedence from files (.leakwatch.yaml), environment variables, and command-line flags.
 
-## Karar
+## Decision
 
-CLI çerçevesi olarak **spf13/cobra**, yapılandırma yönetimi için **spf13/viper** seçilmiştir.
+**spf13/cobra** has been selected as the CLI framework, and **spf13/viper** for configuration management.
 
-### Gerekçe
+### Rationale
 
-- Kubernetes, GitHub CLI, Hugo tarafından kullanılan endüstri standardı
-- İç içe komut desteği (ağaç yapısı)
-- POSIX uyumlu flag yönetimi (`-f`, `--flag`)
-- Cobra ↔ Viper doğal entegrasyonu — flag'ler yapılandırma değerlerine bağlanır
-- `cobra-cli` ile proje iskeleti oluşturma
-- Otomatik yardım metinleri, man page ve markdown çıktı
+- Industry standard used by Kubernetes, GitHub CLI, and Hugo
+- Nested command support (tree structure)
+- POSIX-compliant flag management (`-f`, `--flag`)
+- Native Cobra <-> Viper integration — flags bind to configuration values
+- Project scaffolding with `cobra-cli`
+- Automatic help text, man page, and markdown output
 
-## Değerlendirilen Alternatifler
+## Alternatives Considered
 
 ### urfave/cli
 
-- **Artılar:** Daha basit API, hızlı başlangıç
-- **Eksiler:** İç içe komut desteği daha az esnek, Viper entegrasyonu manuel, daha az ekosistem desteği
-- **Karar:** Reddedildi. Leakwatch'ın komut karmaşıklığı için yetersiz.
+- **Pros:** Simpler API, faster onboarding
+- **Cons:** Less flexible nested command support, manual Viper integration, less ecosystem support
+- **Decision:** Rejected. Insufficient for Leakwatch's command complexity.
 
-## Sonuçlar
+## Consequences
 
-### Olumlu
+### Positive
 
-- Geliştiricilerin aşina olduğu UX (Kubernetes, gh CLI ile aynı kalıplar)
-- `cobra-cli` ile standartlaştırılmış proje yapısı
-- Yapılandırma hiyerarşisi (flag > env > config dosya > varsayılan) otomatik
+- UX familiar to developers (same patterns as Kubernetes, gh CLI)
+- Standardized project structure with `cobra-cli`
+- Configuration hierarchy (flag > env > config file > default) is automatic
 
-### Olumsuz
+### Negative
 
-- Cobra + Viper birlikte nispeten büyük bir bağımlılık ağacı ekler
-- Viper'ın bazı edge case'leri (nested config, type coercion) dikkat gerektirir
+- Cobra + Viper together add a relatively large dependency tree
+- Some edge cases in Viper (nested config, type coercion) require attention

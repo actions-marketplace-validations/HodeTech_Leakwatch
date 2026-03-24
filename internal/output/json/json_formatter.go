@@ -1,4 +1,4 @@
-// Package json, JSON çıktı formatlayıcısını sağlar.
+// Package json provides a JSON output formatter.
 package json
 
 import (
@@ -9,15 +9,15 @@ import (
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
-// Formatter, bulguları JSON formatında çıktılar.
+// Formatter outputs findings in JSON format.
 type Formatter struct {
-	// ShowRaw, true olduğunda bulguların Raw alanını çıktıya dahil eder.
-	// false olduğunda Raw alanı güvenlik amacıyla çıktıdan çıkarılır (defense in depth).
+	// ShowRaw controls whether the Raw field is included in output.
+	// When false, the Raw field is stripped for defense in depth.
 	ShowRaw bool
 }
 
-// Format, bulguları JSON formatında writer'a yazar.
-// ShowRaw false ise Raw alanları aktif olarak temizlenir.
+// Format writes findings as JSON to the given writer.
+// When ShowRaw is false, Raw fields are actively cleared.
 func (f *Formatter) Format(w io.Writer, findings []finding.Finding) error {
 	output := make([]finding.Finding, len(findings))
 	copy(output, findings)
@@ -31,12 +31,12 @@ func (f *Formatter) Format(w io.Writer, findings []finding.Finding) error {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(output); err != nil {
-		return fmt.Errorf("JSON çıktı yazılamadı: %w", err)
+		return fmt.Errorf("failed to write JSON output: %w", err)
 	}
 	return nil
 }
 
-// FileExtension, JSON dosya uzantısını döndürür.
+// FileExtension returns the JSON file extension.
 func (f *Formatter) FileExtension() string {
 	return ".json"
 }

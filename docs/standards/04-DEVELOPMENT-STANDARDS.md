@@ -1,97 +1,97 @@
-# Leakwatch - Geliştirme Standartları ve Altyapı
+# Leakwatch - Development Standards and Infrastructure
 
-> **Belge Versiyonu:** 1.0
-> **Tarih:** 2026-03-24
-> **Durum:** Taslak
+> **Document Version:** 1.0
+> **Date:** 2026-03-24
+> **Status:** Draft
 
 ---
 
-## 1. Geliştirme Ortamı Gereksinimleri
+## 1. Development Environment Requirements
 
-### 1.1 Zorunlu Araçlar
+### 1.1 Required Tools
 
-| Araç | Minimum Versiyon | Amaç |
-|------|------------------|------|
-| Go | 1.22+ | Ana programlama dili |
-| Git | 2.30+ | Versiyon kontrol |
-| golangci-lint | 1.57+ | Statik analiz ve linting |
-| goreleaser | 2.0+ | Build ve release otomasyonu |
-| pre-commit | 3.0+ | Git hook yönetimi |
+| Tool | Minimum Version | Purpose |
+|------|-----------------|---------|
+| Go | 1.22+ | Primary programming language |
+| Git | 2.30+ | Version control |
+| golangci-lint | 1.57+ | Static analysis and linting |
+| goreleaser | 2.0+ | Build and release automation |
+| pre-commit | 3.0+ | Git hook management |
 
-### 1.2 Opsiyonel Araçlar
+### 1.2 Optional Tools
 
-| Araç | Amaç |
-|------|------|
-| Docker | Container imaj testleri |
-| cobra-cli | CLI iskelet oluşturma |
-| govulncheck | Güvenlik açığı taraması |
-| gofumpt | Strict kod formatlama |
-| delve (dlv) | Hata ayıklama |
+| Tool | Purpose |
+|------|---------|
+| Docker | Container image testing |
+| cobra-cli | CLI scaffold generation |
+| govulncheck | Vulnerability scanning |
+| gofumpt | Strict code formatting |
+| delve (dlv) | Debugging |
 
-### 1.3 IDE Desteği
+### 1.3 IDE Support
 
-- **VS Code:** Go eklentisi (Go Team at Google)
-- **GoLand:** JetBrains (birinci sınıf Go desteği)
+- **VS Code:** Go extension (Go Team at Google)
+- **GoLand:** JetBrains (first-class Go support)
 - **Vim/Neovim:** gopls LSP
 
 ---
 
-## 2. Kod Standartları
+## 2. Code Standards
 
-### 2.1 Go Kodlama Kuralları
+### 2.1 Go Coding Rules
 
-Leakwatch, aşağıdaki stil rehberlerini takip eder:
+Leakwatch follows these style guides:
 
-1. **Effective Go** — Go ekibinin resmi stil rehberi
-2. **Go Code Review Comments** — Yaygın inceleme notları
-3. **Uber Go Style Guide** — Ek kurumsal standartlar
+1. **Effective Go** — The official Go team style guide
+2. **Go Code Review Comments** — Common review notes
+3. **Uber Go Style Guide** — Additional enterprise standards
 
-### 2.2 Adlandırma Kuralları
+### 2.2 Naming Conventions
 
-| Öğe | Kural | Örnek |
-|-----|-------|-------|
-| Paket | Kısa, küçük harf, tek kelime | `detector`, `engine`, `output` |
-| Dışa açık fonksiyon | PascalCase | `ScanRepository()` |
-| Dahili fonksiyon | camelCase | `parseConfig()` |
-| Arayüz (Interface) | PascalCase, "-er" soneki | `Detector`, `Verifier`, `Formatter` |
-| Sabit (Constant) | PascalCase veya SCREAMING_SNAKE | `MaxFileSize`, `StatusVerifiedActive` |
-| Değişken | camelCase | `chunkSize`, `workerCount` |
-| Dosya adı | snake_case | `aws_access_key.go`, `worker_pool.go` |
-| Test dosyası | `_test.go` soneki | `engine_test.go` |
+| Element | Rule | Example |
+|---------|------|---------|
+| Package | Short, lowercase, single word | `detector`, `engine`, `output` |
+| Exported function | PascalCase | `ScanRepository()` |
+| Internal function | camelCase | `parseConfig()` |
+| Interface | PascalCase, "-er" suffix | `Detector`, `Verifier`, `Formatter` |
+| Constant | PascalCase or SCREAMING_SNAKE | `MaxFileSize`, `StatusVerifiedActive` |
+| Variable | camelCase | `chunkSize`, `workerCount` |
+| File name | snake_case | `aws_access_key.go`, `worker_pool.go` |
+| Test file | `_test.go` suffix | `engine_test.go` |
 
-### 2.3 Paket Organizasyon Kuralları
+### 2.3 Package Organization Rules
 
 ```
-internal/   → Dışarıdan erişilemez paketler (uygulama detayları)
-pkg/        → Dışarıdan erişilebilir paketler (kütüphane olarak kullanım)
-cmd/        → CLI komut tanımları (ince katman, iş mantığı içermez)
+internal/   → Packages not accessible from outside (implementation details)
+pkg/        → Packages accessible from outside (library usage)
+cmd/        → CLI command definitions (thin layer, no business logic)
 ```
 
-- `cmd/` paketi sadece CLI flag tanımları ve bağlama (wiring) içerir
-- İş mantığı (business logic) `internal/` altındadır
-- Dışarıya açılması istenen tipler `pkg/` altındadır
+- The `cmd/` package contains only CLI flag definitions and wiring
+- Business logic lives under `internal/`
+- Types intended for external use live under `pkg/`
 
-### 2.4 Hata Yönetimi
+### 2.4 Error Handling
 
 ```go
-// ✅ DOĞRU: Hataları sarmalayarak bağlam ekle
+// CORRECT: Wrap errors to add context
 if err != nil {
-    return fmt.Errorf("git repo açılamadı %s: %w", path, err)
+    return fmt.Errorf("failed to open git repo %s: %w", path, err)
 }
 
-// ❌ YANLIŞ: Çıplak hata döndürme
+// INCORRECT: Returning bare error
 if err != nil {
     return err
 }
 
-// ✅ DOĞRU: Sentinel hatalar tanımla
+// CORRECT: Define sentinel errors
 var (
-    ErrSourceNotFound   = errors.New("kaynak bulunamadı")
-    ErrInvalidConfig    = errors.New("geçersiz yapılandırma")
-    ErrVerifyTimeout    = errors.New("doğrulama zaman aşımı")
+    ErrSourceNotFound   = errors.New("source not found")
+    ErrInvalidConfig    = errors.New("invalid configuration")
+    ErrVerifyTimeout    = errors.New("verification timeout")
 )
 
-// ✅ DOĞRU: Context iptali kontrol et
+// CORRECT: Check context cancellation
 select {
 case <-ctx.Done():
     return ctx.Err()
@@ -99,77 +99,77 @@ default:
 }
 ```
 
-### 2.5 Loglama Standartları
+### 2.5 Logging Standards
 
 ```go
-// ✅ DOĞRU: Yapılandırılmış loglama (log/slog)
-slog.Info("tarama tamamlandı",
+// CORRECT: Structured logging (log/slog)
+slog.Info("scan completed",
     "source", "git",
     "findings", len(findings),
     "duration", elapsed,
 )
 
-// ❌ YANLIŞ: fmt.Println veya log.Printf
-fmt.Println("Tarama tamamlandı")
-log.Printf("Bulgu: %d", len(findings))
+// INCORRECT: fmt.Println or log.Printf
+fmt.Println("Scan completed")
+log.Printf("Findings: %d", len(findings))
 
-// ❌ YANLIŞ: Sır içeriğini loglama
-slog.Info("sır bulundu", "raw", secretValue) // ASLA YAPMA
+// INCORRECT: Logging secret content
+slog.Info("secret found", "raw", secretValue) // NEVER DO THIS
 ```
 
 ---
 
-## 3. Test Standartları
+## 3. Test Standards
 
-### 3.1 Test Piramidi
+### 3.1 Test Pyramid
 
 ```mermaid
 block-beta
     columns 1
-    block:e2e["E2E Testler (az sayıda)\nCLI komutlarının uçtan uca testi"]:1
+    block:e2e["E2E Tests (few)\nEnd-to-end testing of CLI commands"]:1
     end
-    block:integration["Entegrasyon Testleri (orta)\nGerçek git repo, gerçek dosya sistemi"]:1
+    block:integration["Integration Tests (moderate)\nReal git repo, real filesystem"]:1
     end
-    block:unit["Birim Testler (çok sayıda)\nHer fonksiyon, her dedektör, her parser"]:1
+    block:unit["Unit Tests (many)\nEvery function, every detector, every parser"]:1
     end
 ```
 
-### 3.2 Test Kapsam Hedefleri
+### 3.2 Test Coverage Targets
 
-| Paket | Minimum Kapsam |
-|-------|---------------|
-| `internal/detector/*` | %95 |
-| `internal/engine/*` | %85 |
-| `internal/source/*` | %80 |
-| `internal/verifier/*` | %75 |
-| `internal/entropy/*` | %95 |
-| `internal/matcher/*` | %90 |
-| `internal/output/*` | %85 |
-| **Genel Hedef** | **%80+** |
+| Package | Minimum Coverage |
+|---------|-----------------|
+| `internal/detector/*` | 95% |
+| `internal/engine/*` | 85% |
+| `internal/source/*` | 80% |
+| `internal/verifier/*` | 75% |
+| `internal/entropy/*` | 95% |
+| `internal/matcher/*` | 90% |
+| `internal/output/*` | 85% |
+| **Overall Target** | **80%+** |
 
-### 3.3 Test Yazım Kuralları
+### 3.3 Test Writing Rules
 
 ```go
-// ✅ DOĞRU: Table-driven testler
+// CORRECT: Table-driven tests
 func TestAWSAccessKeyDetector(t *testing.T) {
     tests := []struct {
         name     string
         input    string
-        expected int // beklenen bulgu sayısı
+        expected int // expected finding count
     }{
         {
-            name:     "geçerli AWS access key",
+            name:     "valid AWS access key",
             input:    "AKIAIOSFODNN7EXAMPLE",
             expected: 1,
         },
         {
             name:     "test/placeholder key",
             input:    "AKIAIOSFODNN7XXXXXXX",
-            expected: 1, // Pattern eşleşir, doğrulama ile ayrılır
+            expected: 1, // Pattern matches, verification distinguishes
         },
         {
-            name:     "eşleşme yok",
-            input:    "bu normal bir metin",
+            name:     "no match",
+            input:    "this is normal text",
             expected: 0,
         },
     }
@@ -183,7 +183,7 @@ func TestAWSAccessKeyDetector(t *testing.T) {
     }
 }
 
-// ✅ DOĞRU: io/fs ile bellek içi dosya sistemi testi
+// CORRECT: In-memory filesystem test with io/fs
 func TestFilesystemSource(t *testing.T) {
     fsys := fstest.MapFS{
         "config.yaml": &fstest.MapFile{
@@ -193,26 +193,26 @@ func TestFilesystemSource(t *testing.T) {
             Data: []byte("package main"),
         },
     }
-    // fsys'i Source'a ver, test et
+    // Pass fsys to Source, test it
 }
 ```
 
-### 3.4 Test Adlandırma
+### 3.4 Test Naming
 
 ```
-Test<Fonksiyon>_<Senaryo>_<BeklenenSonuç>
+Test<Function>_<Scenario>_<ExpectedResult>
 
-Örnekler:
+Examples:
 - TestScanGit_ValidRepo_ReturnsFindings
 - TestShannonEntropy_HighEntropyString_AboveThreshold
 - TestAWSVerifier_InvalidKey_ReturnsInactive
 - TestEngine_CancelledContext_StopsGracefully
 ```
 
-### 3.5 Mock ve Stub Kullanımı
+### 3.5 Mock and Stub Usage
 
 ```go
-// Arayüzlere karşı test et, mock'lar doğal olarak gelir
+// Test against interfaces, mocks come naturally
 type mockDetector struct {
     id       string
     keywords []string
@@ -311,7 +311,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-### 4.3 GoReleaser Yapılandırması (.goreleaser.yml)
+### 4.3 GoReleaser Configuration (.goreleaser.yml)
 
 ```yaml
 version: 2
@@ -356,7 +356,7 @@ changelog:
 
 ## 5. Git Workflow
 
-### 5.1 Branching Stratejisi: GitHub Flow
+### 5.1 Branching Strategy: GitHub Flow
 
 ```mermaid
 gitgraph
@@ -374,93 +374,93 @@ gitgraph
     commit id: "release v0.2.0"
 ```
 
-- `main` — her zaman kararlı ve deploy edilebilir
-- `feature/<isim>` — her özellik için ayrı dal
-- `fix/<isim>` — hata düzeltmeleri için
-- `docs/<isim>` — dokümantasyon güncellemeleri için
+- `main` — always stable and deployable
+- `feature/<name>` — separate branch for each feature
+- `fix/<name>` — for bug fixes
+- `docs/<name>` — for documentation updates
 
-### 5.2 Commit Mesajı Formatı: Conventional Commits
-
-```
-<tür>[kapsam]: <açıklama>
-
-[gövde]
-
-[alt bilgi]
-```
-
-**Türler:**
-
-| Tür | Açıklama |
-|-----|----------|
-| `feat` | Yeni özellik |
-| `fix` | Hata düzeltme |
-| `docs` | Dokümantasyon |
-| `test` | Test ekleme/düzeltme |
-| `refactor` | Yeniden yapılandırma |
-| `perf` | Performans iyileştirmesi |
-| `ci` | CI/CD değişiklikleri |
-| `chore` | Bakım işleri |
-
-**Örnekler:**
+### 5.2 Commit Message Format: Conventional Commits
 
 ```
-feat(detector): AWS Secret Access Key dedektörü eklendi
-fix(engine): worker pool context iptalinde goroutine sızıntısı düzeltildi
-docs(readme): kurulum talimatları güncellendi
-test(entropy): Shannon entropi edge case testleri eklendi
-perf(matcher): Aho-Corasick otomat derleme süresi %40 iyileştirildi
+<type>[scope]: <description>
+
+[body]
+
+[footer]
 ```
 
-### 5.3 Pull Request Kuralları
+**Types:**
 
-- Her PR en az 1 onay (review) gerektirir
-- CI pipeline başarılı olmalıdır
-- Test kapsamı düşmemelidir
-- Linter uyarıları düzeltilmelidir
-- PR açıklaması şunları içermelidir:
-  - Ne yapıldı ve neden
-  - Test planı
-  - Breaking change varsa belirtilmeli
+| Type | Description |
+|------|-------------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `docs` | Documentation |
+| `test` | Adding/fixing tests |
+| `refactor` | Refactoring |
+| `perf` | Performance improvement |
+| `ci` | CI/CD changes |
+| `chore` | Maintenance tasks |
 
-### 5.4 Sürüm Numaralama: Semantic Versioning (SemVer)
+**Examples:**
+
+```
+feat(detector): add AWS Secret Access Key detector
+fix(engine): fix goroutine leak on worker pool context cancellation
+docs(readme): update installation instructions
+test(entropy): add Shannon entropy edge case tests
+perf(matcher): improve Aho-Corasick automaton build time by 40%
+```
+
+### 5.3 Pull Request Rules
+
+- Every PR requires at least 1 approval (review)
+- CI pipeline must pass
+- Test coverage must not decrease
+- Linter warnings must be fixed
+- PR description must include:
+  - What was done and why
+  - Test plan
+  - Breaking changes must be noted if applicable
+
+### 5.4 Version Numbering: Semantic Versioning (SemVer)
 
 ```
 v{MAJOR}.{MINOR}.{PATCH}
 
-MAJOR — Geriye uyumsuz API değişiklikleri
-MINOR — Geriye uyumlu yeni özellikler
-PATCH — Geriye uyumlu hata düzeltmeleri
+MAJOR — Backward-incompatible API changes
+MINOR — Backward-compatible new features
+PATCH — Backward-compatible bug fixes
 
-Örnekler:
-v0.1.0 — İlk MVP sürümü
-v0.2.0 — Git entegrasyonu eklendi
-v0.3.0 — Doğrulama modülü eklendi
-v1.0.0 — Kararlı API, üretime hazır
+Examples:
+v0.1.0 — First MVP release
+v0.2.0 — Git integration added
+v0.3.0 — Verification module added
+v1.0.0 — Stable API, production-ready
 ```
 
 ---
 
-## 6. Linter Yapılandırması (.golangci.yml)
+## 6. Linter Configuration (.golangci.yml)
 
 ```yaml
 linters:
   enable:
-    - errcheck        # Kontrol edilmeyen hata döndüren fonksiyonlar
-    - govet           # Go vet kontrolleri
-    - staticcheck     # Gelişmiş statik analiz
-    - unused          # Kullanılmayan kod
-    - gosimple        # Basitleştirilebilir kod
-    - ineffassign     # Etkisiz atamalar
-    - typecheck       # Tip kontrolleri
-    - gocritic        # Ek stil ve performans kontrolleri
-    - gofumpt         # Strict formatlama
-    - misspell        # İngilizce yazım kontrolleri
-    - prealloc        # Dilim ön-tahsis fırsatları
-    - revive          # Ek linting kuralları
-    - unconvert       # Gereksiz tip dönüşümleri
-    - bodyclose       # HTTP response body kapatma kontrolü
-    - noctx           # HTTP isteklerinde context kontrolü
+    - errcheck        # Unchecked error-returning functions
+    - govet           # Go vet checks
+    - staticcheck     # Advanced static analysis
+    - unused          # Unused code
+    - gosimple        # Simplifiable code
+    - ineffassign     # Ineffective assignments
+    - typecheck       # Type checks
+    - gocritic        # Additional style and performance checks
+    - gofumpt         # Strict formatting
+    - misspell        # English spelling checks
+    - prealloc        # Slice pre-allocation opportunities
+    - revive          # Additional linting rules
+    - unconvert       # Unnecessary type conversions
+    - bodyclose       # HTTP response body close check
+    - noctx           # HTTP request context check
 
 linters-settings:
   gocritic:
@@ -484,98 +484,98 @@ issues:
 
 ---
 
-## 7. Dokümantasyon Standartları
+## 7. Documentation Standards
 
-### 7.1 Kod Dokümantasyonu
+### 7.1 Code Documentation
 
 ```go
-// Package detector sır tespiti için dedektör arayüzlerini ve
-// yerleşik dedektör implementasyonlarını sağlar.
+// Package detector provides detector interfaces and built-in detector
+// implementations for secret detection.
 package detector
 
-// AWSAccessKeyID, AWS Access Key ID'lerini tespit eden dedektördür.
-// AKIA, ABIA, ACCA ve ASIA ön-ekli anahtarları tanır.
+// AWSAccessKeyID is a detector that identifies AWS Access Key IDs.
+// It recognizes keys with AKIA, ABIA, ACCA, and ASIA prefixes.
 //
-// AWS Access Key ID formatı: (AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}
+// AWS Access Key ID format: (AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}
 //
-// Referans: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html
+// Reference: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html
 type AWSAccessKeyID struct{}
 ```
 
-### 7.2 Proje Dokümantasyonu
+### 7.2 Project Documentation
 
-| Dosya | İçerik |
-|-------|--------|
-| `README.md` | Proje tanıtımı, hızlı başlangıç, temel kullanım |
-| `docs/01-COMPETITIVE-ANALYSIS.md` | Rakip analizi ve pazar konumlandırma |
-| `docs/02-TECHNOLOGY-DECISIONS.md` | Teknoloji kararları ve gerekçeleri |
-| `docs/03-ARCHITECTURE.md` | Detaylı mimari tasarım |
-| `docs/04-DEVELOPMENT-STANDARDS.md` | Bu belge — geliştirme standartları |
-| `docs/05-ROADMAP.md` | Fazlandırılmış geliştirme yol haritası |
-| `CONTRIBUTING.md` | Katkıda bulunma rehberi |
-| `CHANGELOG.md` | Sürüm değişiklik kayıtları |
-| `LICENSE` | MIT Lisansı |
+| File | Content |
+|------|---------|
+| `README.md` | Project introduction, quick start, basic usage |
+| `docs/01-COMPETITIVE-ANALYSIS.md` | Competitive analysis and market positioning |
+| `docs/02-TECHNOLOGY-DECISIONS.md` | Technology decisions and rationale |
+| `docs/03-ARCHITECTURE.md` | Detailed architecture design |
+| `docs/04-DEVELOPMENT-STANDARDS.md` | This document — development standards |
+| `docs/05-ROADMAP.md` | Phased development roadmap |
+| `CONTRIBUTING.md` | Contributing guide |
+| `CHANGELOG.md` | Version change log |
+| `LICENSE` | MIT License |
 
 ---
 
-## 8. Bağımlılık Yönetimi
+## 8. Dependency Management
 
-### 8.1 Kurallar
+### 8.1 Rules
 
-- Go modules (`go.mod`) kullanılır
-- Bağımlılıklar minimum tutulur — standart kütüphane tercih edilir
-- Her bağımlılık ekleme/güncelleme PR açıklamasında gerekçelendirilir
-- `govulncheck` ile düzenli güvenlik taraması yapılır
-- Doğrudan bağımlılıklar `go.mod`'da açıkça listelenir
+- Go modules (`go.mod`) are used
+- Dependencies are kept to a minimum — standard library is preferred
+- Every dependency addition/update is justified in the PR description
+- Regular security scanning with `govulncheck`
+- Direct dependencies are explicitly listed in `go.mod`
 
-### 8.2 Doğrudan Bağımlılık Listesi (Planlanan)
+### 8.2 Direct Dependency List (Planned)
 
-| Bağımlılık | Amaç | Lisans |
-|------------|------|--------|
-| `github.com/spf13/cobra` | CLI çerçevesi | Apache-2.0 |
-| `github.com/spf13/viper` | Yapılandırma yönetimi | MIT |
-| `github.com/go-git/go-git/v5` | Git işlemleri | Apache-2.0 |
-| `github.com/google/go-containerregistry` | Container imaj | Apache-2.0 |
-| `github.com/cloudflare/ahocorasick` | Desen eşleştirme | BSD-3 |
-| `github.com/owenrumney/go-sarif` | SARIF çıktı | MIT |
-| `github.com/aws/aws-sdk-go-v2` | AWS doğrulama | Apache-2.0 |
-| `github.com/stretchr/testify` | Test assertion'ları | MIT |
+| Dependency | Purpose | License |
+|------------|---------|---------|
+| `github.com/spf13/cobra` | CLI framework | Apache-2.0 |
+| `github.com/spf13/viper` | Configuration management | MIT |
+| `github.com/go-git/go-git/v5` | Git operations | Apache-2.0 |
+| `github.com/google/go-containerregistry` | Container image | Apache-2.0 |
+| `github.com/cloudflare/ahocorasick` | Pattern matching | BSD-3 |
+| `github.com/owenrumney/go-sarif` | SARIF output | MIT |
+| `github.com/aws/aws-sdk-go-v2` | AWS verification | Apache-2.0 |
+| `github.com/stretchr/testify` | Test assertions | MIT |
 | `golang.org/x/time` | Rate limiting | BSD-3 |
 
-Tüm bağımlılıklar ticari kullanıma uygun açık kaynak lisanslara sahiptir.
+All dependencies have open source licenses compatible with commercial use.
 
 ---
 
-## 9. Güvenlik Standartları
+## 9. Security Standards
 
-### 9.1 Kod Güvenliği
+### 9.1 Code Security
 
-- OWASP Top 10 farkındalığı ile geliştirme
-- Kullanıcı girdileri doğrulanır (dosya yolları, URL'ler, regex desenleri)
-- Path traversal koruması (`filepath.Clean`, `filepath.Rel`)
-- Regex ReDoS koruması (RE2 motoru ile garanti)
-- Secrets asla loglanmaz, asla diske yazılmaz (geçici bile olsa)
-- `govulncheck` CI pipeline'da zorunlu
+- Development with OWASP Top 10 awareness
+- User inputs are validated (file paths, URLs, regex patterns)
+- Path traversal protection (`filepath.Clean`, `filepath.Rel`)
+- Regex ReDoS protection (guaranteed by RE2 engine)
+- Secrets are never logged, never written to disk (even temporarily)
+- `govulncheck` is mandatory in the CI pipeline
 
-### 9.2 Dağıtım Güvenliği
+### 9.2 Distribution Security
 
-- Release binary'leri checksum ile doğrulanabilir
-- GoReleaser ile tekrarlanabilir (reproducible) build
-- GitHub Actions'da minimum yetki (principle of least privilege)
-- Bağımlılık lisans uyumluluk kontrolü
+- Release binaries are verifiable via checksum
+- Reproducible builds with GoReleaser
+- Minimum permissions in GitHub Actions (principle of least privilege)
+- Dependency license compatibility check
 
 ---
 
-## 10. Performans Profilleme
+## 10. Performance Profiling
 
-### 10.1 Profilleme Araçları
+### 10.1 Profiling Tools
 
 ```bash
-# CPU profili
+# CPU profile
 go test -cpuprofile=cpu.out -bench=BenchmarkScan ./internal/engine/
 go tool pprof cpu.out
 
-# Bellek profili
+# Memory profile
 go test -memprofile=mem.out -bench=BenchmarkScan ./internal/engine/
 go tool pprof mem.out
 
@@ -584,7 +584,7 @@ go test -trace=trace.out -bench=BenchmarkScan ./internal/engine/
 go tool trace trace.out
 ```
 
-### 10.2 Benchmark Testleri
+### 10.2 Benchmark Tests
 
 ```go
 func BenchmarkAhoCorasickMatch(b *testing.B) {

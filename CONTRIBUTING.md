@@ -1,8 +1,8 @@
-# Katkıda Bulunma Rehberi
+# Contributing Guide
 
-Leakwatch'a katkıda bulunmak istediğiniz için teşekkürler!
+Thank you for your interest in contributing to Leakwatch!
 
-## Geliştirme Ortamı
+## Development Environment
 
 ```bash
 git clone https://github.com/cemililik/Leakwatch.git
@@ -11,38 +11,38 @@ go mod download
 go test -race ./...
 ```
 
-## Gereksinimler
+## Requirements
 
 - Go 1.23+
 - golangci-lint 1.57+
 - Git 2.30+
 
-## Geliştirme Akışı
+## Development Workflow
 
-1. `main` dalından feature branch oluşturun: `git checkout -b feature/my-feature`
-2. Değişikliklerinizi yapın
-3. Testleri çalıştırın: `go test -race ./...`
-4. Lint kontrolü yapın: `golangci-lint run ./...`
-5. Pull request oluşturun
+1. Create a feature branch from `main`: `git checkout -b feature/my-feature`
+2. Make your changes
+3. Run tests: `go test -race ./...`
+4. Run lint checks: `golangci-lint run ./...`
+5. Create a pull request
 
-## Standartlar
+## Standards
 
-Lütfen aşağıdaki standart belgelerini inceleyin:
+Please review the following standards documents:
 
-- [Geliştirme Standartları](docs/standards/04-DEVELOPMENT-STANDARDS.md)
-- [Kod İnceleme Standartları](docs/standards/01-CODE-REVIEW-STANDARDS.md)
-- [Dokümantasyon Standartları](docs/standards/00-DOCUMENTATION-STANDARDS.md)
+- [Development Standards](docs/standards/04-DEVELOPMENT-STANDARDS.md)
+- [Code Review Standards](docs/standards/01-CODE-REVIEW-STANDARDS.md)
+- [Documentation Standards](docs/standards/00-DOCUMENTATION-STANDARDS.md)
 
-## Commit Mesajları
+## Commit Messages
 
-[Conventional Commits](https://www.conventionalcommits.org/) formatını kullanın:
+Use [Conventional Commits](https://www.conventionalcommits.org/) format:
 
 ```
-feat(detector): AWS Secret Access Key dedektörü eklendi
-fix(engine): worker pool context iptalinde goroutine sızıntısı düzeltildi
-test(entropy): Shannon entropi edge case testleri eklendi
+feat(detector): add AWS Secret Access Key detector
+fix(engine): fix goroutine leak on worker pool context cancellation
+test(entropy): add Shannon entropy edge case tests
 ```
 
-## Lisans
+## License
 
-Katkılarınız [MIT Lisansı](LICENSE) altında lisanslanacaktır.
+Your contributions will be licensed under the [MIT License](LICENSE).

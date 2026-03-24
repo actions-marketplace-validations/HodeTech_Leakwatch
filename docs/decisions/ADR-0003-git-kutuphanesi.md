@@ -1,50 +1,50 @@
-# ADR-0003: Git Kütüphanesi — go-git
+# ADR-0003: Git Library — go-git
 
-- **Durum:** Kabul Edildi
-- **Tarih:** 2026-03-24
-- **Karar Verenler:** Proje ekibi
+- **Status:** Accepted
+- **Date:** 2026-03-24
+- **Decision Makers:** Project team
 
-## Bağlam
+## Context
 
-Leakwatch, Git depolarının tüm commit geçmişini analiz edebilmelidir. Bu, depoyu açma/klonlama, commit'lerde gezinme, her commit'in dosya ağacını okuma ve blob içeriklerine erişme gerektirir. İki ana yaklaşım mevcuttur: harici `git` binary çağrısı (os/exec) veya Go-native bir kütüphane.
+Leakwatch must be able to analyze the entire commit history of Git repositories. This requires opening/cloning repositories, traversing commits, reading the file tree of each commit, and accessing blob contents. Two main approaches exist: calling an external `git` binary (os/exec) or using a Go-native library.
 
-## Karar
+## Decision
 
-**go-git/go-git/v5** (saf Go implementasyonu) seçilmiştir.
+**go-git/go-git/v5** (pure Go implementation) has been selected.
 
-### Gerekçe
+### Rationale
 
-- Saf Go — CGO gerektirmez, çapraz derleme sorunsuz
-- Harici `git` binary bağımlılığı yok — hedef sistemde git kurulu olması gerekmez
-- Git nesneleri üzerinde tam programatik kontrol
-- TruffleHog tarafından üretimde kullanılıyor — kanıtlanmış
-- `LogOptions` ile optimize tarama (`Since`, `Order`, depth sınırlama)
-- Pluggable storage ile bellek içi test desteği
+- Pure Go — no CGO required, cross-compilation is seamless
+- No external `git` binary dependency — git does not need to be installed on the target system
+- Full programmatic control over Git objects
+- Used in production by TruffleHog — proven
+- Optimized scanning via `LogOptions` (`Since`, `Order`, depth limiting)
+- Pluggable storage with in-memory test support
 
-## Değerlendirilen Alternatifler
+## Alternatives Considered
 
 ### git2go (libgit2 bindings)
 
-- **Artılar:** libgit2'nin olgun ve kapsamlı API'si
-- **Eksiler:** CGO gerektirir, çapraz derleme karmaşıklaşır, C derleyici zinciri eşleşmesi gerekir
-- **Karar:** Reddedildi. Go'nun statik binary felsefesine aykırı.
+- **Pros:** libgit2's mature and comprehensive API
+- **Cons:** Requires CGO, cross-compilation becomes complex, C compiler toolchain matching required
+- **Decision:** Rejected. Contradicts Go's static binary philosophy.
 
-### os/exec ile git komutu
+### os/exec with git command
 
-- **Artılar:** Her git özelliğine erişim, basit implementasyon
-- **Eksiler:** Harici bağımlılık, metin ayrıştırma (parsing) gerektirir, performans overhead'i, güvenlik riski (command injection)
-- **Karar:** Reddedildi. Üretim kalitesinde bir araç için güvenilir değil.
+- **Pros:** Access to every git feature, simple implementation
+- **Cons:** External dependency, requires text parsing, performance overhead, security risk (command injection)
+- **Decision:** Rejected. Not reliable for a production-quality tool.
 
-## Sonuçlar
+## Consequences
 
-### Olumlu
+### Positive
 
-- Sıfır harici bağımlılık — tek binary, her yerde çalışır
-- Git iç yapılarına doğrudan erişim (tree, blob, commit nesneleri)
-- Test edilebilirlik: bellek içi repo oluşturma ile birim test
+- Zero external dependencies — single binary, runs everywhere
+- Direct access to Git internals (tree, blob, commit objects)
+- Testability: unit testing with in-memory repo creation
 
-### Olumsuz
+### Negative
 
-- go-git, yerel git'in tüm özelliklerini desteklemez (örn: shallow clone sınırlamaları)
-- Çok büyük monorepolarda bellek tüketimi yerel git'e kıyasla yüksek olabilir
-- Bazı edge case'lerde (submodule, sparse checkout) davranış farklılıkları
+- go-git does not support all features of native git (e.g., shallow clone limitations)
+- Memory consumption in very large monorepos may be higher compared to native git
+- Behavioral differences in some edge cases (submodules, sparse checkout)

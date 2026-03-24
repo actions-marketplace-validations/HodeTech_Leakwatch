@@ -1,4 +1,4 @@
-// Package aws, AWS ile ilgili sır dedektörlerini sağlar.
+// Package aws provides AWS-related secret detectors.
 package aws
 
 import (
@@ -11,7 +11,7 @@ import (
 
 var accessKeyIDPattern = regexp.MustCompile(`(AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}`)
 
-// AccessKeyID, AWS Access Key ID dedektörü.
+// AccessKeyID detects AWS Access Key IDs.
 type AccessKeyID struct{}
 
 func (d *AccessKeyID) ID() string          { return "aws-access-key-id" }
@@ -19,7 +19,7 @@ func (d *AccessKeyID) Description() string  { return "AWS Access Key ID" }
 func (d *AccessKeyID) Keywords() []string   { return []string{"AKIA", "ABIA", "ACCA", "ASIA"} }
 func (d *AccessKeyID) Severity() finding.Severity { return finding.SeverityCritical }
 
-// Scan, verilen veriyi AWS Access Key ID kalıplarına karşı tarar.
+// Scan searches the data for AWS Access Key ID patterns.
 func (d *AccessKeyID) Scan(_ context.Context, data []byte) []detector.RawFinding {
 	matches := accessKeyIDPattern.FindAll(data, -1)
 	if len(matches) == 0 {
