@@ -1,0 +1,355 @@
+package gcs
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"strings"
+	"testing"
+
+	gcsstorage "cloud.google.com/go/storage"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/api/iterator"
+
+	"github.com/cemililik/leakwatch/internal/source"
+)
+
+// mockGCSClient implements the gcsClient interface for testing.
+type mockGCSClient struct {
+	buckets map[string]*mockBucketHandle
+}
+
+func (m *mockGCSClient) Bucket(name string) bucketHandle {
+	if bh, ok := m.buckets[name]; ok {
+		return bh
+	}
+	return &mockBucketHandle{name: name, notFound: true}
+}
+
+func (m *mockGCSClient) Close() error { return nil }
+
+// mockBucketHandle implements the bucketHandle interface for testing.
+type mockBucketHandle struct {
+	name     string
+	notFound bool
+	objects  []*gcsstorage.ObjectAttrs
+	data     map[string]string
+}
+
+func (b *mockBucketHandle) Attrs(_ context.Context) (*gcsstorage.BucketAttrs, error) {
+	if b.notFound {
+		return nil, fmt.Errorf("bucket not found")
+	}
+	return &gcsstorage.BucketAttrs{Name: b.name}, nil
+}
+
+func (b *mockBucketHandle) Objects(_ context.Context, q *gcsstorage.Query) objectIterator {
+	var filtered []*gcsstorage.ObjectAttrs
+	for _, obj := range b.objects {
+		if q != nil && q.Prefix != "" && !strings.HasPrefix(obj.Name, q.Prefix) {
+			continue
+		}
+		filtered = append(filtered, obj)
+	}
+	return &mockObjectIterator{objects: filtered}
+}
+
+func (b *mockBucketHandle) Object(name string) objectHandle {
+	content := ""
+	if b.data != nil {
+		content = b.data[name]
+	}
+	return &mockObjectHandle{content: content}
+}
+
+// mockObjectHandle implements the objectHandle interface for testing.
+type mockObjectHandle struct {
+	content string
+}
+
+func (o *mockObjectHandle) NewReader(_ context.Context) (io.ReadCloser, error) {
+	return io.NopCloser(strings.NewReader(o.content)), nil
+}
+
+// mockObjectIterator implements the objectIterator interface for testing.
+type mockObjectIterator struct {
+	objects []*gcsstorage.ObjectAttrs
+	idx     int
+}
+
+func (it *mockObjectIterator) Next() (*gcsstorage.ObjectAttrs, error) {
+	if it.idx >= len(it.objects) {
+		return nil, iterator.Done
+	}
+	obj := it.objects[it.idx]
+	it.idx++
+	return obj, nil
+}
+
+func TestGCSSource_Type_ReturnsGCS(t *testing.T) {
+	s := New("my-bucket")
+	assert.Equal(t, "gcs", s.Type())
+}
+
+func TestGCSSource_New_DefaultValues(t *testing.T) {
+	s := New("my-bucket")
+	assert.Equal(t, "my-bucket", s.bucket)
+	assert.Equal(t, int64(10*1024*1024), s.maxFileSize)
+	assert.Equal(t, 64, s.bufferSize)
+	assert.Empty(t, s.prefix)
+}
+
+func TestGCSSource_New_WithOptions(t *testing.T) {
+	s := New("my-bucket",
+		WithPrefix("logs/"),
+		WithMaxFileSize(5*1024*1024),
+		WithBufferSize(32),
+		WithProject("my-project"),
+	)
+	assert.Equal(t, "logs/", s.prefix)
+	assert.Equal(t, int64(5*1024*1024), s.maxFileSize)
+	assert.Equal(t, 32, s.bufferSize)
+	assert.Equal(t, "my-project", s.project)
+}
+
+func TestGCSSource_Validate_EmptyBucket_ReturnsError(t *testing.T) {
+	s := New("")
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bucket name is required")
+}
+
+func TestGCSSource_Validate_AccessibleBucket_ReturnsNil(t *testing.T) {
+	mock := &mockGCSClient{
+		buckets: map[string]*mockBucketHandle{
+			"my-bucket": {name: "my-bucket"},
+		},
+	}
+	s := New("my-bucket")
+	s.client = mock
+	assert.NoError(t, s.Validate())
+}
+
+func TestGCSSource_Validate_InaccessibleBucket_ReturnsError(t *testing.T) {
+	mock := &mockGCSClient{
+		buckets: map[string]*mockBucketHandle{},
+	}
+	s := New("missing-bucket")
+	s.client = mock
+	err := s.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "inaccessible")
+}
+
+func TestGCSSource_Chunks_SendsTextObjects(t *testing.T) {
+	mock := &mockGCSClient{
+		buckets: map[string]*mockBucketHandle{
+			"my-bucket": {
+				name: "my-bucket",
+				objects: []*gcsstorage.ObjectAttrs{
+					{Name: "config.yaml", Size: 20},
+					{Name: "secret.txt", Size: 15},
+				},
+				data: map[string]string{
+					"config.yaml": "api_key: test123",
+					"secret.txt":  "password=hunter2",
+				},
+			},
+		},
+	}
+
+	s := New("my-bucket")
+	s.client = mock
+
+	ctx := context.Background()
+	var chunks []string
+	for chunk := range s.Chunks(ctx) {
+		chunks = append(chunks, chunk.SourceMetadata.FilePath)
+	}
+
+	assert.Len(t, chunks, 2)
+	assert.Contains(t, chunks, "my-bucket/config.yaml")
+	assert.Contains(t, chunks, "my-bucket/secret.txt")
+}
+
+func TestGCSSource_Chunks_SkipsBinaryExtensions(t *testing.T) {
+	mock := &mockGCSClient{
+		buckets: map[string]*mockBucketHandle{
+			"my-bucket": {
+				name: "my-bucket",
+				objects: []*gcsstorage.ObjectAttrs{
+					{Name: "code.go", Size: 20},
+					{Name: "image.png", Size: 20},
+				},
+				data: map[string]string{
+					"code.go": "package main",
+				},
+			},
+		},
+	}
+
+	s := New("my-bucket")
+	s.client = mock
+
+	ctx := context.Background()
+	var chunks []string
+	for chunk := range s.Chunks(ctx) {
+		chunks = append(chunks, chunk.SourceMetadata.FilePath)
+	}
+
+	assert.Len(t, chunks, 1)
+	assert.Equal(t, "my-bucket/code.go", chunks[0])
+}
+
+func TestGCSSource_Chunks_SkipsLargeObjects(t *testing.T) {
+	mock := &mockGCSClient{
+		buckets: map[string]*mockBucketHandle{
+			"my-bucket": {
+				name: "my-bucket",
+				objects: []*gcsstorage.ObjectAttrs{
+					{Name: "small.txt", Size: 100},
+					{Name: "big.txt", Size: 20 * 1024 * 1024},
+				},
+				data: map[string]string{
+					"small.txt": "small content",
+				},
+			},
+		},
+	}
+
+	s := New("my-bucket", WithMaxFileSize(1024*1024))
+	s.client = mock
+
+	ctx := context.Background()
+	var chunks []string
+	for chunk := range s.Chunks(ctx) {
+		chunks = append(chunks, chunk.SourceMetadata.FilePath)
+	}
+
+	assert.Len(t, chunks, 1)
+	assert.Equal(t, "my-bucket/small.txt", chunks[0])
+}
+
+func TestGCSSource_Chunks_SkipsBinaryContent(t *testing.T) {
+	mock := &mockGCSClient{
+		buckets: map[string]*mockBucketHandle{
+			"my-bucket": {
+				name: "my-bucket",
+				objects: []*gcsstorage.ObjectAttrs{
+					{Name: "text.txt", Size: 11},
+					{Name: "binary.dat", Size: 11},
+				},
+				data: map[string]string{
+					"text.txt":   "hello world",
+					"binary.dat": "hello\x00world",
+				},
+			},
+		},
+	}
+
+	s := New("my-bucket")
+	s.client = mock
+
+	ctx := context.Background()
+	var chunks []string
+	for chunk := range s.Chunks(ctx) {
+		chunks = append(chunks, chunk.SourceMetadata.FilePath)
+	}
+
+	assert.Len(t, chunks, 1)
+	assert.Equal(t, "my-bucket/text.txt", chunks[0])
+}
+
+func TestGCSSource_Chunks_ContextCancellation(t *testing.T) {
+	mock := &mockGCSClient{
+		buckets: map[string]*mockBucketHandle{
+			"my-bucket": {
+				name: "my-bucket",
+				objects: []*gcsstorage.ObjectAttrs{
+					{Name: "a.txt", Size: 5},
+					{Name: "b.txt", Size: 5},
+					{Name: "c.txt", Size: 5},
+				},
+				data: map[string]string{
+					"a.txt": "aaa",
+					"b.txt": "bbb",
+					"c.txt": "ccc",
+				},
+			},
+		},
+	}
+
+	s := New("my-bucket", WithBufferSize(1))
+	s.client = mock
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ch := s.Chunks(ctx)
+
+	// Read one chunk then cancel.
+	<-ch
+	cancel()
+
+	// Drain the channel; it must close.
+	count := 0
+	for range ch {
+		count++
+	}
+	assert.Less(t, count, 3)
+}
+
+func TestGCSSource_Chunks_SourceMetadata_Format(t *testing.T) {
+	mock := &mockGCSClient{
+		buckets: map[string]*mockBucketHandle{
+			"my-bucket": {
+				name: "my-bucket",
+				objects: []*gcsstorage.ObjectAttrs{
+					{Name: "path/to/file.env", Size: 10},
+				},
+				data: map[string]string{
+					"path/to/file.env": "SECRET=abc",
+				},
+			},
+		},
+	}
+
+	s := New("my-bucket")
+	s.client = mock
+
+	ctx := context.Background()
+	var chunk source.Chunk
+	for chunk = range s.Chunks(ctx) {
+	}
+
+	assert.Equal(t, "gcs", chunk.SourceMetadata.SourceType)
+	assert.Equal(t, "my-bucket/path/to/file.env", chunk.SourceMetadata.FilePath)
+}
+
+func TestGCSSource_Chunks_WithPrefix_FiltersObjects(t *testing.T) {
+	mock := &mockGCSClient{
+		buckets: map[string]*mockBucketHandle{
+			"my-bucket": {
+				name: "my-bucket",
+				objects: []*gcsstorage.ObjectAttrs{
+					{Name: "logs/app.log", Size: 10},
+					{Name: "config/app.yaml", Size: 10},
+				},
+				data: map[string]string{
+					"config/app.yaml": "key: value",
+				},
+			},
+		},
+	}
+
+	s := New("my-bucket", WithPrefix("config/"))
+	s.client = mock
+
+	ctx := context.Background()
+	var chunks []string
+	for chunk := range s.Chunks(ctx) {
+		chunks = append(chunks, chunk.SourceMetadata.FilePath)
+	}
+
+	assert.Len(t, chunks, 1)
+	assert.Equal(t, "my-bucket/config/app.yaml", chunks[0])
+}

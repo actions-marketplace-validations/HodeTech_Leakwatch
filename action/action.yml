@@ -1,0 +1,103 @@
+name: 'Leakwatch Secret Scanner'
+description: 'Scan your codebase for leaked secrets (API keys, passwords, certificates)'
+author: 'cemililik'
+
+branding:
+  icon: 'shield'
+  color: 'red'
+
+inputs:
+  scan-type:
+    description: 'Scan type: fs, git, or image'
+    required: false
+    default: 'fs'
+  path:
+    description: 'Path to scan (for fs/git) or image reference (for image)'
+    required: false
+    default: '.'
+  format:
+    description: 'Output format: json, sarif, csv, table'
+    required: false
+    default: 'sarif'
+  only-verified:
+    description: 'Only report verified active secrets'
+    required: false
+    default: 'false'
+  no-verify:
+    description: 'Disable secret verification'
+    required: false
+    default: 'true'
+  min-severity:
+    description: 'Minimum severity to report: low, medium, high, critical'
+    required: false
+    default: 'low'
+  sarif-upload:
+    description: 'Upload SARIF results to GitHub Code Scanning'
+    required: false
+    default: 'false'
+  version:
+    description: 'Leakwatch version to use'
+    required: false
+    default: 'latest'
+
+outputs:
+  findings-count:
+    description: 'Number of secrets found'
+  sarif-file:
+    description: 'Path to SARIF output file (if format=sarif)'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Leakwatch
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        if [ "$VERSION" = "latest" ]; then
+          go install github.com/cemililik/leakwatch@latest
+        else
+          go install github.com/cemililik/leakwatch@"$VERSION"
+        fi
+
+    - name: Run scan
+      id: scan
+      shell: bash
+      run: |
+        ARGS="scan ${{ inputs.scan-type }} ${{ inputs.path }}"
+        ARGS="$ARGS --format ${{ inputs.format }}"
+        ARGS="$ARGS --min-severity ${{ inputs.min-severity }}"
+
+        if [ "${{ inputs.only-verified }}" = "true" ]; then
+          ARGS="$ARGS --only-verified"
+        fi
+
+        if [ "${{ inputs.no-verify }}" = "true" ]; then
+          ARGS="$ARGS --no-verify"
+        fi
+
+        if [ "${{ inputs.format }}" = "sarif" ]; then
+          ARGS="$ARGS --output results.sarif"
+          echo "sarif-file=results.sarif" >> "$GITHUB_OUTPUT"
+        fi
+
+        set +e
+        leakwatch $ARGS
+        EXIT_CODE=$?
+        set -e
+
+        if [ $EXIT_CODE -eq 1 ]; then
+          echo "findings-count=1" >> "$GITHUB_OUTPUT"
+          echo "::warning::Leakwatch found secrets in your code"
+        elif [ $EXIT_CODE -eq 0 ]; then
+          echo "findings-count=0" >> "$GITHUB_OUTPUT"
+        else
+          echo "::error::Leakwatch scan failed with exit code $EXIT_CODE"
+          exit $EXIT_CODE
+        fi
+
+    - name: Upload SARIF
+      if: inputs.sarif-upload == 'true' && inputs.format == 'sarif'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: results.sarif
+        category: leakwatch

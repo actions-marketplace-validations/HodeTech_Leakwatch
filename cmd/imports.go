@@ -11,3 +11,9 @@ import (
 	_ "github.com/cemililik/leakwatch/internal/detector/slack"
 	_ "github.com/cemililik/leakwatch/internal/detector/stripe"
 )
+
+// Doğrulayıcıları derleme zamanında kaydet (init() ile).
+import (
+	_ "github.com/cemililik/leakwatch/internal/verifier/aws"
+	_ "github.com/cemililik/leakwatch/internal/verifier/github"
+)
