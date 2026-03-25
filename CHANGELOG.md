@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Sprint 2: Hugging Face, DeepSeek, GCP, Azure (Storage + Entra), Okta, Twilio, Mailgun, Vault, Grafana, PagerDuty, CircleCI, GitHub OAuth
   - Sprint 3: PyPI, RubyGems, Docker Hub, DigitalOcean, Heroku, Vercel, New Relic, Sentry, Shopify, Supabase, Cloudflare, Notion, Linear, Figma, Airtable
   - Sprint 4: Terraform, Databricks, Bitbucket, Coinbase, Infura, RabbitMQ, FTP, LDAP, Auth0, LaunchDarkly, Snyk, SonarCloud, Doppler, MS Teams, Postmark
+- **53 verifiers** — verification coverage increased from 4.8% (3/63) to 84% (53/63)
+  - V-1 (Tier 1 P0): OpenAI, Anthropic, GitLab, SendGrid, DigitalOcean, Cloudflare, Heroku, New Relic, Telegram, Discord, Notion
+  - V-2 (Tier 1 P1): Sentry, Vercel, NPM, PyPI, Grafana, PagerDuty, Databricks, Linear, Figma, Airtable, HuggingFace, CircleCI
+  - V-3 (Tier 1 P2): DockerHub, Doppler, Snyk, SonarCloud, Postmark, Terraform, LaunchDarkly, Mailgun, Coinbase, Infura
+  - V-4 (Tier 2): Okta, Shopify, Stripe (live+test), Twilio, Bitbucket, Auth0, Datadog, RubyGems, DeepSeek, Supabase
+  - V-5 (Tier 2+3): GitHub OAuth, Teams Webhook, Azure Storage, Azure Entra, GCP, Snowflake, RabbitMQ
+  - Verification types: **Live API verification** (48 detectors — API call to provider) and **Format validation** (5 detectors — structural check without network call)
+  - Per-provider rate limiting for all verifiers
 - Remediation guidance for all 63 detectors
 - APISIX key patterns added to generic API key detector
 

@@ -1,9 +1,9 @@
 # Leakwatch - Phased Development Roadmap
 
-> **Document Version:** 4.0
-> **Date:** 2026-03-24
+> **Document Version:** 5.0
+> **Date:** 2026-03-25
 > **Status:** Active
-> **Last Updated:** 2026-03-24
+> **Last Updated:** 2026-03-25
 
 ---
 
@@ -18,15 +18,23 @@
 | Phase 5 — Platform Expansion | Completed (8/8) | `v1.0.0` | 2026-03-24 |
 | Phase 6 — Remediation Guidance | Completed | `v1.1.0` | 2026-03-24 |
 | Phase 7 — Slack Scanning | Completed | `v1.2.0` | 2026-03-24 |
-| Phase 8 — Verifier Expansion | Planned | `v1.3.0` | — |
+| Phase 8 — Verifier Expansion | Completed | `v1.3.0` | 2026-03-25 |
 | Phase 9 — Confluence/Jira | Planned | `v1.4.0` | — |
 | Phase 10 — Secrets Inventory | Planned | `v1.5.0` | — |
 | Phase 11 — Honeytokens | Planned | `v1.6.0` | — |
 
+### v1.3.0 Highlights
+
+- **53 verifiers implemented** — verification coverage increased from 4.8% (3/63) to 84% (53/63)
+- **Live API verification** for 48 detectors across cloud, AI/ML, DevTools, CI/CD, communication, payment, monitoring, security, and SaaS categories
+- **Format validation** for 5 detectors (JWT, Azure Storage, Azure Entra, GCP Service Account, Snowflake)
+- **Per-provider rate limiting** for all verifiers with configurable limits
+- **5 implementation sprints** completed: V-1 through V-5
+
 ### v1.0.0 Highlights
 
 - **5 scan sources:** Filesystem, Git history, Container image, AWS S3, Google Cloud Storage
-- **10+ detectors:** AWS, GitHub Token, Slack Token/Webhook, Stripe (live/test), JWT, DB Connection String, Private Key, Generic API Key + YAML custom rules
+- **63 detectors:** AWS, GitHub, Slack, Stripe, JWT, and 58 more across cloud, AI/ML, DevTools, CI/CD, communication, payment, database, infrastructure, identity, monitoring, security, and SaaS categories + YAML custom rules
 - **4 output formats:** JSON, SARIF, CSV, Table
 - **Aho-Corasick hybrid detection engine** with Shannon entropy analysis
 - **Verifier infrastructure:** AWS STS and GitHub API verifiers (rate-limited, concurrent)
@@ -310,31 +318,31 @@ GitHub Release published with `v1.0.0` tag.
 
 ---
 
-## Phase 8: Verifier Expansion — PLANNED
+## Phase 8: Verifier Expansion — COMPLETED
 
 **Goal:** Increase verification coverage from 4.8% (3/63) to 84% (53/63). Verified secrets are the key differentiator.
 
-**Duration:** 5 sprints | **Version:** `v1.3.0` | **Status:** Planned
+**Duration:** 5 sprints | **Version:** `v1.3.0` | **Status:** Completed
 
 **Analysis:** [docs/architecture/05-VERIFIER-ANALYSIS.md](architecture/05-VERIFIER-ANALYSIS.md)
 
 ### Deliverables
 
-| Sprint | Verifiers | Coverage |
-|--------|-----------|----------|
-| V-1 (Tier 1 P0) | OpenAI, Anthropic, GitLab, SendGrid, DigitalOcean, Cloudflare, Heroku, New Relic, Telegram, Discord, Notion | 14/63 (22%) |
-| V-2 (Tier 1 P1) | Sentry, Vercel, NPM, PyPI, Grafana, PagerDuty, Databricks, Linear, Figma, Airtable, HuggingFace, CircleCI | 26/63 (41%) |
-| V-3 (Tier 1 P2) | DockerHub, Doppler, Snyk, SonarCloud, Postmark, Terraform, LaunchDarkly, Mailgun, Coinbase, Infura | 36/63 (57%) |
-| V-4 (Tier 2) | Okta, Shopify, Stripe, Twilio, Bitbucket, Auth0, Datadog, RubyGems, DeepSeek, Supabase | 46/63 (73%) |
-| V-5 (Tier 2+3) | GitHub OAuth, Teams Webhook, Azure Storage, Azure Entra, GCP, Snowflake, RabbitMQ | 53/63 (84%) |
+| Sprint | Verifiers | Coverage | Status |
+|--------|-----------|----------|--------|
+| V-1 (Tier 1 P0) | OpenAI, Anthropic, GitLab, SendGrid, DigitalOcean, Cloudflare, Heroku, New Relic, Telegram, Discord, Notion | 14/63 (22%) | [x] Completed |
+| V-2 (Tier 1 P1) | Sentry, Vercel, NPM, PyPI, Grafana, PagerDuty, Databricks, Linear, Figma, Airtable, HuggingFace, CircleCI | 26/63 (41%) | [x] Completed |
+| V-3 (Tier 1 P2) | DockerHub, Doppler, Snyk, SonarCloud, Postmark, Terraform, LaunchDarkly, Mailgun, Coinbase, Infura | 36/63 (57%) | [x] Completed |
+| V-4 (Tier 2) | Okta, Shopify, Stripe, Twilio, Bitbucket, Auth0, Datadog, RubyGems, DeepSeek, Supabase | 46/63 (73%) | [x] Completed |
+| V-5 (Tier 2+3) | GitHub OAuth, Teams Webhook, Azure Storage, Azure Entra, GCP, Snowflake, RabbitMQ | 53/63 (84%) | [x] Completed |
 
 ### Acceptance Criteria
 
-- [ ] Verification coverage reaches 84%+ (53/63)
-- [ ] All Tier 1 verifiers use simple HTTP GET/POST pattern
-- [ ] Rate limiting per provider (configurable)
-- [ ] `--only-verified` returns results for 53 detector types
-- [ ] Never log raw credentials during verification
+- [x] Verification coverage reaches 84%+ (53/63)
+- [x] All Tier 1 verifiers use simple HTTP GET/POST pattern
+- [x] Rate limiting per provider (configurable)
+- [x] `--only-verified` returns results for 53 detector types
+- [x] Never log raw credentials during verification
 
 ---
 
@@ -451,7 +459,7 @@ GitHub Release published with `v1.0.0` tag.
 | `v1.0.0` | Phase 5 | S3/GCS, verifiers, GitHub Action, Docker | 2026-03-24 |
 | `v1.1.0` | Phase 6 | Remediation guidance for all detectors | — |
 | `v1.2.0` | Phase 7 | Slack workspace scanning | — |
-| `v1.3.0` | Phase 8 | Verifier expansion (4.8% → 84% coverage) | — |
+| `v1.3.0` | Phase 8 | Verifier expansion (4.8% → 84% coverage) | 2026-03-25 |
 | `v1.4.0` | Phase 9 | Confluence/Jira scanning | — |
 | `v1.5.0` | Phase 10 | Secrets inventory (SQLite) | — |
 | `v1.6.0` | Phase 11 | Honeytokens | — |
@@ -479,7 +487,7 @@ GitHub Release published with `v1.0.0` tag.
 | GitHub Stars | 500+ | 2,000+ |
 | Contributors | 5+ | 15+ |
 | Detector count | 50+ | 200+ |
-| Verifier count | 5+ | 20+ |
+| Verifier count | 53 (achieved) | 60+ |
 | Source count | 5 (fs, git, container, S3, GCS) | 8+ |
 
 ---

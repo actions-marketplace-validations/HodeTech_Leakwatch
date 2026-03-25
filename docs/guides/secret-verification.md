@@ -1,14 +1,18 @@
 # Leakwatch - Secret Verification Guide
 
-> **Document Version:** 1.0
-> **Date:** 2026-03-24
+> **Document Version:** 2.0
+> **Date:** 2026-03-25
 > **Status:** Active
 
 ---
 
 ## 1. What is Secret Verification?
 
-Secret verification is the process of checking whether a detected secret is actually active and valid. Leakwatch does this by making controlled, read-only API calls to the service that issued the credential.
+Secret verification is the process of checking whether a detected secret is actually active and valid. Leakwatch ships with **53 verifiers** covering **84% of its 63 built-in detectors**, making it one of the most comprehensive verification systems available under an MIT license.
+
+Verification is performed through two methods:
+- **Live API verification** (48 detectors) -- controlled, read-only API calls to the service that issued the credential
+- **Format validation** (5 detectors) -- structural checks (decode, parse, expiry) without network calls
 
 **Why it matters:**
 
@@ -62,7 +66,97 @@ stateDiagram-v2
 
 ---
 
-## 3. AWS Verification
+## 3. Verified Detectors
+
+Leakwatch provides 53 verifiers across three verification types. The following table shows all verified detectors grouped by verification method.
+
+### Live API Verification (48 detectors)
+
+These verifiers make a read-only API call to the provider to confirm whether the secret is active or inactive.
+
+| Category | Detector | Detector ID | API Endpoint |
+|----------|----------|-------------|-------------|
+| **Cloud** | AWS Access Key | `aws-access-key-id` | STS `GetCallerIdentity` |
+| **Cloud** | DigitalOcean Token | `digitalocean-token` | `api.digitalocean.com/v2/account` |
+| **Cloud** | Cloudflare API Token | `cloudflare-api-token` | `api.cloudflare.com/client/v4/user/tokens/verify` |
+| **Cloud** | Heroku API Key | `heroku-api-key` | `api.heroku.com/account` |
+| **Cloud** | Vercel Token | `vercel-token` | `api.vercel.com/v2/user` |
+| **AI/ML** | OpenAI API Key | `openai-api-key` | `api.openai.com/v1/models` |
+| **AI/ML** | Anthropic API Key | `anthropic-api-key` | `api.anthropic.com/v1/models` |
+| **AI/ML** | Hugging Face Token | `huggingface-token` | `huggingface.co/api/whoami-v2` |
+| **AI/ML** | DeepSeek API Key | `deepseek-api-key` | `api.deepseek.com/models` |
+| **DevTools** | GitHub PAT | `github-token` | `api.github.com/user` |
+| **DevTools** | GitHub OAuth Token | `github-oauth-token` | `api.github.com/user` |
+| **DevTools** | GitLab PAT | `gitlab-pat` | `gitlab.com/api/v4/user` |
+| **DevTools** | Bitbucket App Password | `bitbucket-app-password` | `api.bitbucket.org/2.0/user` |
+| **DevTools** | NPM Token | `npm-token` | `registry.npmjs.org/-/npm/v1/user` |
+| **DevTools** | PyPI Token | `pypi-api-token` | `upload.pypi.org/legacy/` |
+| **DevTools** | RubyGems Key | `rubygems-api-key` | `rubygems.org/api/v1/api_key.json` |
+| **DevTools** | Docker Hub PAT | `dockerhub-pat` | `hub.docker.com/v2/user/login` |
+| **CI/CD** | CircleCI Token | `circleci-token` | `circleci.com/api/v2/me` |
+| **CI/CD** | Terraform Cloud Token | `terraform-cloud-token` | `app.terraform.io/api/v2/account/details` |
+| **Communication** | Slack Bot Token | `slack-token` | `slack.com/api/auth.test` |
+| **Communication** | Discord Bot Token | `discord-bot-token` | `discord.com/api/v10/users/@me` |
+| **Communication** | Telegram Bot Token | `telegram-bot-token` | `api.telegram.org/bot{token}/getMe` |
+| **Email** | SendGrid API Key | `sendgrid-api-key` | `api.sendgrid.com/v3/user/profile` |
+| **Email** | Mailgun API Key | `mailgun-api-key` | `api.mailgun.net/v3/domains` |
+| **Email** | Postmark Server Token | `postmark-server-token` | `api.postmarkapp.com/server` |
+| **Payment** | Stripe Live Key | `stripe-api-key-live` | `api.stripe.com/v1/charges?limit=1` |
+| **Payment** | Stripe Test Key | `stripe-api-key-test` | `api.stripe.com/v1/charges?limit=1` |
+| **Payment** | Coinbase API Key | `coinbase-api-key` | `api.coinbase.com/v2/user` |
+| **Database** | Supabase Service Key | `supabase-service-key` | `{project-ref}.supabase.co/rest/v1/` |
+| **Infrastructure** | Databricks PAT | `databricks-token` | `{workspace}.cloud.databricks.com/api/2.0/clusters/list` |
+| **Identity** | Okta API Token | `okta-api-token` | `{domain}/api/v1/users/me` |
+| **Identity** | Auth0 Management Token | `auth0-management-token` | `{domain}/api/v2/users?per_page=1` |
+| **Identity** | HashiCorp Vault Token | `hashicorp-vault-token` | `{vault-addr}/v1/auth/token/lookup-self` |
+| **Monitoring** | Datadog API Key | `datadog-api-key` | `api.datadoghq.com/api/v1/validate` |
+| **Monitoring** | Grafana API Key | `grafana-api-key` | `grafana.com/api/user` |
+| **Monitoring** | PagerDuty API Key | `pagerduty-api-key` | `api.pagerduty.com/users/me` |
+| **Monitoring** | New Relic API Key | `newrelic-api-key` | `api.newrelic.com/v2/users.json` |
+| **Monitoring** | Sentry Auth Token | `sentry-token` | `sentry.io/api/0/` |
+| **Security** | Snyk API Key | `snyk-api-key` | `api.snyk.io/rest/self` |
+| **Security** | Twilio API Key | `twilio-api-key` | `api.twilio.com/2010-04-01/Accounts.json` |
+| **Secrets Mgmt** | Doppler Service Token | `doppler-token` | `api.doppler.com/v3/me` |
+| **Feature Flags** | LaunchDarkly SDK Key | `launchdarkly-sdk-key` | `app.launchdarkly.com/api/v2/caller-identity` |
+| **Code Quality** | SonarCloud Token | `sonarcloud-token` | `sonarcloud.io/api/authentication/validate` |
+| **SaaS** | Shopify Access Token | `shopify-access-token` | `{shop}.myshopify.com/admin/api/2024-01/shop.json` |
+| **SaaS** | Notion Token | `notion-token` | `api.notion.com/v1/users/me` |
+| **SaaS** | Linear API Key | `linear-api-key` | `api.linear.app/graphql` |
+| **SaaS** | Figma PAT | `figma-pat` | `api.figma.com/v1/me` |
+| **SaaS** | Airtable PAT | `airtable-pat` | `api.airtable.com/v0/meta/whoami` |
+
+### Format Validation (5 detectors)
+
+These verifiers perform structural validation without making network calls. They check format, decode tokens, and validate expiry claims.
+
+| Detector | Detector ID | Validation Method |
+|----------|-------------|-------------------|
+| JWT | `jwt` | Decode and check `exp` claim; validate structural integrity |
+| Azure Storage Key | `azure-storage-key` | HMAC-SHA256 signature format validation |
+| Azure Entra Secret | `azure-entra-secret` | OAuth2 client credential format check |
+| GCP Service Account | `gcp-service-account` | JSON key file structure and private key parsing |
+| Snowflake Credentials | `snowflake-credentials` | Connection string format and credential structure validation |
+
+### Not Verifiable (10 detectors)
+
+These detectors identify secrets that cannot be verified through automated means.
+
+| Detector | Detector ID | Reason |
+|----------|-------------|--------|
+| Private Key | `private-key` | No remote verification endpoint; validity depends on deployment target |
+| Generic API Key | `generic-api-key` | Unknown provider; no way to determine which API to call |
+| Database Connection String | `database-connection-string` | Requires direct database connection; intrusive and unsafe |
+| Redis Connection | `redis-connection-string` | Requires direct network connection to typically internal Redis instance |
+| RabbitMQ Connection | `rabbitmq-connection-string` | Requires direct network connection to broker |
+| FTP/SFTP Credentials | `ftp-credentials` | Requires direct connection to potentially internal FTP servers |
+| LDAP Credentials | `ldap-credentials` | Requires direct connection to LDAP directory server |
+| Slack Webhook | `slack-webhook` | Verification would send a message (side effect) |
+| MS Teams Webhook | `teams-webhook` | Verification would send a message (side effect) |
+| Infura API Key | `infura-api-key` | Uses API quota; high false-positive overlap with generic hex strings |
+
+---
+
+## 4. AWS Verification
 
 ### How It Works
 
@@ -119,7 +213,7 @@ If the Secret Access Key is not found alongside the Access Key ID, verification 
 
 ---
 
-## 4. GitHub Verification
+## 5. GitHub Verification
 
 ### How It Works
 
@@ -161,7 +255,7 @@ When the token is active, the verifier returns:
 
 ---
 
-## 5. CLI Flags
+## 6. CLI Flags
 
 Leakwatch provides flags to control verification behavior on all scan commands (`scan fs`, `scan git`, `scan image`).
 
@@ -186,7 +280,7 @@ leakwatch scan git . --only-verified --min-severity critical
 
 ---
 
-## 6. Rate Limiting and Concurrency
+## 7. Rate Limiting and Concurrency
 
 The verification engine manages API calls carefully to avoid overwhelming provider APIs and to stay within rate limits.
 
@@ -221,7 +315,7 @@ verification:
 
 ---
 
-## 7. Security Considerations
+## 8. Security Considerations
 
 Verification involves sending discovered credentials to provider APIs. Keep the following in mind:
 
@@ -233,7 +327,7 @@ Verification involves sending discovered credentials to provider APIs. Keep the 
 
 ---
 
-## 8. Use Cases and Strategies
+## 9. Use Cases and Strategies
 
 ### CI/CD Pipeline: Two-Phase Approach
 
@@ -288,7 +382,7 @@ flowchart TD
 
 ---
 
-## 9. Next Steps
+## 10. Next Steps
 
 | Topic | Document |
 |-------|----------|

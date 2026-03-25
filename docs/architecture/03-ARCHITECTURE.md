@@ -28,11 +28,11 @@ flowchart LR
         E4[Custom Rules]
     end
 
-    subgraph Verifiers["Verifiers"]
+    subgraph Verifiers["Verifiers (53 verifiers, 84% coverage)"]
         V1[AWS STS]
         V2[GitHub API]
         V3[Slack API]
-        V4[...]
+        V4[Stripe, JWT, ...]
     end
 
     subgraph Output["Output"]

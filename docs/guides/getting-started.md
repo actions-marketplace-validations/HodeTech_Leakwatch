@@ -14,7 +14,7 @@ Leakwatch is a high-performance, open source (MIT) security tool that detects, v
 
 - **63 built-in detectors + unlimited YAML custom rules** -- Covers major cloud providers, AI platforms, CI/CD tools, databases, and SaaS services out of the box, with YAML custom rules for anything else
 - **Hybrid detection engine** -- Aho-Corasick pre-filter, regex validation, and Shannon entropy analysis for a low false positive rate
-- **Secret verification** -- Verifies whether discovered secrets are still active via API calls (AWS, GitHub, Slack, etc.)
+- **Secret verification** -- 53 built-in verifiers with 84% verification coverage confirm whether discovered secrets are still active via API calls (AWS, GitHub, Slack, Stripe, and more)
 - **Multi-source support** -- Filesystem, Git repository, container images, S3, GCS, parallel multi-repo, and Slack
 - **Flexible output** -- JSON, SARIF, CSV, and table formats
 - **Single binary, zero dependencies** -- Runs on every platform, no Docker daemon required
@@ -36,10 +36,11 @@ flowchart LR
         E3["Entropy\nAnalysis"]
     end
 
-    subgraph Dogrulama["Secret Verification"]
+    subgraph Dogrulama["Secret Verification\n(53 verifiers, 84% coverage)"]
         V1["AWS STS"]
         V2["GitHub API"]
         V3["Slack API"]
+        V4["Stripe, JWT, ..."]
     end
 
     Kaynaklar -->|Chunks| E1

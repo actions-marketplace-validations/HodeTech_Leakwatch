@@ -29,9 +29,11 @@ leakwatch/
 │   │   ├── s3/             # AWS S3 bucket source
 │   │   ├── gcs/            # Google Cloud Storage source
 │   │   └── slack/          # Slack workspace source
-│   ├── verifier/           # Secret verification (Verifier interface)
+│   ├── verifier/           # Secret verification (53 verifiers, 84% coverage)
 │   │   ├── aws/            # AWS STS verifier
-│   │   └── github/         # GitHub API verifier
+│   │   ├── github/         # GitHub API verifier
+│   │   ├── ...             # 51 more verifier packages (live API + format validation)
+│   │   └── jwt/            # JWT format validator
 │   ├── entropy/            # Shannon entropy calculation
 │   ├── matcher/            # Aho-Corasick keyword pre-filtering
 │   ├── output/             # Output formatters (Formatter interface)

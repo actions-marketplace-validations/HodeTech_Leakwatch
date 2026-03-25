@@ -454,7 +454,7 @@ flowchart TD
         subgraph LW["Leakwatch Process (non-root)"]
             CMD["CLI Command\n(scan fs/git/image/s3/gcs)"]
             ENG["Detection Engine\n(Aho-Corasick + Regex + Entropy)"]
-            VER["Verification Engine\n(AWS STS, GitHub API)"]
+            VER["Verification Engine\n(53 verifiers, 84% coverage)"]
             FMT["Output Formatter"]
         end
     end
