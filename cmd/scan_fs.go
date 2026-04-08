@@ -67,6 +67,7 @@ func runScanFs(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	cfg.scanRoot = absPath
+	cfg.scanTarget = absPath
 
 	excludePaths, _ := cmd.Flags().GetStringSlice("exclude")
 

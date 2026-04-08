@@ -61,6 +61,7 @@ func runScanS3(cmd *cobra.Command, args []string) error {
 		opts = append(opts, s3source.WithRegion(region))
 	}
 
+	cfg.scanTarget = "s3://" + args[0]
 	src := s3source.New(args[0], opts...)
 
 	return executeScan(cmd.Context(), cfg, src, nil)

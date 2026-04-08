@@ -52,6 +52,7 @@ func runScanImage(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	cfg.scanTarget = args[0]
 	src := container.New(args[0],
 		container.WithMaxFileSize(cfg.maxFileSize),
 	)

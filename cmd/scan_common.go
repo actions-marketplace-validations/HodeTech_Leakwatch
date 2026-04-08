@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -49,6 +50,7 @@ type scanConfig struct {
 	minSeverity       finding.Severity
 	enableRemediation bool
 	scanRoot          string // root path for .leakwatchignore resolution
+	scanTarget        string // display name for scan summary (path, URL, image ref)
 }
 
 // bindScanFlags binds common scan flags to Viper.
@@ -195,19 +197,27 @@ func executeScan(parent context.Context, cfg *scanConfig, src source.Source, cl 
 		return fmt.Errorf("scan failed: %w", err)
 	}
 
-	// Apply .leakwatchignore if file exists in scan root.
-	if cfg.scanRoot != "" {
-		ignorePath := filepath.Join(cfg.scanRoot, ".leakwatchignore")
-		if rules, err := filter.LoadIgnoreFile(ignorePath); err == nil {
-			var filtered []finding.Finding
-			for _, f := range result.Findings {
-				if !rules.ShouldIgnore(f.SourceMetadata.FilePath) {
-					filtered = append(filtered, f)
-				}
-			}
-			result.Findings = filtered
-			slog.Debug("applied .leakwatchignore", "path", ignorePath)
+	// Apply .leakwatchignore — search in scan root first, then CWD.
+	var ignoreRules *filter.IgnoreRules
+	for _, dir := range []string{cfg.scanRoot, "."} {
+		if dir == "" {
+			continue
 		}
+		ignorePath := filepath.Join(dir, ".leakwatchignore")
+		if rules, err := filter.LoadIgnoreFile(ignorePath); err == nil {
+			ignoreRules = rules
+			slog.Debug("loaded .leakwatchignore", "path", ignorePath)
+			break
+		}
+	}
+	if ignoreRules != nil {
+		var filtered []finding.Finding
+		for _, f := range result.Findings {
+			if !ignoreRules.ShouldIgnore(f.SourceMetadata.FilePath) {
+				filtered = append(filtered, f)
+			}
+		}
+		result.Findings = filtered
 	}
 
 	// Enrich findings with remediation guidance if enabled.
@@ -236,12 +246,31 @@ func executeScan(parent context.Context, cfg *scanConfig, src source.Source, cl 
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 
+	// Print scan summary to stderr (visible regardless of output format/file).
+	printScanSummary(result, src.Type(), cfg.scanTarget)
+
 	if len(result.Findings) > 0 {
-		slog.Info("secrets found", "count", len(result.Findings))
 		return &FindingsExitError{Count: len(result.Findings)}
 	}
 
 	return nil
+}
+
+// printScanSummary writes scan metadata to stderr.
+func printScanSummary(result *engine.ScanResult, sourceType string, target string) {
+	fmt.Fprintf(os.Stderr, "\n── Scan Summary ─────────────────────────────────\n")
+	fmt.Fprintf(os.Stderr, "  Date:            %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(os.Stderr, "  Source:          %s\n", sourceType)
+	if target != "" {
+		fmt.Fprintf(os.Stderr, "  Target:          %s\n", target)
+	}
+	fmt.Fprintf(os.Stderr, "  Files scanned:   %d\n", result.ScannedChunks)
+	fmt.Fprintf(os.Stderr, "  Duration:        %s\n", result.Duration.Round(time.Millisecond))
+	fmt.Fprintf(os.Stderr, "  Findings:        %d\n", len(result.Findings))
+	if result.Interrupted {
+		fmt.Fprintf(os.Stderr, "  Status:          interrupted (partial results)\n")
+	}
+	fmt.Fprintf(os.Stderr, "─────────────────────────────────────────────────\n\n")
 }
 
 func parseSeverity(s string) finding.Severity {

@@ -90,6 +90,7 @@ func runScanGit(cmd *cobra.Command, args []string) error {
 		opts = append(opts, gitsource.WithDepth(depth))
 	}
 
+	cfg.scanTarget = args[0]
 	src := gitsource.New(args[0], opts...)
 
 	return executeScan(cmd.Context(), cfg, src, src)

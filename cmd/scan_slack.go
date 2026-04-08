@@ -109,6 +109,7 @@ func runScanSlack(cmd *cobra.Command, _ []string) error {
 		opts = append(opts, slacksource.WithRateLimit(rateLimit))
 	}
 
+	cfg.scanTarget = "slack workspace"
 	src := slacksource.New(token, opts...)
 
 	return executeScan(cmd.Context(), cfg, src, nil)

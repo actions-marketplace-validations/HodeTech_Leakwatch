@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -80,6 +81,8 @@ func runScanRepos(cmd *cobra.Command, args []string) error {
 	if cfg.noVerify {
 		verifierCfg.Enabled = false
 	}
+
+	scanStart := time.Now()
 
 	// Semaphore to limit parallel repo scans.
 	sem := make(chan struct{}, parallel)
@@ -170,7 +173,12 @@ func runScanRepos(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 
-	slog.Info("parallel scan completed", "repos", len(args), "total_findings", len(allFindings))
+	// Print combined summary for all repos.
+	printScanSummary(&engine.ScanResult{
+		Findings:      allFindings,
+		ScannedChunks: len(allFindings), // approximate — per-repo chunk counts not aggregated
+		Duration:      time.Since(scanStart),
+	}, "repos", fmt.Sprintf("%d repositories", len(args)))
 
 	if len(allFindings) > 0 {
 		return &FindingsExitError{Count: len(allFindings)}

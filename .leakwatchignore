@@ -1,0 +1,15 @@
+# Test files contain synthetic secret patterns for detector testing.
+# These are NOT real secrets — they are fixtures that match regex patterns.
+**/*_test.go
+
+# Verifier implementations contain API URL patterns that may match detectors.
+internal/verifier/**
+
+# Go module checksums — hash values can trigger false positives.
+go.sum
+
+# Documentation may contain example patterns.
+docs/**
+
+# Vendor dependencies.
+vendor/**
