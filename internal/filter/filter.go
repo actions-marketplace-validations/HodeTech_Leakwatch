@@ -24,6 +24,26 @@ var defaultBinaryExtensions = map[string]bool{
 	".pdf": true, ".woff": true, ".woff2": true, ".ttf": true, ".eot": true,
 }
 
+// defaultSkipFilenames lists filenames that are always skipped.
+// These are auto-generated files that contain hashes/checksums
+// which frequently trigger false positives.
+var defaultSkipFilenames = map[string]bool{
+	"package-lock.json": true,
+	"yarn.lock":         true,
+	"pnpm-lock.yaml":    true,
+	"composer.lock":     true,
+	"Gemfile.lock":      true,
+	"Cargo.lock":        true,
+	"poetry.lock":       true,
+	"go.sum":            true,
+	"Pipfile.lock":      true,
+}
+
+// IsSkippedFilename checks whether a filename should be skipped.
+func IsSkippedFilename(path string) bool {
+	return defaultSkipFilenames[filepath.Base(path)]
+}
+
 // IsExcludedExtension checks whether a file extension should be excluded.
 func IsExcludedExtension(path string, extraExts []string) bool {
 	ext := strings.ToLower(filepath.Ext(path))

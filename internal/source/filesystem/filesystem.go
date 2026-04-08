@@ -129,6 +129,11 @@ func (s *FilesystemSource) Chunks(ctx context.Context) <-chan source.Chunk {
 }
 
 func (s *FilesystemSource) shouldSkip(path string, d fs.DirEntry) bool {
+	// Skip auto-generated lock files (contain hashes that trigger false positives).
+	if filter.IsSkippedFilename(path) {
+		return true
+	}
+
 	// Extension check
 	if filter.IsExcludedExtension(path, s.excludeExts) {
 		return true

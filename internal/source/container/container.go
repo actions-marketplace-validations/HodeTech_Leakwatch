@@ -140,6 +140,11 @@ func (s *ContainerSource) scanTarLayer(ctx context.Context, ch chan<- source.Chu
 			continue
 		}
 
+		// Skip auto-generated lock files.
+		if filter.IsSkippedFilename(header.Name) {
+			continue
+		}
+
 		// Skip binary extensions.
 		if filter.IsExcludedExtension(header.Name, nil) {
 			continue

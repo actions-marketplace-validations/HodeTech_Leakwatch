@@ -89,6 +89,7 @@ func runScanRepos(cmd *cobra.Command, args []string) error {
 	var mu sync.Mutex
 	var allFindings []finding.Finding
 	var scanErrors []error
+	var totalChunks int
 
 	var wg sync.WaitGroup
 	for _, repoURL := range args {
@@ -138,7 +139,8 @@ func runScanRepos(cmd *cobra.Command, args []string) error {
 
 			if result != nil {
 				allFindings = append(allFindings, result.Findings...)
-				slog.Info("repository scan completed", "url", url, "findings", len(result.Findings))
+				totalChunks += result.ScannedChunks
+				slog.Info("repository scan completed", "url", url, "findings", len(result.Findings), "files", result.ScannedChunks)
 			}
 		}(repoURL)
 	}
@@ -176,7 +178,7 @@ func runScanRepos(cmd *cobra.Command, args []string) error {
 	// Print combined summary for all repos.
 	printScanSummary(&engine.ScanResult{
 		Findings:      allFindings,
-		ScannedChunks: len(allFindings), // approximate — per-repo chunk counts not aggregated
+		ScannedChunks: totalChunks,
 		Duration:      time.Since(scanStart),
 	}, "repos", fmt.Sprintf("%d repositories", len(args)))
 

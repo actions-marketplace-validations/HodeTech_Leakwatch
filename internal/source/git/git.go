@@ -15,6 +15,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
+	"github.com/cemililik/leakwatch/internal/filter"
 	"github.com/cemililik/leakwatch/internal/source"
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
@@ -224,6 +225,11 @@ func (s *GitSource) chunksFullHistory(ctx context.Context, ch chan<- source.Chun
 				return nil
 			}
 
+			// Skip auto-generated lock files.
+			if filter.IsSkippedFilename(f.Name) {
+				return nil
+			}
+
 			content, err := f.Contents()
 			if err != nil {
 				slog.Warn("failed to read file contents", "file", f.Name, "error", err)
@@ -365,6 +371,10 @@ func (s *GitSource) chunksSinceCommit(ctx context.Context, ch chan<- source.Chun
 
 			isBinary, _ := file.IsBinary()
 			if isBinary {
+				continue
+			}
+
+			if filter.IsSkippedFilename(change.To.Name) {
 				continue
 			}
 
