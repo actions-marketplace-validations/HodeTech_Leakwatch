@@ -58,7 +58,7 @@ You can use one of the following methods to install Leakwatch on your system.
 
 ### 2.1 Go Install
 
-If Go 1.22 or higher is installed:
+If Go 1.25 or higher is installed:
 
 ```bash
 go install github.com/cemililik/leakwatch@latest
@@ -110,17 +110,32 @@ leakwatch version v0.x.x (commit: abc1234, built: 2026-03-24)
 
 ---
 
-## 3. First Scan
+## 3. Initial Setup
+
+Before your first scan, generate a configuration file with recommended defaults:
+
+```bash
+# Generate .leakwatch.yaml in the current directory
+leakwatch init
+```
+
+This creates a `.leakwatch.yaml` file with sensible defaults for concurrency, entropy thresholds, verification, and common exclusion patterns. You can customize it later as needed.
+
+---
+
+## 4. First Scan
 
 Leakwatch supports seven scan commands for different source types. Below are basic usage examples for each.
 
-### 3.1 Filesystem Scan (`scan fs`)
+Every scan prints a **summary to stderr** at the end, showing the date, source type, target, files scanned, duration, and findings count. This is useful for quick feedback in both interactive and CI/CD usage.
 
-Scans all files in a directory. Does not examine Git history, only checks current file contents.
+### 4.1 Filesystem Scan (`scan fs`)
+
+Scans all files in a directory. Does not examine Git history, only checks current file contents. When no path is given, it defaults to the current directory.
 
 ```bash
-# Scan current directory
-leakwatch scan fs .
+# Scan current directory (path is optional, defaults to CWD)
+leakwatch scan fs
 
 # Scan a specific project directory
 leakwatch scan fs /path/to/project
@@ -129,12 +144,24 @@ leakwatch scan fs /path/to/project
 leakwatch scan fs /path/to/project --output results.json
 ```
 
+Every scan prints a summary to stderr. Example output:
+
+```
+[Scan Summary]
+  Date     : 2026-04-08 14:22:00
+  Source   : filesystem
+  Target   : /path/to/project
+  Files    : 342
+  Duration : 1.24s
+  Findings : 3
+```
+
 **When to use:**
 - When a quick scan is needed
 - When scanning files that are not in a Git repository
 - When checking build artifacts in CI/CD pipelines
 
-### 3.2 Git Repository Scan (`scan git`)
+### 4.2 Git Repository Scan (`scan git`)
 
 Scans the entire commit history of a Git repository. Also finds secrets in deleted or modified files.
 
@@ -166,7 +193,7 @@ leakwatch scan git https://github.com/org/repo.git --depth 50
 - During PR reviews
 - During regular security audits
 
-### 3.3 Container Image Scan (`scan image`)
+### 4.3 Container Image Scan (`scan image`)
 
 Scans container images layer by layer. Does not require a Docker daemon; reads directly from the registry or local cache.
 
@@ -189,7 +216,7 @@ leakwatch scan image registry.example.com/team/service:main
 - During security audits of third-party images
 - For post-build checks in CI/CD pipelines
 
-### 3.4 S3 Bucket Scan (`scan s3`)
+### 4.4 S3 Bucket Scan (`scan s3`)
 
 Scans objects in an AWS S3 bucket. Uses your default AWS credentials or the credentials configured in your environment.
 
@@ -205,7 +232,7 @@ leakwatch scan s3 my-bucket --prefix config/
 - When auditing cloud storage for accidentally uploaded secrets
 - During security reviews of shared S3 buckets
 
-### 3.5 GCS Bucket Scan (`scan gcs`)
+### 4.5 GCS Bucket Scan (`scan gcs`)
 
 Scans objects in a Google Cloud Storage bucket.
 
@@ -218,7 +245,7 @@ leakwatch scan gcs my-bucket --project my-project
 - When auditing GCP storage for leaked secrets
 - During cloud infrastructure security reviews
 
-### 3.6 Parallel Multi-Repo Scan (`scan repos`)
+### 4.6 Parallel Multi-Repo Scan (`scan repos`)
 
 Scans multiple Git repositories in parallel, useful for auditing an entire organization.
 
@@ -231,7 +258,7 @@ leakwatch scan repos https://github.com/org/repo1 https://github.com/org/repo2 -
 - When auditing all repositories in an organization
 - During large-scale security assessments across multiple projects
 
-### 3.7 Slack Workspace Scan (`scan slack`)
+### 4.7 Slack Workspace Scan (`scan slack`)
 
 Scans messages and files in a Slack workspace for leaked secrets.
 
@@ -246,11 +273,11 @@ leakwatch scan slack --token xoxb-... --channels general,engineering
 
 ---
 
-## 4. Understanding the Output
+## 5. Understanding the Output
 
 By default, Leakwatch writes results to standard output (stdout) in JSON format. Below is an example finding and field descriptions.
 
-### 4.1 Example JSON Output
+### 5.1 Example JSON Output
 
 ```json
 [
@@ -279,7 +306,7 @@ By default, Leakwatch writes results to standard output (stdout) in JSON format.
 ]
 ```
 
-### 4.2 Field Descriptions
+### 5.2 Field Descriptions
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -300,7 +327,9 @@ By default, Leakwatch writes results to standard output (stdout) in JSON format.
 | `detected_at` | string | Time when the finding was detected (ISO 8601) |
 | `entropy` | float | Shannon entropy value (range 0-8) |
 
-### 4.3 Severity Levels
+### 5.3 Severity Levels
+
+> **Note:** When using `--format table`, severity levels are displayed with colors in the terminal: red for critical and high, yellow for medium, and blue for low. Colors are automatically disabled when output is redirected to a file.
 
 | Level | Value | Description | Example |
 |-------|-------|-------------|---------|
@@ -309,7 +338,7 @@ By default, Leakwatch writes results to standard output (stdout) in JSON format.
 | **medium** | 1 | Secrets providing limited access | API Key (read-only) |
 | **low** | 0 | Low-risk or potential secrets | Generic API Key, test token |
 
-### 4.4 Verification Statuses
+### 5.4 Verification Statuses
 
 | Status | Description |
 |--------|-------------|
@@ -330,11 +359,11 @@ stateDiagram-v2
 
 ---
 
-## 5. Common Flags
+## 6. Common Flags
 
 The following flags are shared across all scan commands (`scan fs`, `scan git`, `scan image`, `scan s3`, `scan gcs`, `scan repos`, `scan slack`).
 
-### 5.1 Output Flags
+### 6.1 Output Flags
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
@@ -355,7 +384,7 @@ leakwatch scan fs . --format csv | grep "critical"
 
 > **Security warning:** The `--show-raw` flag shows the full content of secrets. Only use this flag in secure environments. DO NOT use it in CI/CD logs or shared terminals.
 
-### 5.2 Performance Flags
+### 6.2 Performance Flags
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
@@ -370,7 +399,7 @@ leakwatch scan fs . --concurrency 4
 leakwatch scan fs . --max-file-size 52428800
 ```
 
-### 5.3 Verification and Remediation Flags
+### 6.3 Verification and Remediation Flags
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -396,7 +425,7 @@ leakwatch scan git . --only-verified --min-severity critical
 leakwatch scan fs . --remediation
 ```
 
-### 5.4 Git-Specific Flags
+### 6.4 Git-Specific Flags
 
 These flags can only be used with the `scan git` command:
 
@@ -418,7 +447,7 @@ leakwatch scan git . --since-commit HEAD~1
 leakwatch scan git https://github.com/org/repo.git --branch main --depth 100
 ```
 
-### 5.5 General Flags
+### 6.5 General Flags
 
 These flags apply to all commands:
 
@@ -437,7 +466,7 @@ leakwatch scan git . --log-level debug
 
 ---
 
-## 6. Exit Codes
+## 7. Exit Codes
 
 Leakwatch returns meaningful exit codes for easy use in CI/CD pipelines:
 
@@ -478,7 +507,7 @@ flowchart TD
 
 ---
 
-## 7. Scan Pipeline
+## 8. Scan Pipeline
 
 An overview of how Leakwatch executes a scan:
 
@@ -514,11 +543,11 @@ sequenceDiagram
 
 ---
 
-## 8. Quick Reference Table
+## 9. Quick Reference Table
 
 | Task | Command |
 |------|---------|
-| Scan current directory | `leakwatch scan fs .` |
+| Scan current directory | `leakwatch scan fs` |
 | Scan Git history | `leakwatch scan git .` |
 | Scan remote repository | `leakwatch scan git https://github.com/org/repo.git` |
 | Scan container image | `leakwatch scan image nginx:latest` |

@@ -23,6 +23,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Per-provider rate limiting for all verifiers
 - Remediation guidance for all 63 detectors
 - APISIX key patterns added to generic API key detector
+- **`leakwatch init` command** — generates a `.leakwatch.yaml` with recommended defaults
+- **Scan summary** — every scan prints a summary to stderr (date, source type, target, files scanned, duration, findings count)
+- **Colored table output** — severity-colored terminal output (red=critical/high, yellow=medium, blue=low), auto-disabled when writing to a file
+- **Rich help messages** — all commands include Example sections with practical usage patterns
+- **Better error messages** — friendly error messages with help suggestions
+
+### Changed
+- **`scan fs` defaults to current directory** — path argument is now optional (defaults to `.`)
+- **`.leakwatchignore` CWD fallback** — now searches the current working directory if `.leakwatchignore` is not found in the scan root
+
+### Security
+- Upgraded to **Go 1.25.9** (fixes 7 stdlib vulnerabilities)
+- Upgraded to **go-git v5.17.1** (fixes idx file DoS vulnerability)
 
 ---
 

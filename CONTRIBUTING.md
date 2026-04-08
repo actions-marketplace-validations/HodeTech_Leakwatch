@@ -14,7 +14,7 @@ go test -race ./...
 ## Requirements
 
 - Go 1.25+
-- golangci-lint 1.57+
+- golangci-lint v2+
 - Git 2.30+
 
 ## Development Workflow

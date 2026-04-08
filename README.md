@@ -24,6 +24,8 @@
 - **Hybrid detection engine** — Low false positives with Aho-Corasick + Regex + Entropy
 - **Easy extensibility** — YAML for simple rules, Go plugin for advanced ones
 - **Single binary, zero dependencies** — Runs on every platform
+- **Scan summary** — Every scan prints a summary to stderr (date, source, target, files scanned, duration, findings)
+- **Colored terminal output** — Severity-colored table output (red=critical/high, yellow=medium, blue=low), auto-disabled for file output
 
 ---
 
@@ -45,10 +47,20 @@ docker run --rm -v $(pwd):/scan ghcr.io/cemililik/leakwatch:latest scan fs /scan
 curl -sSfL https://github.com/cemililik/Leakwatch/releases/latest/download/leakwatch_$(uname -s)_$(uname -m).tar.gz | tar xz
 ```
 
+### Quick Setup
+
+```bash
+# Generate a recommended .leakwatch.yaml in the current directory
+leakwatch init
+```
+
 ### Usage
 
 ```bash
-# Scan filesystem
+# Scan current directory (default when no path given)
+leakwatch scan fs
+
+# Scan a specific directory
 leakwatch scan fs /path/to/project
 
 # Scan Git repository (full history)
@@ -191,6 +203,8 @@ repos:
 ---
 
 ## Configuration
+
+Create a configuration file with recommended defaults using `leakwatch init`, or write one manually:
 
 ```yaml
 # .leakwatch.yaml

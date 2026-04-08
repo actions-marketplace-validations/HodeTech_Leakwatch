@@ -103,7 +103,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
 
       - name: Leakwatch Scan
         uses: cemililik/leakwatch-action@v1
@@ -142,7 +142,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
 
       - name: Leakwatch Scan
         uses: cemililik/leakwatch-action@v1
@@ -193,7 +193,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
 
       # PR'in base commit'ini bul
       - name: Base commit'i belirle
@@ -250,7 +250,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
 
       - name: Tam gecmis taramasi
         uses: cemililik/leakwatch-action@v1
@@ -305,7 +305,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
 
       - name: Base commit'i belirle
         id: base
@@ -338,7 +338,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
 
       - name: Dosya sistemi taramasi
         uses: cemililik/leakwatch-action@v1
@@ -360,7 +360,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
 
       - name: Tam gecmis taramasi
         uses: cemililik/leakwatch-action@v1
@@ -392,7 +392,7 @@ stages:
 
 leakwatch-scan:
   stage: security
-  image: golang:1.22-alpine
+  image: golang:1.25-alpine
   before_script:
     - go install github.com/cemililik/leakwatch@latest
   script:
@@ -420,7 +420,7 @@ stages:
 
 leakwatch-mr-scan:
   stage: security
-  image: golang:1.22-alpine
+  image: golang:1.25-alpine
   before_script:
     - apk add --no-cache git
     - go install github.com/cemililik/leakwatch@latest
@@ -440,7 +440,7 @@ leakwatch-mr-scan:
 
 leakwatch-full-scan:
   stage: security
-  image: golang:1.22-alpine
+  image: golang:1.25-alpine
   before_script:
     - apk add --no-cache git
     - go install github.com/cemililik/leakwatch@latest
@@ -650,7 +650,7 @@ jobs:
           python-version: '3.12'
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
       - run: pip install pre-commit
       - run: pre-commit run --all-files
 ```
@@ -899,6 +899,40 @@ Use CI/CD notification mechanisms to inform the team when secrets are found:
       }
   env:
     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+```
+
+### 8.7 Scan Summary in CI Logs
+
+Leakwatch prints a scan summary to stderr after every scan. This summary is valuable in CI/CD logs for tracking scan metadata without parsing the structured output:
+
+```
+Scan Summary
+============
+Source:       filesystem
+Path:         /home/runner/work/my-app/my-app
+Duration:     2.34s
+Files:        1,247
+Chunks:       3,891
+Findings:     3
+  Critical:   1
+  High:       1
+  Medium:     1
+  Low:        0
+Verified:     2 / 3
+```
+
+Because the summary is written to stderr, it appears in the CI log even when stdout is redirected to a file (e.g., `--output results.sarif`). This makes it easy to review scan metrics at a glance in GitHub Actions, GitLab CI, or Jenkins build logs without opening the artifact.
+
+Example in a GitHub Actions workflow:
+
+```yaml
+- name: Leakwatch Scan
+  run: |
+    leakwatch scan fs . \
+      --format sarif --output results.sarif \
+      --min-severity medium
+    # The scan summary is printed to stderr and visible
+    # in the step log regardless of --output redirection.
 ```
 
 ---

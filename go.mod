@@ -1,6 +1,6 @@
 module github.com/cemililik/leakwatch
 
-go 1.25.7
+go 1.25.9
 
 require (
 	cloud.google.com/go/storage v1.61.3
@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.2
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.9
 	github.com/cloudflare/ahocorasick v0.0.0-20240916140611-054963ec9396
-	github.com/go-git/go-git/v5 v5.17.0
+	github.com/go-git/go-git/v5 v5.17.1
 	github.com/google/go-containerregistry v0.21.3
 	github.com/slack-go/slack v0.20.0
 	github.com/spf13/cobra v1.10.2

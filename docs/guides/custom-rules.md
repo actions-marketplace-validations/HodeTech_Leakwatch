@@ -46,7 +46,9 @@ flowchart TD
 
 ## 2. YAML Rule Definition Structure
 
-Custom rules are defined under the `custom-rules` field in the `.leakwatch.yaml` file. Each rule contains the following fields:
+Custom rules are defined under the `custom-rules` field in the `.leakwatch.yaml` file. If you do not have a configuration file yet, run `leakwatch init` to generate a starter `.leakwatch.yaml` with sensible defaults -- you can then add your custom rules to it.
+
+Each rule contains the following fields:
 
 ```yaml
 # .leakwatch.yaml
@@ -184,7 +186,7 @@ echo "acme_live_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6" | grep -oP 'acme_(live|test)_[
 
 ### Step 2: Write the YAML Rule
 
-Add the following section to your `.leakwatch.yaml` file:
+If you don't have a `.leakwatch.yaml` yet, create one with `leakwatch init`. Then add the following `custom-rules` section:
 
 ```yaml
 # .leakwatch.yaml

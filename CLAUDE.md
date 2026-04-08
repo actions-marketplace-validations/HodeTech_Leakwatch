@@ -6,7 +6,7 @@ This file defines the standards and context that Claude Code should reference wh
 
 Leakwatch is a high-performance, open source (MIT) security tool that detects, verifies, and reports leaked secrets (API keys, passwords, certificates) in codebases, Git histories, and container images.
 
-**Language:** Go (1.22+)
+**Language:** Go (1.25+)
 **License:** MIT
 **Repo:** https://github.com/cemililik/Leakwatch
 
@@ -15,6 +15,7 @@ Leakwatch is a high-performance, open source (MIT) security tool that detects, v
 ```
 leakwatch/
 ├── cmd/                    # CLI commands (Cobra) — thin layer, no business logic
+│   ├── init.go             # leakwatch init command (generates .leakwatch.yaml)
 ├── internal/               # Internal packages — all business logic lives here
 │   ├── engine/             # Scan engine (worker pool, pipeline)
 │   ├── detector/           # Secret detectors (60 packages, 63 detectors)

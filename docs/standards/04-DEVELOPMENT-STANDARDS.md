@@ -12,9 +12,9 @@
 
 | Tool | Minimum Version | Purpose |
 |------|-----------------|---------|
-| Go | 1.22+ | Primary programming language |
+| Go | 1.25+ | Primary programming language |
 | Git | 2.30+ | Version control |
-| golangci-lint | 1.57+ | Static analysis and linting |
+| golangci-lint | 2.11+ | Static analysis and linting |
 | goreleaser | 2.0+ | Build and release automation |
 | pre-commit | 3.0+ | Git hook management |
 
@@ -246,7 +246,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ['1.22', '1.23']
+        go-version: ['1.25']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -265,10 +265,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
-      - uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
+          go-version: '1.25'
+      - run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
+      - run: golangci-lint run ./... --config .golangci.yml
 
   security:
     runs-on: ubuntu-latest
@@ -276,7 +275,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.25'
       - run: go install golang.org/x/vuln/cmd/govulncheck@latest
       - run: govulncheck ./...
 ```
@@ -302,7 +301,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.25'
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: '~> v2'

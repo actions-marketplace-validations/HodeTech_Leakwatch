@@ -19,9 +19,18 @@
 | Phase 6 — Remediation Guidance | Completed | `v1.1.0` | 2026-03-24 |
 | Phase 7 — Slack Scanning | Completed | `v1.2.0` | 2026-03-24 |
 | Phase 8 — Verifier Expansion | Completed | `v1.3.0` | 2026-03-25 |
+| Phase 8.1 — CLI UX Improvements | Completed | `v1.3.1` | 2026-04-08 |
 | Phase 9 — Confluence/Jira | Planned | `v1.4.0` | — |
 | Phase 10 — Secrets Inventory | Planned | `v1.5.0` | — |
 | Phase 11 — Honeytokens | Planned | `v1.6.0` | — |
+
+### v1.3.1 Highlights
+
+- **Scan summary** — printed to stderr after every scan, showing source, duration, files scanned, findings count, and verification stats
+- **`leakwatch init`** — new command that generates a starter `.leakwatch.yaml` configuration file with sensible defaults
+- **Colored table output** — ANSI colors for severity levels in terminal table formatter (critical=red, high=yellow, medium=cyan, low=white)
+- **Go 1.25.9** — updated toolchain with latest security fixes
+- **`.leakwatchignore` CWD fallback** — when no `.leakwatchignore` is found alongside the config file, Leakwatch now also checks the current working directory
 
 ### v1.3.0 Highlights
 
@@ -460,6 +469,7 @@ GitHub Release published with `v1.0.0` tag.
 | `v1.1.0` | Phase 6 | Remediation guidance for all detectors | — |
 | `v1.2.0` | Phase 7 | Slack workspace scanning | — |
 | `v1.3.0` | Phase 8 | Verifier expansion (4.8% → 84% coverage) | 2026-03-25 |
+| `v1.3.1` | Phase 8.1 | CLI UX: scan summary, init command, colored table | 2026-04-08 |
 | `v1.4.0` | Phase 9 | Confluence/Jira scanning | — |
 | `v1.5.0` | Phase 10 | Secrets inventory (SQLite) | — |
 | `v1.6.0` | Phase 11 | Honeytokens | — |

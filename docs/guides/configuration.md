@@ -37,6 +37,15 @@ flowchart TD
 
 ## 2. Configuration File (.leakwatch.yaml)
 
+The easiest way to create a configuration file is with the `leakwatch init` command:
+
+```bash
+# Generate .leakwatch.yaml with recommended defaults in the current directory
+leakwatch init
+```
+
+This generates a `.leakwatch.yaml` file with sensible defaults for concurrency, entropy thresholds, verification, and common exclusion patterns. You can then customize it as needed.
+
 Leakwatch searches for the configuration file in the following order:
 
 1. The file specified with the `--config` flag (if provided)
@@ -440,11 +449,23 @@ The `.leakwatchignore` file is used to exclude specific files and directories fr
 
 ### 5.1 File Location
 
-The `.leakwatchignore` file should be placed in the scan root directory:
+The `.leakwatchignore` file should be placed in the scan root directory. Leakwatch searches for it using the following fallback order:
+
+1. **Scan root directory** -- the directory being scanned (e.g., the path passed to `scan fs`)
+2. **Current working directory (CWD)** -- if `.leakwatchignore` is not found in the scan root, Leakwatch falls back to the directory where the command was invoked
+
+This fallback is useful when you run a scan against a directory that differs from your working directory. For example, if you keep a shared `.leakwatchignore` in your project root but scan a subdirectory:
+
+```bash
+# CWD is /home/user/project (where .leakwatchignore lives)
+# Scanning a subdirectory that has no .leakwatchignore of its own
+leakwatch scan fs /home/user/project/services/api
+# -> .leakwatchignore is loaded from /home/user/project/
+```
 
 ```
 project/
-├── .leakwatchignore    # Place it here
+├── .leakwatchignore    # Preferred location (scan root)
 ├── .leakwatch.yaml
 ├── src/
 │   └── ...

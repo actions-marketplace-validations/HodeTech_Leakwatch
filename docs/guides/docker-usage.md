@@ -57,6 +57,30 @@ docker run --rm \
   ghcr.io/cemililik/leakwatch:latest scan gcs gs://my-bucket/prefix
 ```
 
+### Scan Summary
+
+Every scan prints a summary to stderr showing source, duration, file count, findings, and verification stats. When writing output to a file with `--output`, the summary still appears in the terminal:
+
+```bash
+docker run --rm -v "$(pwd):/scan:ro" ghcr.io/cemililik/leakwatch:latest scan fs /scan
+```
+
+```
+Scan Summary
+============
+Source:       filesystem
+Path:         /scan
+Duration:     1.87s
+Files:        934
+Chunks:       2,610
+Findings:     2
+  Critical:   0
+  High:       1
+  Medium:     1
+  Low:        0
+Verified:     1 / 2
+```
+
 ---
 
 ## 2. Volume Mounting
@@ -389,7 +413,7 @@ The Leakwatch Docker image uses a multi-stage build:
 
 | Stage | Image | Purpose |
 |-------|-------|---------|
-| Builder | `golang:1.24-alpine` | Compiles the Go binary with `CGO_ENABLED=0` |
+| Builder | `golang:1.25-alpine` | Compiles the Go binary with `CGO_ENABLED=0` |
 | Runtime | `alpine:3.20` | Minimal runtime with `ca-certificates` and `git` |
 
 ### Security Features
