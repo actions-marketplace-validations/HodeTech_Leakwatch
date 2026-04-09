@@ -35,13 +35,13 @@ func TestDetector_Scan_MatchAndReject(t *testing.T) {
 	}{
 		{
 			name:     "valid key with 20 char suffix",
-			input:    validKey,
+			input:    "PAGERDUTY_API_KEY=" + validKey,
 			expected: 1,
 			redacted: "u+****" + validKey[len(validKey)-4:],
 		},
 		{
 			name:     "valid key with longer suffix",
-			input:    longerKey,
+			input:    "pagerduty_token=" + longerKey,
 			expected: 1,
 			redacted: "u+****" + longerKey[len(longerKey)-4:],
 		},
@@ -51,8 +51,18 @@ func TestDetector_Scan_MatchAndReject(t *testing.T) {
 			expected: 1,
 		},
 		{
+			name:     "no match - key without pagerduty context",
+			input:    validKey,
+			expected: 0,
+		},
+		{
+			name:     "no match - npm hash that looks like key",
+			input:    "sha512-u+" + suffix20 + "==",
+			expected: 0,
+		},
+		{
 			name:     "no match - suffix too short",
-			input:    "u+abc123",
+			input:    "pagerduty u+abc123",
 			expected: 0,
 		},
 		{
