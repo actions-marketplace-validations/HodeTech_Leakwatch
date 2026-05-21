@@ -1,9 +1,9 @@
 # Leakwatch - Phased Development Roadmap
 
-> **Document Version:** 6.0
+> **Document Version:** 6.1
 > **Date:** 2026-04-09
-> **Status:** Active
-> **Last Updated:** 2026-04-09
+> **Status:** Approved
+> **Last Updated:** 2026-05-21
 
 ---
 
@@ -466,6 +466,103 @@ GitHub Release published with `v1.0.0` tag.
 - [ ] `leakwatch honeytoken deploy <id> .env` injects into file
 - [ ] Webhook fires when honeytoken is detected in unexpected location
 - [ ] Value shown once during generation, only hash persisted
+
+---
+
+## Known Gaps & Follow-up Work
+
+These are not new phases — they are **work that the current `v1.5.0` release still owes**: features the documentation promises but the code does not (yet) deliver, code-quality findings that survived the PR #6 cleanup pass, and refactors flagged by SonarCloud that need their own focused review. Tracked here so nothing slips through the cracks.
+
+**Source:** PR #6 (chore/docs-cleanup-and-sonar-alignment) verification pass and SonarCloud scan of `cemililik_Leakwatch` taken 2026-05-21.
+
+### P0 — Functional Bugs (documented features that do not work)
+
+Each of these is referenced in the public guides, but the corresponding wiring is missing from the scan pipeline. A user following the docs today will get silently incorrect behavior.
+
+| # | Bug | Evidence | Fix sketch |
+|---|-----|----------|------------|
+| 1 | **YAML `custom-rules:` is never loaded** — `internal/detector/custom.RegisterCustomRules(...)` exists with tests, but no caller anywhere. `.leakwatch.yaml` with `custom-rules:` is silently ignored, breaking the entire Custom Rules feature documented in [custom-rules.md](guides/custom-rules.md) and in the README. | `grep -r RegisterCustomRules .` returns only the definition site and its test; never called from `cmd/`, `engine/`, or `config/`. | Extend `Config` (in [internal/config/config.go](../internal/config/config.go)) with `CustomRules []custom.RuleDef`, bind via Viper; in [cmd/scan_common.go](../cmd/scan_common.go) `executeScan` call `custom.RegisterCustomRules(cfg.CustomRules)` **before** engine construction. |
+| 2 | **Inline ignore (`# leakwatch:ignore` / `# leakwatch:ignore:<id>`) is not applied** — [internal/filter/inline.go](../internal/filter/inline.go) exposes `HasInlineIgnore`, `HasInlineIgnoreForDetector`, `FilterFindingsByInlineIgnore` with passing tests, but `executeScan` never invokes them. README, [configuration.md §6](guides/configuration.md), and [ci-cd-integration.md §7.3](guides/ci-cd-integration.md) all promise this works. | `grep -r FilterFindingsByInlineIgnore .` returns the definition + tests only. | Two viable approaches: (a) post-scan filter in `executeScan` using cached source data (requires engine to keep chunk text); (b) detector-level check inside the engine where `chunkData` and `lineNum` are already known. (b) is cleaner — extend the engine's `processChunk` to consult `inline.HasInlineIgnoreForDetector` before emitting a `RawFinding`. |
+| 3 | **`verification.*` YAML config is not bound** — `verification.enabled`, `verification.timeout`, `verification.concurrency`, `verification.rate-limit` are emitted into `.leakwatch.yaml` by `leakwatch init` (see [cmd/init.go](../cmd/init.go)) and documented in [configuration.md §2.1-§2.2](guides/configuration.md), but `internal/config/config.go` has no `VerificationConfig` struct. Users editing these values get no effect. | `grep -E "verification|VerificationConfig" internal/config/` is empty. | Add `VerificationConfig` to `Config` with fields `Enabled bool`, `Timeout time.Duration`, `Concurrency int`, `RateLimit float64`; bind keys in Viper init; flow through `addVerifyFlags` overrides in `cmd/scan_common.go` so CLI > env > config > defaults precedence holds. |
+
+**Suggested follow-up branch:** `fix/wire-custom-rules-and-inline-ignore` — bundle (1) and (2) since they share the same `executeScan` integration surface. (3) is independent and can go in a separate small PR.
+
+### P1 — Config Schema Drift
+
+`docs/guides/configuration.md` documents YAML keys beyond the three P0 items above; `internal/config/config.go` does not read them. They silently no-op today.
+
+| YAML key | Documented at | Current behavior |
+|---|---|---|
+| `output.severity-threshold` | configuration.md:143, 220 | Only `--min-severity` CLI flag is read. |
+| `filter.exclude-detectors` | configuration.md:120-122, 211 | Not bound; no detector-disable path exists in the engine. |
+| `slack.token`, `slack.channels`, `slack.exclude-channels`, `slack.include-dms`, `slack.include-files`, `slack.rate-limit` | configuration.md:239-255 | Only `--token` / `LEAKWATCH_SLACK_TOKEN` env is read; the other six knobs come from CLI flags exclusively. |
+
+**Plan:** either bind these keys in Viper and route them through `cmd/scan_*.go`, or remove them from `configuration.md` to stop over-promising. Recommend binding — they are useful config sources.
+
+### P1 — SonarCloud Findings Still Open
+
+PR #6 closed: 8 BLOCKER vulns (`action.yml` script injection), 110 × `godre:S8184` blank-import smell, 13 × `go:S1192` in `remediation/guidance.go`, 2 hotspots (Dockerfile + release.yml). Remaining open findings as of the 2026-05-21 scan:
+
+| Rule | Count | Severity | Where | Plan |
+|---|---:|---|---|---|
+| `go:S3776` Cognitive complexity > 15 | 11 funcs | Critical | [internal/source/git/git.go:269](../internal/source/git/git.go) (**cog 49**), `s3.go:122` (31), `git.go:164` (29), `cmd/scan_common.go:154` (29), `scan_repos.go:60` (26), `filesystem.go:67` (24), `container.go:116` (22), `sarif_formatter.go:121` (22), `slack.go:196` (19), `gcs.go:174` (16), `table_formatter.go:37` (16) | Extract-method refactor per function. `git.go:269` is the highest priority (49 ≫ 15). |
+| `go:S1192` | 1 | Critical | `internal/verifier/infura/infura_verifier.go:93` — `"Infura API key is invalid or revoked"` ×3 | Local `const`. |
+| `go:S108` Empty test block | 2 | Major | `gcs_test.go:321`, `s3_test.go:242` | Either remove or add `TODO` + meaningful assertion. |
+| `godre:S8196` One-method interface naming | 3 | Minor | `cmd/scan_common.go:34`, `internal/source/gcs/gcs.go:45`, `internal/verifier/aws/aws_verifier.go:22` | Rename to `-er` suffix (project naming convention). |
+| `godre:S8205` Nested anonymous struct | 2 | Minor | `terraform_verifier.go:107`, `linear_verifier.go:112` | Promote to named type. |
+| `godre:S8209` Consecutive same-type params | 1 | Minor | `internal/filter/inline.go:27` | Group params (`a, b string` rather than `a string, b string`). |
+| `typescript:S6551` | 7 | Minor | `vscode/src/scanner.ts` | Replace `?? ""` non-string fallbacks with explicit `String(...)` casts. |
+| `typescript:S7772` | 2-3 | Minor | `vscode/src/extension.ts`, `scanner.ts`, `webpack.config.js` | Use `node:` prefix for `path`, `child_process`. |
+| `typescript:S7778` | 2 | Minor | `vscode/src/extension.ts` | Combine consecutive `push(a); push(b);` into `push(a, b)`. |
+| `docker:S7020` | 1 | Minor | `Dockerfile:11` | Likely already closed by the PR #6 line split; verify on next scan. |
+
+### P1 — SonarCloud Project Hygiene
+
+- **Quality Gate is `NONE`.** Even after this PR's findings drop, the gate will not enforce on PRs until a profile (e.g. "Sonar way") is assigned. **Action:** assign a gate via SonarCloud UI → Project Settings → Quality Gate. Not actionable from a PR.
+- **No `sonar-project.properties` and no `.github/workflows/sonar.yml`.** PR #6's plan provided draft contents for both; once `SONAR_TOKEN` is added as a repo secret, adding these two files would put Sonar in CI for every PR. **Action:** track as a small chore PR.
+
+### P2 — Duplication Refactor Opportunities
+
+SonarCloud reports the project at **36.8% duplicated lines**. PR #6 dramatically reduced one source (the remediation registry — was 99.3% density). Remaining major duplication clusters:
+
+| Refactor | Files affected | Estimated dedup |
+|---|---|---|
+| **`internal/verifier/httpapi` generic HTTP helper** (Bearer/Basic + JSON body + status-code → `VerificationStatus` map) | 14+ verifier packages (anthropic, openai, deepseek, github, huggingface, gitlab, dockerhub, discord, circleci, etc., each at ~95% density and ~100-130 lines) | ~6 000 → ~1 000 duplicate lines |
+| **`internal/verifier/testutil/verifierharness`** table-driven HTTP mock | 14+ `_test.go` files mirror the same setup/teardown for table-driven HTTP tests (sendgrid, snyk, rubygems, npm, dockerhub, heroku, sentry, notion, ...) | ~1 500 → ~300 duplicate lines |
+| **`internal/detector/credstring`** common `scheme://user:pass@host` detector | 4 connection-string detectors (FTP, Redis, RabbitMQ, LDAP — tests are ~92% byte-identical) and their tests | ~500 → ~150 duplicate lines |
+
+Combined target: **project duplication 36.8% → ~10%**. Each of these is architectural — open a dedicated PR per refactor, not a mega-commit.
+
+### P2 — Coverage Gaps
+
+CLAUDE.md sets the detector-coverage standard at **≥95%**. Packages currently below or at the edge:
+
+| Package | Coverage | Standard | Note |
+|---|---:|---|---|
+| `detector/generic` | 82.1% | 95% | Entropy paths not all exercised. |
+| `detector/heroku` | 93.8% | 95% | One regex branch uncovered. |
+| `detector/privatekey` | 92.3% | 95% | DSA / EC / PGP branches less covered than RSA / SSH. |
+| `detector/snowflake` | 92.3% | 95% | Format validator edge cases. |
+| `detector/stripe` | 92.3% | 95% | Live + test key duplication; testutil refactor (P2 above) helps here. |
+
+Source packages (no formal standard, but visible gaps):
+
+| Package | Coverage |
+|---|---:|
+| `source/container` | 55.2% |
+| `source/git` | 64.2% |
+| `source/gcs` | 71.3% |
+| `source/s3` | 73.6% |
+
+### P2 — Miscellaneous
+
+- **VS Code extension custom rules path setting** ([vscode-extension.md](guides/vscode-extension.md) `leakwatch.customRulesPath`) is wired through to the CLI via `--custom-rules`, but the CLI side does nothing until P0 #1 is fixed. Will auto-resolve.
+- **JWT format-only verifier (optional future):** `internal/verifier/jwt/` does not exist. If we ever want format-only verification for JWTs (decode + `exp` check) we need a new verification status semantic ("verified_well_formed" or similar) to avoid implying the token grants access. Until then, JWT findings are correctly classified as "Not Verifiable".
+
+### P3 — Long-tail Notes
+
+- **Missing `v1.1.0` / `v1.2.0` git tags:** Phase 6 and Phase 7 were released as part of `v1.3.0` without intermediate tags. Backfilling tags retroactively is optional (`git tag v1.1.0 <commit>; git tag v1.2.0 <commit>; git push --tags`) — useful for some package indexers, not blocking. See note under Release Plan.
+- **Self-scan noise from test fixtures:** detector and verifier tests embed synthetic keys that match their own regex. `.leakwatchignore` already excludes `**/*_test.go` and `internal/verifier/**` for user-facing scans; running `leakwatch scan fs .` inside this repo with the default ignore will still find a handful in `rules/examples.yaml` and docs — acceptable.
 
 ---
 
