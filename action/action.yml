@@ -51,37 +51,43 @@ runs:
   steps:
     - name: Install Leakwatch
       shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
       run: |
-        VERSION="${{ inputs.version }}"
-        if [ "$VERSION" = "latest" ]; then
+        if [ "$INPUT_VERSION" = "latest" ]; then
           go install github.com/cemililik/leakwatch@latest
         else
-          go install github.com/cemililik/leakwatch@"$VERSION"
+          go install "github.com/cemililik/leakwatch@$INPUT_VERSION"
         fi
 
     - name: Run scan
       id: scan
       shell: bash
+      env:
+        INPUT_SCAN_TYPE: ${{ inputs.scan-type }}
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_MIN_SEVERITY: ${{ inputs.min-severity }}
+        INPUT_ONLY_VERIFIED: ${{ inputs.only-verified }}
+        INPUT_NO_VERIFY: ${{ inputs.no-verify }}
       run: |
-        ARGS="scan ${{ inputs.scan-type }} ${{ inputs.path }}"
-        ARGS="$ARGS --format ${{ inputs.format }}"
-        ARGS="$ARGS --min-severity ${{ inputs.min-severity }}"
+        ARGS=(scan "$INPUT_SCAN_TYPE" "$INPUT_PATH" --format "$INPUT_FORMAT" --min-severity "$INPUT_MIN_SEVERITY")
 
-        if [ "${{ inputs.only-verified }}" = "true" ]; then
-          ARGS="$ARGS --only-verified"
+        if [ "$INPUT_ONLY_VERIFIED" = "true" ]; then
+          ARGS+=(--only-verified)
         fi
 
-        if [ "${{ inputs.no-verify }}" = "true" ]; then
-          ARGS="$ARGS --no-verify"
+        if [ "$INPUT_NO_VERIFY" = "true" ]; then
+          ARGS+=(--no-verify)
         fi
 
-        if [ "${{ inputs.format }}" = "sarif" ]; then
-          ARGS="$ARGS --output results.sarif"
+        if [ "$INPUT_FORMAT" = "sarif" ]; then
+          ARGS+=(--output results.sarif)
           echo "sarif-file=results.sarif" >> "$GITHUB_OUTPUT"
         fi
 
         set +e
-        leakwatch $ARGS
+        leakwatch "${ARGS[@]}"
         EXIT_CODE=$?
         set -e
 
