@@ -1,8 +1,8 @@
 # Leakwatch - Code Review Standards
 
-> **Document Version:** 1.0
-> **Date:** 2026-03-24
-> **Status:** Draft
+> **Document Version:** 1.1
+> **Date:** 2026-05-22
+> **Status:** Approved
 
 ---
 

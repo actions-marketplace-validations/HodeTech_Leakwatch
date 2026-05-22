@@ -288,10 +288,13 @@ jobs:
   slack-scan:
     runs-on: ubuntu-latest
     steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
       - name: Install Leakwatch
-        run: |
-          curl -sSL https://github.com/cemililik/Leakwatch/releases/latest/download/leakwatch_linux_amd64.tar.gz | tar xz
-          sudo mv leakwatch /usr/local/bin/
+        run: go install github.com/cemililik/leakwatch@latest
 
       - name: Scan Slack workspace
         env:

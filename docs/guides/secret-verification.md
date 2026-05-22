@@ -8,7 +8,7 @@
 
 ## 1. What is Secret Verification?
 
-Secret verification is the process of checking whether a detected secret is actually active and valid. Leakwatch ships with **54 verifiers (51 packages)** covering **84% of its 64 detectors (60 packages)**, making it one of the most comprehensive verification systems available under an MIT license.
+Secret verification is the process of checking whether a detected secret is actually active and valid. Leakwatch ships with **54 verifiers (51 packages)** covering **85.7% of its 63 detectors (60 packages)**, making it one of the most comprehensive verification systems available under an MIT license.
 
 Verification is performed through two methods:
 - **Live API verification** (48 detectors) -- controlled, read-only API calls to the service that issued the credential
