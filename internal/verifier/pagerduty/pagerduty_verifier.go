@@ -13,6 +13,7 @@ import (
 
 	"github.com/cemililik/leakwatch/internal/detector"
 	"github.com/cemililik/leakwatch/internal/verifier"
+	"github.com/cemililik/leakwatch/internal/verifier/internal/httpx"
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
@@ -68,7 +69,7 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 
 	client := v.httpClient
 	if client == nil {
-		client = http.DefaultClient
+		client = httpx.Client()
 	}
 
 	resp, err := client.Do(req)
@@ -81,6 +82,17 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// A redirect from an API endpoint means the credential context is wrong
+	// (for example a login redirect or a moved host). The shared client does
+	// not follow redirects so the credential is never re-sent to the redirect
+	// target; treat it as a verification error rather than an active secret.
+	if httpx.IsRedirect(resp.StatusCode) {
+		return finding.VerificationResult{
+			Status:  finding.StatusVerifyError,
+			Message: fmt.Sprintf("unexpected redirect (status %d)", resp.StatusCode),
+		}
+	}
+
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return handleActiveKey(ctx, resp.Body)
@@ -91,7 +103,8 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 			Message: "PagerDuty API key is invalid or revoked",
 		}
 	default:
-		slog.ErrorContext(ctx, "pagerduty verifier: unexpected status code",
+		slog.ErrorContext(
+			ctx, "pagerduty verifier: unexpected status code",
 			slog.Int("status_code", resp.StatusCode),
 		)
 		return finding.VerificationResult{
@@ -109,11 +122,11 @@ func handleActiveKey(ctx context.Context, body io.Reader) finding.VerificationRe
 		} `json:"user"`
 	}
 
-	if err := json.NewDecoder(body).Decode(&resp); err != nil {
+	if err := json.NewDecoder(httpx.LimitReader(body)).Decode(&resp); err != nil {
 		slog.ErrorContext(ctx, "pagerduty verifier: failed to decode response", slog.String("error", err.Error()))
 		return finding.VerificationResult{
-			Status:  finding.StatusVerifiedActive,
-			Message: "PagerDuty API key is active (could not parse user info)",
+			Status:  finding.StatusVerifyError,
+			Message: fmt.Sprintf("200 OK but failed to decode response body: %v", err),
 		}
 	}
 
@@ -121,7 +134,8 @@ func handleActiveKey(ctx context.Context, body io.Reader) finding.VerificationRe
 		"user_name": resp.User.Name,
 	}
 
-	slog.InfoContext(ctx, "pagerduty verifier: API key is active",
+	slog.InfoContext(
+		ctx, "pagerduty verifier: API key is active",
 		slog.String("user_name", resp.User.Name),
 	)
 

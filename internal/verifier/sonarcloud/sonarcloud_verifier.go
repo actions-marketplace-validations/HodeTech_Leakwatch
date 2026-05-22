@@ -12,6 +12,7 @@ import (
 
 	"github.com/cemililik/leakwatch/internal/detector"
 	"github.com/cemililik/leakwatch/internal/verifier"
+	"github.com/cemililik/leakwatch/internal/verifier/internal/httpx"
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
@@ -67,7 +68,7 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 
 	client := v.httpClient
 	if client == nil {
-		client = http.DefaultClient
+		client = httpx.Client()
 	}
 
 	resp, err := client.Do(req)
@@ -80,6 +81,17 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// A redirect from an API endpoint means the credential context is wrong
+	// (for example a login redirect or a moved host). The shared client does
+	// not follow redirects so the credential is never re-sent to the redirect
+	// target; treat it as a verification error rather than an active secret.
+	if httpx.IsRedirect(resp.StatusCode) {
+		return finding.VerificationResult{
+			Status:  finding.StatusVerifyError,
+			Message: fmt.Sprintf("unexpected redirect (status %d)", resp.StatusCode),
+		}
+	}
+
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return handleValidateResponse(ctx, resp.Body)
@@ -90,7 +102,8 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 			Message: "SonarCloud token is invalid or revoked",
 		}
 	default:
-		slog.ErrorContext(ctx, "sonarcloud verifier: unexpected status code",
+		slog.ErrorContext(
+			ctx, "sonarcloud verifier: unexpected status code",
 			slog.Int("status_code", resp.StatusCode),
 		)
 		return finding.VerificationResult{
@@ -106,7 +119,7 @@ func handleValidateResponse(ctx context.Context, body io.Reader) finding.Verific
 		Valid bool `json:"valid"`
 	}
 
-	if err := json.NewDecoder(body).Decode(&validation); err != nil {
+	if err := json.NewDecoder(httpx.LimitReader(body)).Decode(&validation); err != nil {
 		slog.ErrorContext(ctx, "sonarcloud verifier: failed to decode response", slog.String("error", err.Error()))
 		return finding.VerificationResult{
 			Status:  finding.StatusVerifyError,

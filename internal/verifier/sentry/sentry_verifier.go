@@ -1,5 +1,8 @@
 // Package sentry provides a verifier for Sentry authentication tokens.
-// It uses the Sentry API GET /api/0/ endpoint to check token validity.
+// It uses the auth-required Sentry API GET /api/0/organizations/ endpoint to
+// check token validity. The API root (/api/0/) responds 200 without
+// authentication, so it cannot distinguish a valid token from an invalid one
+// and must not be used for verification.
 package sentry
 
 import (
@@ -10,6 +13,7 @@ import (
 
 	"github.com/cemililik/leakwatch/internal/detector"
 	"github.com/cemililik/leakwatch/internal/verifier"
+	"github.com/cemililik/leakwatch/internal/verifier/internal/httpx"
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
@@ -52,7 +56,10 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 		apiURL = defaultAPIURL
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL+"/api/0/", nil)
+	// Use an auth-required endpoint: /api/0/ responds 200 without authentication
+	// (false positive), whereas /api/0/organizations/ returns 401 for an invalid
+	// token.
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL+"/api/0/organizations/", nil)
 	if err != nil {
 		slog.ErrorContext(ctx, "sentry verifier: failed to create request", slog.String("error", err.Error()))
 		return finding.VerificationResult{
@@ -65,7 +72,7 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 
 	client := v.httpClient
 	if client == nil {
-		client = http.DefaultClient
+		client = httpx.Client()
 	}
 
 	resp, err := client.Do(req)
@@ -77,6 +84,17 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 		}
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	// A redirect from an API endpoint means the credential context is wrong
+	// (for example a login redirect or a moved host). The shared client does
+	// not follow redirects so the credential is never re-sent to the redirect
+	// target; treat it as a verification error rather than an active secret.
+	if httpx.IsRedirect(resp.StatusCode) {
+		return finding.VerificationResult{
+			Status:  finding.StatusVerifyError,
+			Message: fmt.Sprintf("unexpected redirect (status %d)", resp.StatusCode),
+		}
+	}
 
 	switch resp.StatusCode {
 	case http.StatusOK:
@@ -92,7 +110,8 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 			Message: "Sentry token is invalid or revoked",
 		}
 	default:
-		slog.ErrorContext(ctx, "sentry verifier: unexpected status code",
+		slog.ErrorContext(
+			ctx, "sentry verifier: unexpected status code",
 			slog.Int("status_code", resp.StatusCode),
 		)
 		return finding.VerificationResult{

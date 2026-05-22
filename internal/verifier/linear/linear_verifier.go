@@ -13,6 +13,7 @@ import (
 
 	"github.com/cemililik/leakwatch/internal/detector"
 	"github.com/cemililik/leakwatch/internal/verifier"
+	"github.com/cemililik/leakwatch/internal/verifier/internal/httpx"
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
@@ -71,7 +72,7 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 
 	client := v.httpClient
 	if client == nil {
-		client = http.DefaultClient
+		client = httpx.Client()
 	}
 
 	resp, err := client.Do(req)
@@ -84,6 +85,17 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// A redirect from an API endpoint means the credential context is wrong
+	// (for example a login redirect or a moved host). The shared client does
+	// not follow redirects so the credential is never re-sent to the redirect
+	// target; treat it as a verification error rather than an active secret.
+	if httpx.IsRedirect(resp.StatusCode) {
+		return finding.VerificationResult{
+			Status:  finding.StatusVerifyError,
+			Message: fmt.Sprintf("unexpected redirect (status %d)", resp.StatusCode),
+		}
+	}
+
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return handleOKResponse(ctx, resp.Body)
@@ -94,7 +106,8 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 			Message: "Linear API key is invalid or revoked",
 		}
 	default:
-		slog.ErrorContext(ctx, "linear verifier: unexpected status code",
+		slog.ErrorContext(
+			ctx, "linear verifier: unexpected status code",
 			slog.Int("status_code", resp.StatusCode),
 		)
 		return finding.VerificationResult{
@@ -119,7 +132,7 @@ func handleOKResponse(ctx context.Context, body io.Reader) finding.VerificationR
 		} `json:"errors"`
 	}
 
-	if err := json.NewDecoder(body).Decode(&resp); err != nil {
+	if err := json.NewDecoder(httpx.LimitReader(body)).Decode(&resp); err != nil {
 		slog.ErrorContext(ctx, "linear verifier: failed to decode response", slog.String("error", err.Error()))
 		return finding.VerificationResult{
 			Status:  finding.StatusVerifyError,
@@ -128,7 +141,8 @@ func handleOKResponse(ctx context.Context, body io.Reader) finding.VerificationR
 	}
 
 	if len(resp.Errors) > 0 {
-		slog.DebugContext(ctx, "linear verifier: API key returned errors",
+		slog.DebugContext(
+			ctx, "linear verifier: API key returned errors",
 			slog.String("error", resp.Errors[0].Message),
 		)
 		return finding.VerificationResult{
@@ -142,7 +156,8 @@ func handleOKResponse(ctx context.Context, body io.Reader) finding.VerificationR
 			"name": resp.Data.Viewer.Name,
 		}
 
-		slog.InfoContext(ctx, "linear verifier: API key is active",
+		slog.InfoContext(
+			ctx, "linear verifier: API key is active",
 			slog.String("name", resp.Data.Viewer.Name),
 		)
 

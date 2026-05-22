@@ -1,5 +1,9 @@
 // Package gcp provides a verifier for GCP service account keys.
-// It validates the JSON structure without making any API calls.
+//
+// It validates the JSON structure without making any API calls. Because no
+// live verification is performed, the result is always StatusUnverified: a
+// valid structure does not prove the key is active, and an invalid structure
+// does not prove it is inactive.
 package gcp
 
 import (
@@ -48,41 +52,44 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 
 	var key serviceAccountKey
 	if err := json.Unmarshal(raw.Raw, &key); err != nil {
-		slog.DebugContext(ctx, "gcp verifier: failed to parse JSON",
+		slog.DebugContext(
+			ctx, "gcp verifier: failed to parse JSON",
 			slog.String("error", err.Error()),
 		)
 		return finding.VerificationResult{
-			Status:  finding.StatusVerifiedInactive,
-			Message: "invalid JSON structure",
+			Status:  finding.StatusUnverified,
+			Message: "format invalid (invalid JSON structure); live verification not supported",
 		}
 	}
 
 	if key.Type != "service_account" {
-		slog.DebugContext(ctx, "gcp verifier: unexpected type field",
+		slog.DebugContext(
+			ctx, "gcp verifier: unexpected type field",
 			slog.String("type", key.Type),
 		)
 		return finding.VerificationResult{
-			Status:  finding.StatusVerifiedInactive,
-			Message: "JSON type field is not service_account",
+			Status:  finding.StatusUnverified,
+			Message: "format invalid (JSON type field is not service_account); live verification not supported",
 		}
 	}
 
 	if key.ProjectID == "" || key.PrivateKeyID == "" || key.ClientEmail == "" {
 		slog.DebugContext(ctx, "gcp verifier: missing required fields")
 		return finding.VerificationResult{
-			Status:  finding.StatusVerifiedInactive,
-			Message: "missing required fields in service account key",
+			Status:  finding.StatusUnverified,
+			Message: "format invalid (missing required fields in service account key); live verification not supported",
 		}
 	}
 
-	slog.InfoContext(ctx, "gcp verifier: service account key format validated",
+	slog.DebugContext(
+		ctx, "gcp verifier: service account key format validated",
 		slog.String("project_id", key.ProjectID),
 		slog.String("client_email", key.ClientEmail),
 	)
 
 	return finding.VerificationResult{
-		Status:  finding.StatusVerifiedActive,
-		Message: "Service account key format validated",
+		Status:  finding.StatusUnverified,
+		Message: "format valid; live verification not supported (would require GCP OAuth2 token exchange)",
 		ExtraData: map[string]string{
 			"project_id":   key.ProjectID,
 			"client_email": key.ClientEmail,

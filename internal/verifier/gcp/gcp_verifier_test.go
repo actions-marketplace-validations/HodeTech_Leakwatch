@@ -15,7 +15,7 @@ func TestVerifier_Type_ReturnsCorrectID(t *testing.T) {
 	assert.Equal(t, "gcp-service-account", v.Type())
 }
 
-func TestVerify_ValidServiceAccountKey_ReturnsActive(t *testing.T) {
+func TestVerify_ValidServiceAccountKey_ReturnsUnverified(t *testing.T) {
 	v := &Verifier{}
 
 	raw := detector.RawFinding{
@@ -35,13 +35,13 @@ func TestVerify_ValidServiceAccountKey_ReturnsActive(t *testing.T) {
 
 	result := v.Verify(context.Background(), raw)
 
-	assert.Equal(t, finding.StatusVerifiedActive, result.Status)
-	assert.Equal(t, "Service account key format validated", result.Message)
+	assert.Equal(t, finding.StatusUnverified, result.Status)
+	assert.Contains(t, result.Message, "format valid")
 	assert.Equal(t, "my-project-123", result.ExtraData["project_id"])
 	assert.Equal(t, "sa@my-project-123.iam.gserviceaccount.com", result.ExtraData["client_email"])
 }
 
-func TestVerify_InvalidJSON_ReturnsInactive(t *testing.T) {
+func TestVerify_InvalidJSON_ReturnsUnverified(t *testing.T) {
 	v := &Verifier{}
 
 	raw := detector.RawFinding{
@@ -52,11 +52,11 @@ func TestVerify_InvalidJSON_ReturnsInactive(t *testing.T) {
 
 	result := v.Verify(context.Background(), raw)
 
-	assert.Equal(t, finding.StatusVerifiedInactive, result.Status)
-	assert.Equal(t, "invalid JSON structure", result.Message)
+	assert.Equal(t, finding.StatusUnverified, result.Status)
+	assert.Contains(t, result.Message, "format invalid")
 }
 
-func TestVerify_WrongType_ReturnsInactive(t *testing.T) {
+func TestVerify_WrongType_ReturnsUnverified(t *testing.T) {
 	v := &Verifier{}
 
 	raw := detector.RawFinding{
@@ -72,11 +72,11 @@ func TestVerify_WrongType_ReturnsInactive(t *testing.T) {
 
 	result := v.Verify(context.Background(), raw)
 
-	assert.Equal(t, finding.StatusVerifiedInactive, result.Status)
-	assert.Equal(t, "JSON type field is not service_account", result.Message)
+	assert.Equal(t, finding.StatusUnverified, result.Status)
+	assert.Contains(t, result.Message, "format invalid")
 }
 
-func TestVerify_MissingFields_ReturnsInactive(t *testing.T) {
+func TestVerify_MissingFields_ReturnsUnverified(t *testing.T) {
 	v := &Verifier{}
 
 	raw := detector.RawFinding{
@@ -90,8 +90,8 @@ func TestVerify_MissingFields_ReturnsInactive(t *testing.T) {
 
 	result := v.Verify(context.Background(), raw)
 
-	assert.Equal(t, finding.StatusVerifiedInactive, result.Status)
-	assert.Equal(t, "missing required fields in service account key", result.Message)
+	assert.Equal(t, finding.StatusUnverified, result.Status)
+	assert.Contains(t, result.Message, "format invalid")
 }
 
 func TestVerify_EmptyInput_ReturnsUnverified(t *testing.T) {

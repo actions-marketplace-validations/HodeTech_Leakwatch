@@ -13,6 +13,7 @@ import (
 
 	"github.com/cemililik/leakwatch/internal/detector"
 	"github.com/cemililik/leakwatch/internal/verifier"
+	"github.com/cemililik/leakwatch/internal/verifier/internal/httpx"
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
@@ -70,7 +71,7 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 
 	client := v.httpClient
 	if client == nil {
-		client = http.DefaultClient
+		client = httpx.Client()
 	}
 
 	resp, err := client.Do(req)
@@ -83,6 +84,17 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// A redirect from an API endpoint means the credential context is wrong
+	// (for example a login redirect or a moved host). The shared client does
+	// not follow redirects so the credential is never re-sent to the redirect
+	// target; treat it as a verification error rather than an active secret.
+	if httpx.IsRedirect(resp.StatusCode) {
+		return finding.VerificationResult{
+			Status:  finding.StatusVerifyError,
+			Message: fmt.Sprintf("unexpected redirect (status %d)", resp.StatusCode),
+		}
+	}
+
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return handleActiveKey(ctx, resp.Body)
@@ -93,7 +105,8 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 			Message: "Infura API key is invalid or revoked",
 		}
 	default:
-		slog.ErrorContext(ctx, "infura verifier: unexpected status code",
+		slog.ErrorContext(
+			ctx, "infura verifier: unexpected status code",
 			slog.Int("status_code", resp.StatusCode),
 		)
 		return finding.VerificationResult{
@@ -113,7 +126,7 @@ func handleActiveKey(ctx context.Context, body io.Reader) finding.VerificationRe
 		} `json:"error"`
 	}
 
-	if err := json.NewDecoder(body).Decode(&rpcResp); err != nil {
+	if err := json.NewDecoder(httpx.LimitReader(body)).Decode(&rpcResp); err != nil {
 		slog.ErrorContext(ctx, "infura verifier: failed to decode response", slog.String("error", err.Error()))
 		return finding.VerificationResult{
 			Status:  finding.StatusVerifyError,
@@ -122,7 +135,8 @@ func handleActiveKey(ctx context.Context, body io.Reader) finding.VerificationRe
 	}
 
 	if rpcResp.Error != nil {
-		slog.DebugContext(ctx, "infura verifier: API key returned error response",
+		slog.DebugContext(
+			ctx, "infura verifier: API key returned error response",
 			slog.String("error_message", rpcResp.Error.Message),
 		)
 		return finding.VerificationResult{

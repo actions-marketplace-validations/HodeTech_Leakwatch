@@ -11,6 +11,7 @@ import (
 
 	"github.com/cemililik/leakwatch/internal/detector"
 	"github.com/cemililik/leakwatch/internal/verifier"
+	"github.com/cemililik/leakwatch/internal/verifier/internal/httpx"
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
@@ -66,7 +67,7 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 
 	client := v.httpClient
 	if client == nil {
-		client = http.DefaultClient
+		client = httpx.Client()
 	}
 
 	resp, err := client.Do(req)
@@ -78,6 +79,17 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 		}
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	// A redirect from an API endpoint means the credential context is wrong
+	// (for example a login redirect or a moved host). The shared client does
+	// not follow redirects so the credential is never re-sent to the redirect
+	// target; treat it as a verification error rather than an active secret.
+	if httpx.IsRedirect(resp.StatusCode) {
+		return finding.VerificationResult{
+			Status:  finding.StatusVerifyError,
+			Message: fmt.Sprintf("unexpected redirect (status %d)", resp.StatusCode),
+		}
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return finding.VerificationResult{
@@ -94,7 +106,7 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 		URL   string `json:"url"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.NewDecoder(httpx.LimitReader(resp.Body)).Decode(&result); err != nil {
 		slog.ErrorContext(ctx, "slack verifier: failed to decode response", slog.String("error", err.Error()))
 		return finding.VerificationResult{
 			Status:  finding.StatusVerifyError,
@@ -118,7 +130,8 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 		extra["user"] = result.User
 	}
 
-	slog.InfoContext(ctx, "slack verifier: token is active",
+	slog.InfoContext(
+		ctx, "slack verifier: token is active",
 		slog.String("team", result.Team),
 		slog.String("user", result.User),
 	)

@@ -11,6 +11,7 @@ import (
 
 	"github.com/cemililik/leakwatch/internal/detector"
 	"github.com/cemililik/leakwatch/internal/verifier"
+	"github.com/cemililik/leakwatch/internal/verifier/internal/httpx"
 	"github.com/cemililik/leakwatch/pkg/finding"
 )
 
@@ -92,7 +93,7 @@ func verifyStripeKey(ctx context.Context, apiURL string, httpClient *http.Client
 
 	client := httpClient
 	if client == nil {
-		client = http.DefaultClient
+		client = httpx.Client()
 	}
 
 	resp, err := client.Do(req)
@@ -105,9 +106,21 @@ func verifyStripeKey(ctx context.Context, apiURL string, httpClient *http.Client
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// A redirect from an API endpoint means the credential context is wrong
+	// (for example a login redirect or a moved host). The shared client does
+	// not follow redirects so the credential is never re-sent to the redirect
+	// target; treat it as a verification error rather than an active secret.
+	if httpx.IsRedirect(resp.StatusCode) {
+		return finding.VerificationResult{
+			Status:  finding.StatusVerifyError,
+			Message: fmt.Sprintf("unexpected redirect (status %d)", resp.StatusCode),
+		}
+	}
+
 	switch resp.StatusCode {
 	case http.StatusOK:
-		slog.InfoContext(ctx, "stripe verifier: API key is active",
+		slog.InfoContext(
+			ctx, "stripe verifier: API key is active",
 			slog.String("key_type", keyType),
 		)
 		return finding.VerificationResult{
@@ -118,7 +131,8 @@ func verifyStripeKey(ctx context.Context, apiURL string, httpClient *http.Client
 			},
 		}
 	case http.StatusUnauthorized:
-		slog.DebugContext(ctx, "stripe verifier: API key is inactive",
+		slog.DebugContext(
+			ctx, "stripe verifier: API key is inactive",
 			slog.String("key_type", keyType),
 		)
 		return finding.VerificationResult{
@@ -126,7 +140,8 @@ func verifyStripeKey(ctx context.Context, apiURL string, httpClient *http.Client
 			Message: fmt.Sprintf("Stripe %s API key is invalid or revoked", keyType),
 		}
 	default:
-		slog.ErrorContext(ctx, "stripe verifier: unexpected status code",
+		slog.ErrorContext(
+			ctx, "stripe verifier: unexpected status code",
 			slog.Int("status_code", resp.StatusCode),
 		)
 		return finding.VerificationResult{
