@@ -2,6 +2,7 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/cemililik/leakwatch/internal/detector"
 	"github.com/cemililik/leakwatch/internal/entropy"
+	"github.com/cemililik/leakwatch/internal/filter"
 	"github.com/cemililik/leakwatch/internal/matcher"
 	"github.com/cemililik/leakwatch/internal/source"
 	"github.com/cemililik/leakwatch/internal/verifier"
@@ -188,6 +190,14 @@ func (e *Engine) worker(ctx context.Context, jobs <-chan source.Chunk, results c
 			rawFindings := det.Scan(ctx, chunk.Data)
 			for _, raw := range rawFindings {
 				f := e.rawToFinding(raw, chunk, det)
+
+				// Honor inline ignore markers (# leakwatch:ignore[:<id>]) on the
+				// finding's source line. Skipped before verification so ignored
+				// secrets never trigger a network call.
+				if filter.LineHasInlineIgnore(chunk.Data, f.SourceMetadata.Line, det.ID()) {
+					continue
+				}
+
 				pair := verifier.VerifyPair{Finding: f, Raw: raw}
 				select {
 				case <-ctx.Done():
@@ -220,6 +230,16 @@ func (e *Engine) rawToFinding(raw detector.RawFinding, chunk source.Chunk, det d
 
 	if e.config.EnableEntropy && len(raw.Raw) > 0 {
 		f.Entropy = entropy.Calculate(raw.Raw)
+	}
+
+	// Compute the 1-based line number from the match offset when the source did
+	// not already provide one. This powers both human-readable output and inline
+	// ignore handling. For multi-line matches (e.g. private keys) this is the
+	// line where the match begins.
+	if f.SourceMetadata.Line == 0 && len(raw.Raw) > 0 {
+		if offset := bytes.Index(chunk.Data, raw.Raw); offset >= 0 {
+			f.SourceMetadata.Line = 1 + bytes.Count(chunk.Data[:offset], []byte{'\n'})
+		}
 	}
 
 	// Deterministik ID: detectorID + redacted + filePath

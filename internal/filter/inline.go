@@ -45,6 +45,22 @@ func HasInlineIgnoreForDetector(line string, detectorID string) bool {
 	return line[afterTag] != ':'
 }
 
+// LineHasInlineIgnore reports whether the 1-based lineNum in data carries an
+// inline ignore marker (generic or detector-specific) for detectorID.
+// It returns false when lineNum is out of range or non-positive, which lets
+// callers use it as a single guard regardless of whether line tracking is
+// available for a given source.
+func LineHasInlineIgnore(data []byte, lineNum int, detectorID string) bool {
+	if lineNum <= 0 {
+		return false
+	}
+	line := getLine(data, lineNum)
+	if line == "" {
+		return false
+	}
+	return HasInlineIgnoreForDetector(line, detectorID)
+}
+
 // FilterFindingsByInlineIgnore returns a filtered slice of findings, removing
 // any finding whose source line contains an inline ignore marker.
 // sourceData maps file paths to their raw content; findings whose file is
@@ -53,13 +69,11 @@ func FilterFindingsByInlineIgnore(findings []finding.Finding, sourceData map[str
 	var kept []finding.Finding
 	for _, f := range findings {
 		data, ok := sourceData[f.SourceMetadata.FilePath]
-		if !ok || f.SourceMetadata.Line <= 0 {
+		if !ok {
 			kept = append(kept, f)
 			continue
 		}
-
-		line := getLine(data, f.SourceMetadata.Line)
-		if HasInlineIgnoreForDetector(line, f.DetectorID) {
+		if LineHasInlineIgnore(data, f.SourceMetadata.Line, f.DetectorID) {
 			continue
 		}
 		kept = append(kept, f)
