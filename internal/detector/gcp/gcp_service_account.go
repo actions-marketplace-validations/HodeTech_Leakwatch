@@ -96,9 +96,21 @@ func (d *Detector) Scan(_ context.Context, data []byte) []detector.RawFinding {
 // back to the marker range itself, ensuring a non-nil, account-local slice that
 // never spans the whole input.
 func enclosingObject(data []byte, start, end int) []byte {
-	// Walk backwards to the opening brace whose matching close brace contains
-	// the marker.
-	open := -1
+	open := findEnclosingOpenBrace(data, start)
+	if open == -1 {
+		return data[start:end]
+	}
+	if closeIdx := findMatchingCloseBrace(data, open); closeIdx != -1 {
+		return data[open : closeIdx+1]
+	}
+	// Unbalanced (truncated) input: return from the opening brace to the end.
+	return data[open:]
+}
+
+// findEnclosingOpenBrace walks backwards from start to the opening brace whose
+// matching close brace would contain the marker, accounting for nested objects.
+// It returns the index of that brace, or -1 if none is found.
+func findEnclosingOpenBrace(data []byte, start int) int {
 	depth := 0
 	for i := start; i >= 0; i-- {
 		switch data[i] {
@@ -106,21 +118,19 @@ func enclosingObject(data []byte, start, end int) []byte {
 			depth++
 		case '{':
 			if depth == 0 {
-				open = i
-			} else {
-				depth--
+				return i
 			}
-		}
-		if open != -1 {
-			break
+			depth--
 		}
 	}
-	if open == -1 {
-		return data[start:end]
-	}
+	return -1
+}
 
-	// Walk forwards from the opening brace to its matching close brace.
-	depth = 0
+// findMatchingCloseBrace walks forwards from the opening brace at open to its
+// matching close brace, accounting for nested objects. It returns the index of
+// that brace, or -1 if the input is unbalanced (truncated).
+func findMatchingCloseBrace(data []byte, open int) int {
+	depth := 0
 	for i := open; i < len(data); i++ {
 		switch data[i] {
 		case '{':
@@ -128,12 +138,11 @@ func enclosingObject(data []byte, start, end int) []byte {
 		case '}':
 			depth--
 			if depth == 0 {
-				return data[open : i+1]
+				return i
 			}
 		}
 	}
-	// Unbalanced (truncated) input: return from the opening brace to the end.
-	return data[open:]
+	return -1
 }
 
 // redactPrivateKey returns a copy of block with any private_key PEM value

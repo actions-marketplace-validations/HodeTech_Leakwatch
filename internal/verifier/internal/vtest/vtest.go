@@ -64,7 +64,11 @@ func Run(t *testing.T, c Case) {
 	t.Helper()
 
 	t.Run(c.Name+"/closed_server_returns_verify_error", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+		server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			// Intentionally empty: the server is closed immediately below, so
+			// this handler is never invoked. Its only purpose is to obtain a
+			// valid URL/client pair that then yields a connection-refused error.
+		}))
 		url := server.URL
 		client := server.Client()
 		server.Close() // Force a connection-refused transport error.

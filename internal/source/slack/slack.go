@@ -29,7 +29,7 @@ type SlackSource struct {
 	includeDMs      bool
 	// includeFiles is accepted for forward-compatibility but is currently a
 	// no-op: Slack file scanning is not yet implemented (only message text is
-	// scanned). See processChannel and TODO(planned) below.
+	// scanned). See the planned-feature note in processChannel below.
 	includeFiles bool
 	rateLimit    float64
 	bufferSize   int
@@ -93,7 +93,7 @@ func (s *SlackSource) Chunks(ctx context.Context) <-chan source.Chunk {
 
 		// File scanning is advertised via WithIncludeFiles but is not yet
 		// implemented. Warn loudly instead of silently ignoring the request so
-		// the behavior is honest. See TODO(planned) in processChannel.
+		// the behavior is honest. See the planned-feature note in processChannel.
 		if s.includeFiles {
 			slog.Warn("slack file scanning requested but not yet implemented; scanning message text only")
 		}
@@ -263,10 +263,10 @@ func (s *SlackSource) processChannel(ctx context.Context, ch chan<- source.Chunk
 				continue
 			}
 
-			// TODO(planned): Slack file scanning — see ROADMAP. When
-			// s.includeFiles is honored, msg.Files (and each File.URLPrivate)
-			// should be downloaded and emitted as additional chunks here.
-			// Currently only msg.Text is scanned.
+			// Planned (see ROADMAP): Slack file scanning. When s.includeFiles is
+			// honored, msg.Files (and each File.URLPrivate) should be downloaded
+			// and emitted as additional chunks here. Currently only msg.Text is
+			// scanned.
 
 			select {
 			case ch <- source.Chunk{

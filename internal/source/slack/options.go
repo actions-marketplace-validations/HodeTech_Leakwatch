@@ -42,7 +42,7 @@ func WithIncludeDMs(include bool) Option {
 //
 // NOTE: Slack file scanning is not yet implemented. This option is currently a
 // no-op for actual scanning behavior (only message text is scanned); enabling
-// it causes a warning to be logged. See ROADMAP / TODO(planned) in slack.go.
+// it causes a warning to be logged. See ROADMAP and the planned-feature note in slack.go.
 func WithIncludeFiles(include bool) Option {
 	return func(s *SlackSource) {
 		s.includeFiles = include
