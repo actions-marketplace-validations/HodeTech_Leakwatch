@@ -4,8 +4,11 @@ package config
 import (
 	"fmt"
 	"runtime"
+	"time"
 
 	"github.com/spf13/viper"
+
+	"github.com/cemililik/leakwatch/internal/detector/custom"
 )
 
 // Supported output formats.
@@ -18,10 +21,12 @@ var validFormats = map[string]bool{
 
 // Config represents the complete application configuration.
 type Config struct {
-	Scan      ScanConfig      `mapstructure:"scan"`
-	Detection DetectionConfig `mapstructure:"detection"`
-	Filter    FilterConfig    `mapstructure:"filter"`
-	Output    OutputConfig    `mapstructure:"output"`
+	Scan         ScanConfig         `mapstructure:"scan"`
+	Detection    DetectionConfig    `mapstructure:"detection"`
+	Verification VerificationConfig `mapstructure:"verification"`
+	Filter       FilterConfig       `mapstructure:"filter"`
+	Output       OutputConfig       `mapstructure:"output"`
+	CustomRules  []custom.RuleDef   `mapstructure:"custom-rules"`
 }
 
 // ScanConfig holds scan engine configuration.
@@ -41,16 +46,26 @@ type EntropyConfig struct {
 	Threshold float64 `mapstructure:"threshold"`
 }
 
+// VerificationConfig holds secret verification configuration.
+type VerificationConfig struct {
+	Enabled     bool          `mapstructure:"enabled"`
+	Timeout     time.Duration `mapstructure:"timeout"`
+	Concurrency int           `mapstructure:"concurrency"`
+	RateLimit   float64       `mapstructure:"rate-limit"`
+}
+
 // FilterConfig holds filtering configuration.
 type FilterConfig struct {
-	ExcludePaths []string `mapstructure:"exclude-paths"`
+	ExcludePaths     []string `mapstructure:"exclude-paths"`
+	ExcludeDetectors []string `mapstructure:"exclude-detectors"`
 }
 
 // OutputConfig holds output configuration.
 type OutputConfig struct {
-	Format  string `mapstructure:"format"`
-	File    string `mapstructure:"file"`
-	ShowRaw bool   `mapstructure:"show-raw"`
+	Format            string `mapstructure:"format"`
+	File              string `mapstructure:"file"`
+	SeverityThreshold string `mapstructure:"severity-threshold"`
+	ShowRaw           bool   `mapstructure:"show-raw"`
 }
 
 // setDefaults configures default values on the given Viper instance.
@@ -59,6 +74,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("scan.max-file-size", 10*1024*1024) // 10MB
 	v.SetDefault("detection.entropy.enabled", true)
 	v.SetDefault("detection.entropy.threshold", 4.0)
+	v.SetDefault("verification.enabled", true)
+	v.SetDefault("verification.timeout", 10*time.Second)
+	v.SetDefault("verification.concurrency", 4)
+	v.SetDefault("verification.rate-limit", 10.0)
 	v.SetDefault("output.format", "json")
 	v.SetDefault("output.show-raw", false)
 }
@@ -99,6 +118,15 @@ func (c *Config) validate() error {
 	}
 	if c.Detection.Entropy.Threshold < 0 || c.Detection.Entropy.Threshold > 8.0 {
 		return fmt.Errorf("invalid entropy threshold: %.2f (must be 0-8)", c.Detection.Entropy.Threshold)
+	}
+	if c.Verification.Timeout <= 0 {
+		return fmt.Errorf("invalid verification timeout: %s (must be positive)", c.Verification.Timeout)
+	}
+	if c.Verification.Concurrency < 1 {
+		return fmt.Errorf("invalid verification concurrency: %d (must be >= 1)", c.Verification.Concurrency)
+	}
+	if c.Verification.RateLimit <= 0 {
+		return fmt.Errorf("invalid verification rate-limit: %.2f (must be positive)", c.Verification.RateLimit)
 	}
 	return nil
 }

@@ -17,6 +17,7 @@ import (
 
 	"github.com/cemililik/leakwatch/internal/config"
 	"github.com/cemililik/leakwatch/internal/detector"
+	"github.com/cemililik/leakwatch/internal/detector/custom"
 	"github.com/cemililik/leakwatch/internal/engine"
 	"github.com/cemililik/leakwatch/internal/filter"
 	"github.com/cemililik/leakwatch/internal/output"
@@ -40,6 +41,7 @@ type scanConfig struct {
 	concurrency       int
 	maxFileSize       int64
 	excludePaths      []string
+	excludeDetectors  []string
 	enableEntropy     bool
 	entropyThreshold  float64
 	showRaw           bool
@@ -51,6 +53,15 @@ type scanConfig struct {
 	enableRemediation bool
 	scanRoot          string // root path for .leakwatchignore resolution
 	scanTarget        string // display name for scan summary (path, URL, image ref)
+
+	// Verification engine settings sourced from the `verification:` config block.
+	verifyEnabled     bool
+	verifyTimeout     time.Duration
+	verifyConcurrency int
+	verifyRateLimit   float64
+
+	// User-defined YAML custom rules from the `custom-rules:` config block.
+	customRules []custom.RuleDef
 }
 
 // bindScanFlags binds common scan flags to Viper.
@@ -99,6 +110,11 @@ func loadScanConfig(cmd *cobra.Command) (*scanConfig, error) {
 	if err != nil {
 		slog.Debug("min-severity flag not available", "error", err)
 	}
+	// The --min-severity flag takes precedence; fall back to the
+	// output.severity-threshold config value only when the flag is not set.
+	if !cmd.Flags().Changed("min-severity") && cfg.Output.SeverityThreshold != "" {
+		minSevStr = cfg.Output.SeverityThreshold
+	}
 	minSev := parseSeverity(minSevStr)
 	enableRemediation, err := cmd.Flags().GetBool("remediation")
 	if err != nil {
@@ -122,6 +138,7 @@ func loadScanConfig(cmd *cobra.Command) (*scanConfig, error) {
 		concurrency:       cfg.Scan.Concurrency,
 		maxFileSize:       cfg.Scan.MaxFileSize,
 		excludePaths:      cfg.Filter.ExcludePaths,
+		excludeDetectors:  cfg.Filter.ExcludeDetectors,
 		enableEntropy:     cfg.Detection.Entropy.Enabled,
 		entropyThreshold:  cfg.Detection.Entropy.Threshold,
 		showRaw:           showRaw || cfg.Output.ShowRaw,
@@ -131,6 +148,11 @@ func loadScanConfig(cmd *cobra.Command) (*scanConfig, error) {
 		onlyVerified:      onlyVerified,
 		minSeverity:       minSev,
 		enableRemediation: enableRemediation,
+		verifyEnabled:     cfg.Verification.Enabled,
+		verifyTimeout:     cfg.Verification.Timeout,
+		verifyConcurrency: cfg.Verification.Concurrency,
+		verifyRateLimit:   cfg.Verification.RateLimit,
+		customRules:       cfg.CustomRules,
 	}, nil
 }
 
@@ -160,14 +182,33 @@ func executeScan(parent context.Context, cfg *scanConfig, src source.Source, cl 
 		}()
 	}
 
+	// Register user-defined custom rules (from the `custom-rules:` config block)
+	// before snapshotting the detector set so they participate in the scan.
+	if len(cfg.customRules) > 0 {
+		count, errs := custom.RegisterCustomRules(cfg.customRules)
+		for _, e := range errs {
+			slog.Warn("custom rule registration skipped", "error", e)
+		}
+		slog.Info("custom rules registered", "count", count, "skipped", len(errs))
+	}
+
 	detectors := detector.All()
+	if len(cfg.excludeDetectors) > 0 {
+		detectors = excludeDetectorsByID(detectors, cfg.excludeDetectors)
+	}
 	if len(detectors) == 0 {
 		return fmt.Errorf("no registered detectors found")
 	}
 	slog.Debug("detectors loaded", "count", len(detectors))
 
-	// Configure verification.
-	verifierCfg := verifier.DefaultConfig()
+	// Configure verification from the `verification:` config block.
+	// The --no-verify CLI flag takes precedence over the config value.
+	verifierCfg := verifier.Config{
+		Enabled:     cfg.verifyEnabled,
+		Timeout:     cfg.verifyTimeout,
+		Concurrency: cfg.verifyConcurrency,
+		RateLimit:   cfg.verifyRateLimit,
+	}
 	if cfg.noVerify {
 		verifierCfg.Enabled = false
 	}
@@ -284,4 +325,21 @@ func parseSeverity(s string) finding.Severity {
 	default:
 		return finding.SeverityLow
 	}
+}
+
+// excludeDetectorsByID returns the detectors whose ID is not in the exclude list.
+func excludeDetectorsByID(detectors []detector.Detector, exclude []string) []detector.Detector {
+	excluded := make(map[string]bool, len(exclude))
+	for _, id := range exclude {
+		excluded[id] = true
+	}
+	kept := make([]detector.Detector, 0, len(detectors))
+	for _, d := range detectors {
+		if excluded[d.ID()] {
+			slog.Debug("detector excluded by config", "detector_id", d.ID())
+			continue
+		}
+		kept = append(kept, d)
+	}
+	return kept
 }
