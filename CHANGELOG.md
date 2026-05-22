@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Custom rules are now loaded from `.leakwatch.yaml`** — the documented `custom-rules:` block is finally wired into the scan. Previously `custom.RegisterCustomRules` existed and was tested but never called, so user-defined detectors were silently ignored. Registration is duplicate-safe: a rule whose ID collides with a built-in detector (or another custom rule) is skipped with a warning instead of panicking. (Resolves ROADMAP "Known Gaps" P0 #1.)
+- **Inline ignore (`# leakwatch:ignore` / `# leakwatch:ignore:<detector-id>`) is now honored** — the marker is checked on each finding's source line during scanning and ignored findings are dropped before verification, so they never trigger a network call. The library helpers existed but were never invoked by the engine. (Resolves ROADMAP "Known Gaps" P0 #2.)
+- **Line numbers are now reported for findings** — the engine computes the 1-based line of each match (from its byte offset within the chunk). Previously every finding reported `line: 0` in JSON/SARIF/CSV/table output. This is also the prerequisite that makes inline ignore possible.
+- **`verification.*` config is now bound** — `verification.enabled`, `verification.timeout`, `verification.concurrency`, and `verification.rate-limit` from `.leakwatch.yaml` now drive the verification engine. They were emitted by `leakwatch init` and documented but had no effect. The `--no-verify` flag still takes precedence. (Resolves ROADMAP "Known Gaps" P0 #3.)
+- **`filter.exclude-detectors` and `output.severity-threshold` config are now bound** — documented YAML keys that previously no-opped. `--min-severity` still overrides `output.severity-threshold`. (Resolves ROADMAP "Known Gaps" P1 config schema drift, except the optional `slack.*` keys.)
+
 ### Fixed
 - **`dbconn` placeholder case-sensitivity bug** — `Password=TODO` and `Password=FIXME` (uppercase) were previously **not** skipped as placeholders even though the placeholder list contained the entries. The lookup lowercased the password but compared against uppercase slice entries, so the two values silently fell through and were reported as findings. The placeholder slice is now lowercased so case-insensitive matching actually works as documented. **User-visible behavior change:** `Password=TODO` no longer produces a finding.
 
