@@ -63,7 +63,7 @@ Each shortlisted detector runs its compiled **regular expression** against the c
 - A **redacted** representation safe for output.
 - Optional extra metadata (e.g. account ID for an AWS key).
 
-Leakwatch ships **63 built-in detectors** across 60 packages, covering cloud providers, AI APIs, payment platforms, databases, messaging tools, version control, and more. You can add your own patterns via [custom YAML rules](#/configuration/custom-rules).
+Leakwatch ships **63 built-in detectors** across 60 packages, covering cloud providers, AI APIs, payment platforms, databases, messaging tools, version control, and more. You can add your own patterns via [custom YAML rules](#/detectors/custom-rules).
 
 All detectors are registered at compile time using Go's `init()` function and blank imports (ADR-0004). There is no plugin loader or dynamic discovery at runtime.
 
@@ -160,4 +160,4 @@ The architecture reflects several deliberate choices documented as ADRs:
 - [How Verification Works](#/verification/how-verification-works)
 - [Configuration File](#/configuration/config-file)
 - [CLI Reference](#/reference/cli-reference)
-- [Custom Rules](#/configuration/custom-rules)
+- [Custom Rules](#/detectors/custom-rules)

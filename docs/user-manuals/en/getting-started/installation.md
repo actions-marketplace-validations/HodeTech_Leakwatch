@@ -53,7 +53,7 @@ Available tags:
 Mount the directory you want to scan to `/scan` inside the container. Flags and options work identically to the native binary — see [CLI Reference](#/reference/cli-reference) for the full list.
 
 :::tip
-For Docker-specific usage patterns, including scanning remote Git repositories and passing credentials securely, see [Using Docker](#/guides/docker).
+For Docker-specific usage patterns, including scanning remote Git repositories and passing credentials securely, see [Using Docker](#/ci-cd/docker-usage).
 :::
 
 ## Prebuilt binary
@@ -96,6 +96,6 @@ If the command is not found, check that the install directory is on your `PATH`.
 ## See also
 
 - [Quick Start](#/getting-started/quick-start)
-- [Using Docker](#/guides/docker)
+- [Using Docker](#/ci-cd/docker-usage)
 - [CLI Reference](#/reference/cli-reference)
 - [Configuration File](#/configuration/config-file)

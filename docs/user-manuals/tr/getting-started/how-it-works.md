@@ -63,7 +63,7 @@ Kısa listeye alınan her dedektör, derlenmiş **düzenli ifadesini** parça ba
 - Çıktı için güvenli olan **maskelenmiş** bir gösterim.
 - İsteğe bağlı ek meta veri (örneğin bir AWS anahtarı için hesap kimliği).
 
-Leakwatch, 60 paket genelinde **63 yerleşik dedektör** ile birlikte gelir; bulut sağlayıcılarını, yapay zekâ API'lerini, ödeme platformlarını, veritabanlarını, mesajlaşma araçlarını, sürüm kontrolünü ve daha fazlasını kapsar. [Özel YAML kuralları](#/configuration/custom-rules) aracılığıyla kendi desenlerinizi ekleyebilirsiniz.
+Leakwatch, 60 paket genelinde **63 yerleşik dedektör** ile birlikte gelir; bulut sağlayıcılarını, yapay zekâ API'lerini, ödeme platformlarını, veritabanlarını, mesajlaşma araçlarını, sürüm kontrolünü ve daha fazlasını kapsar. [Özel YAML kuralları](#/detectors/custom-rules) aracılığıyla kendi desenlerinizi ekleyebilirsiniz.
 
 Tüm dedektörler, Go'nun `init()` işlevi ve boş importlar kullanılarak derleme zamanında kaydedilir (ADR-0004). Çalışma zamanında eklenti yükleyici veya dinamik keşif yoktur.
 
@@ -160,4 +160,4 @@ Mimari, ADR'ler olarak belgelenmiş çeşitli bilinçli seçimleri yansıtır:
 - [Doğrulama Nasıl Çalışır](#/verification/how-verification-works)
 - [Yapılandırma Dosyası](#/configuration/config-file)
 - [CLI Referansı](#/reference/cli-reference)
-- [Özel Kurallar](#/configuration/custom-rules)
+- [Özel Kurallar](#/detectors/custom-rules)

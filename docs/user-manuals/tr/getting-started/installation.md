@@ -53,7 +53,7 @@ Kullanılabilir etiketler:
 Taramak istediğiniz dizini konteyner içindeki `/scan` dizinine bağlayın. Bayraklar ve seçenekler yerel ikili dosyayla tamamen aynı şekilde çalışır — tam liste için [CLI Referansı](#/reference/cli-reference) sayfasına bakın.
 
 :::tip
-Uzak Git depolarını tarama ve kimlik bilgilerini güvenli biçimde geçirme dahil Docker'a özgü kullanım kalıpları için [Docker Kullanımı](#/guides/docker) sayfasına bakın.
+Uzak Git depolarını tarama ve kimlik bilgilerini güvenli biçimde geçirme dahil Docker'a özgü kullanım kalıpları için [Docker Kullanımı](#/ci-cd/docker-usage) sayfasına bakın.
 :::
 
 ## Hazır ikili dosya
@@ -96,6 +96,6 @@ Komut bulunamazsa kurulum dizininin `PATH` değişkeninde olup olmadığını ko
 ## Ayrıca bakın
 
 - [Hızlı Başlangıç](#/getting-started/quick-start)
-- [Docker Kullanımı](#/guides/docker)
+- [Docker Kullanımı](#/ci-cd/docker-usage)
 - [CLI Referansı](#/reference/cli-reference)
 - [Yapılandırma Dosyası](#/configuration/config-file)
