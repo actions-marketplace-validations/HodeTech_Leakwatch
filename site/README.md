@@ -13,17 +13,20 @@ site/
 ├── index.html          Landing page (Redacted hero with a scan-reveal document)
 ├── docs.html           Documentation portal (sidebar + hash-routed content)
 ├── contact.html        Contact page (Formspree-backed form + GitHub channels)
+├── playground.html     In-browser scanner — paste text, real detection runs client-side
 ├── css/style.css       Design system (the Redacted dossier theme)
 ├── js/
 │   ├── translations.js UI strings for EN / TR (marketing chrome + docs shell)
 │   ├── i18n.js         Language detection, switching, persistence
 │   ├── main.js         Mobile nav, copy buttons, hero scan animation, contact form
 │   ├── docs.js         Docs portal controller (nav, routing, search, Mermaid)
+│   ├── scanner.js      Playground engine (runs window.LW_DETECTORS client-side)
+│   ├── detectors.js    GENERATED — detector patterns extracted from internal/detector
 │   └── manuals/        GENERATED — compiled manual content (do not edit by hand)
 │       ├── _index.js   Navigation tree (from docs/user-manuals/_meta.yaml)
 │       ├── en.js       English manual pages, rendered to HTML
 │       └── tr.js       Turkish manual pages, rendered to HTML
-├── assets/             favicon.svg, og.svg
+├── assets/             favicon.svg, og.svg, fonts/
 └── .nojekyll           Disable Jekyll (so files like _index.js are served)
 ```
 
@@ -33,6 +36,27 @@ The site is bilingual (English + Turkish) with **client-side switching**: a
 single set of URLs, with the language toggled in the navbar and remembered in
 `localStorage`. UI strings live in `js/translations.js`; manual content is
 compiled per language into `js/manuals/<lang>.js`.
+
+## Playground (in-browser scanner)
+
+`playground.html` + `js/scanner.js` let visitors paste a file and run Leakwatch's
+**real detection patterns entirely client-side** — nothing is uploaded. It is a
+preview: regex + entropy detection only. The CLI adds live verification, Git
+history, containers, cloud/Slack, and the entropy/custom-rule detectors.
+
+The patterns are **not hand-maintained**. `tools/site-build` parses
+`internal/detector/**` with `go/ast` and emits `js/detectors.js`
+(`window.LW_DETECTORS`) — each detector's ID, severity, keywords, and regex
+pattern(s). Go uses RE2 (no look-around/back-references), a subset of JS regex,
+so patterns port over; a small normalization step handles Go-only tokens
+(leading inline flags → JS flags, `(?P<name>)` → `(?<name>)`, Go anchors). This
+keeps the browser scanner in sync with the engine automatically. Currently
+**62 of 63** detectors run in the browser (the entropy-gated generic detector
+and runtime custom rules stay CLI-only). Regenerate together with the manuals:
+
+```bash
+cd tools/site-build && go run .
+```
 
 ## Contact form (Formspree)
 

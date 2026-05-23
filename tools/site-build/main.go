@@ -160,6 +160,14 @@ func run() error {
 		fmt.Printf("site-build: wrote %s (%d pages)\n", filepath.Base(target), len(bag))
 	}
 
+	// Compile the in-browser playground detector set from internal/detector.
+	jsDir := filepath.Join(root, "site", "js")
+	nDet, err := buildDetectors(root, jsDir)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("site-build: wrote detectors.js (%d detectors)\n", nDet)
+
 	if missing > 0 && *strict {
 		return fmt.Errorf("%d manual page(s) missing (strict mode)", missing)
 	}
