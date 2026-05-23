@@ -10,11 +10,6 @@ on:
       - ".github/workflows/site-deploy.yml"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 # Allow one concurrent deployment; cancel in-progress runs for the same ref.
 concurrency:
   group: pages
@@ -23,6 +18,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Least privilege: the build job only needs to read the repo.
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,9 +35,6 @@ jobs:
         working-directory: tools/site-build
         run: go run . -strict
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -48,6 +43,10 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # Only the deploy job needs write access to Pages and an OIDC token.
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

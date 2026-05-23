@@ -70,6 +70,33 @@ cd tools/site-build
 go run .            # add -strict to fail on any missing translation
 ```
 
+## Fonts
+
+Web fonts (JetBrains Mono + Space Grotesk) are **self-hosted** under
+`assets/fonts/` and declared in `css/fonts.css` — no third-party requests, no
+subresource-integrity concerns, and the site works offline. Only the `latin`
+and `latin-ext` subsets are bundled (latin-ext covers Turkish: ş, ğ, ı, İ, …).
+
+To regenerate after changing weights, run this from the repo root (Python 3):
+
+```bash
+python3 - <<'PY'
+import re, os, urllib.request
+UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"}
+url = "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
+css = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30).read().decode()
+os.makedirs("site/assets/fonts", exist_ok=True); faces=[]
+for sub, block in re.findall(r"/\*\s*([\w-]+)\s*\*/\s*(@font-face\s*\{[^}]+\})", css):
+    if sub not in ("latin", "latin-ext"): continue
+    fam=re.search(r"font-family:\s*'([^']+)'",block)[1]; w=re.search(r"font-weight:\s*(\d+)",block)[1]
+    u=re.search(r"src:\s*url\((https://[^)]+\.woff2)\)",block)[1]; ur=re.search(r"unicode-range:\s*([^;]+);",block)[1]
+    fn=f"{fam.lower().replace(' ','-')}-{w}-{sub}.woff2"
+    open(f"site/assets/fonts/{fn}","wb").write(urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=30).read())
+    faces.append(f"@font-face{{font-family:'{fam}';font-style:normal;font-weight:{w};font-display:swap;src:url(../assets/fonts/{fn}) format('woff2');unicode-range:{ur};}}")
+open("site/css/fonts.css","w").write("/* Self-hosted web fonts (latin + latin-ext). */\n"+"\n".join(faces)+"\n")
+PY
+```
+
 ## Local preview
 
 Serve the folder over HTTP (the docs portal loads JS files, so `file://` will
