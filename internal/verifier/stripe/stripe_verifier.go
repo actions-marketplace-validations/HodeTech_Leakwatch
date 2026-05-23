@@ -6,7 +6,6 @@ package stripe
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/cemililik/leakwatch/internal/detector"
@@ -66,87 +65,21 @@ func (v *TestKeyVerifier) Verify(ctx context.Context, raw detector.RawFinding) f
 	return verifyStripeKey(ctx, v.apiURL, v.httpClient, raw, "test")
 }
 
-// verifyStripeKey performs the actual Stripe API key verification.
+// verifyStripeKey performs the Stripe API key verification shared by both the
+// live and test verifiers. Stripe authenticates the key as the Basic auth
+// username (with an empty password) and reports validity by status code.
 func verifyStripeKey(ctx context.Context, apiURL string, httpClient *http.Client, raw detector.RawFinding, keyType string) finding.VerificationResult {
 	token := string(raw.Raw)
-	if token == "" {
-		return finding.VerificationResult{
-			Status:  finding.StatusUnverified,
-			Message: "empty token",
-		}
-	}
+	resolved := httpx.BaseURL(apiURL, defaultAPIURL)
 
-	if apiURL == "" {
-		apiURL = defaultAPIURL
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL+"/v1/balance", nil)
-	if err != nil {
-		slog.ErrorContext(ctx, "stripe verifier: failed to create request", slog.String("error", err.Error()))
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("failed to create request: %v", err),
-		}
-	}
-	req.SetBasicAuth(token, "")
-	req.Header.Set("User-Agent", "leakwatch-verifier")
-
-	client := httpClient
-	if client == nil {
-		client = httpx.Client()
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		slog.ErrorContext(ctx, "stripe verifier: request failed", slog.String("error", err.Error()))
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("request failed: %v", err),
-		}
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// A redirect from an API endpoint means the credential context is wrong
-	// (for example a login redirect or a moved host). The shared client does
-	// not follow redirects so the credential is never re-sent to the redirect
-	// target; treat it as a verification error rather than an active secret.
-	if httpx.IsRedirect(resp.StatusCode) {
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("unexpected redirect (status %d)", resp.StatusCode),
-		}
-	}
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		slog.InfoContext(
-			ctx, "stripe verifier: API key is active",
-			slog.String("key_type", keyType),
-		)
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifiedActive,
-			Message: fmt.Sprintf("Stripe %s API key is active", keyType),
-			ExtraData: map[string]string{
-				"key_type": keyType,
-			},
-		}
-	case http.StatusUnauthorized:
-		slog.DebugContext(
-			ctx, "stripe verifier: API key is inactive",
-			slog.String("key_type", keyType),
-		)
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifiedInactive,
-			Message: fmt.Sprintf("Stripe %s API key is invalid or revoked", keyType),
-		}
-	default:
-		slog.ErrorContext(
-			ctx, "stripe verifier: unexpected status code",
-			slog.Int("status_code", resp.StatusCode),
-		)
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("unexpected status code: %d", resp.StatusCode),
-		}
-	}
+	return httpx.VerifyToken(ctx, httpClient, token, httpx.TokenSpec{
+		Name: "stripe",
+		Request: httpx.Request{
+			URL:           resolved + "/v1/balance",
+			BasicAuthUser: token,
+		},
+		ActiveMessage:   fmt.Sprintf("Stripe %s API key is active", keyType),
+		InactiveMessage: fmt.Sprintf("Stripe %s API key is invalid or revoked", keyType),
+		ActiveExtra:     map[string]string{"key_type": keyType},
+	})
 }

@@ -5,9 +5,7 @@ package figma
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 
 	"github.com/cemililik/leakwatch/internal/detector"
@@ -43,102 +41,28 @@ func (v *Verifier) Type() string {
 // Raw contains the token value.
 func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.VerificationResult {
 	token := string(raw.Raw)
-	if token == "" {
-		return finding.VerificationResult{
-			Status:  finding.StatusUnverified,
-			Message: "empty token",
-		}
-	}
+	apiURL := httpx.BaseURL(v.apiURL, defaultAPIURL)
 
-	apiURL := v.apiURL
-	if apiURL == "" {
-		apiURL = defaultAPIURL
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL+"/v1/me", nil)
-	if err != nil {
-		slog.ErrorContext(ctx, "figma verifier: failed to create request", slog.String("error", err.Error()))
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("failed to create request: %v", err),
-		}
-	}
-	req.Header.Set("X-Figma-Token", token)
-	req.Header.Set("User-Agent", "leakwatch-verifier")
-
-	client := v.httpClient
-	if client == nil {
-		client = httpx.Client()
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		slog.ErrorContext(ctx, "figma verifier: request failed", slog.String("error", err.Error()))
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("request failed: %v", err),
-		}
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// A redirect from an API endpoint means the credential context is wrong
-	// (for example a login redirect or a moved host). The shared client does
-	// not follow redirects so the credential is never re-sent to the redirect
-	// target; treat it as a verification error rather than an active secret.
-	if httpx.IsRedirect(resp.StatusCode) {
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("unexpected redirect (status %d)", resp.StatusCode),
-		}
-	}
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return handleActiveToken(ctx, resp.Body)
-	case http.StatusForbidden:
-		slog.DebugContext(ctx, "figma verifier: token is inactive")
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifiedInactive,
-			Message: "Figma token is invalid or revoked",
-		}
-	default:
-		slog.ErrorContext(
-			ctx, "figma verifier: unexpected status code",
-			slog.Int("status_code", resp.StatusCode),
-		)
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("unexpected status code: %d", resp.StatusCode),
-		}
-	}
+	return httpx.VerifyToken(ctx, v.httpClient, token, httpx.TokenSpec{
+		Name: "figma",
+		Request: httpx.Request{
+			URL:    apiURL + "/v1/me",
+			Header: map[string]string{"X-Figma-Token": token},
+		},
+		InactiveStatuses: []int{http.StatusForbidden},
+		ActiveMessage:    "Figma token is active",
+		InactiveMessage:  "Figma token is invalid or revoked",
+		Decode:           decodeUser,
+	})
 }
 
-// handleActiveToken parses the Figma API response for a valid token.
-func handleActiveToken(ctx context.Context, body io.Reader) finding.VerificationResult {
+// decodeUser parses the Figma API response for a valid token.
+func decodeUser(body io.Reader) (map[string]string, string, error) {
 	var user struct {
 		Handle string `json:"handle"`
 	}
-
-	if err := json.NewDecoder(httpx.LimitReader(body)).Decode(&user); err != nil {
-		slog.ErrorContext(ctx, "figma verifier: failed to decode response", slog.String("error", err.Error()))
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("200 OK but failed to decode response body: %v", err),
-		}
+	if err := json.NewDecoder(body).Decode(&user); err != nil {
+		return nil, "", err
 	}
-
-	extra := map[string]string{
-		"handle": user.Handle,
-	}
-
-	slog.InfoContext(
-		ctx, "figma verifier: token is active",
-		slog.String("handle", user.Handle),
-	)
-
-	return finding.VerificationResult{
-		Status:    finding.StatusVerifiedActive,
-		Message:   "Figma token is active",
-		ExtraData: extra,
-	}
+	return map[string]string{"handle": user.Handle}, "", nil
 }

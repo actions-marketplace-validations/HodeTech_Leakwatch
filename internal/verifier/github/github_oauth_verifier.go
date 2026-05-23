@@ -5,9 +5,7 @@ package github
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 
 	"github.com/cemililik/leakwatch/internal/detector"
@@ -40,103 +38,30 @@ func (v *OAuthVerifier) Type() string {
 // Raw contains the token value.
 func (v *OAuthVerifier) Verify(ctx context.Context, raw detector.RawFinding) finding.VerificationResult {
 	token := string(raw.Raw)
-	if token == "" {
-		return finding.VerificationResult{
-			Status:  finding.StatusUnverified,
-			Message: "empty token",
-		}
-	}
+	apiURL := httpx.BaseURL(v.apiURL, defaultAPIURL)
 
-	apiURL := v.apiURL
-	if apiURL == "" {
-		apiURL = defaultAPIURL
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL+"/user", nil)
-	if err != nil {
-		slog.ErrorContext(ctx, "github oauth verifier: failed to create request", slog.String("error", err.Error()))
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("failed to create request: %v", err),
-		}
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "leakwatch-verifier")
-
-	client := v.httpClient
-	if client == nil {
-		client = httpx.Client()
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		slog.ErrorContext(ctx, "github oauth verifier: request failed", slog.String("error", err.Error()))
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("request failed: %v", err),
-		}
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// A redirect from an API endpoint means the credential context is wrong
-	// (for example a login redirect or a moved host). The shared client does
-	// not follow redirects so the credential is never re-sent to the redirect
-	// target; treat it as a verification error rather than an active secret.
-	if httpx.IsRedirect(resp.StatusCode) {
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("unexpected redirect (status %d)", resp.StatusCode),
-		}
-	}
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return handleActiveOAuthToken(ctx, resp.Body)
-	case http.StatusUnauthorized:
-		slog.DebugContext(ctx, "github oauth verifier: token is inactive")
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifiedInactive,
-			Message: "GitHub OAuth token is invalid or revoked",
-		}
-	default:
-		slog.ErrorContext(
-			ctx, "github oauth verifier: unexpected status code",
-			slog.Int("status_code", resp.StatusCode),
-		)
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("unexpected status code: %d", resp.StatusCode),
-		}
-	}
+	return httpx.VerifyToken(ctx, v.httpClient, token, httpx.TokenSpec{
+		Name: "github oauth",
+		Request: httpx.Request{
+			URL: apiURL + "/user",
+			Header: map[string]string{
+				"Authorization": "Bearer " + token,
+				"Accept":        "application/vnd.github+json",
+			},
+		},
+		ActiveMessage:   "GitHub OAuth token is active",
+		InactiveMessage: "GitHub OAuth token is invalid or revoked",
+		Decode:          decodeOAuthUser,
+	})
 }
 
-// handleActiveOAuthToken parses the GitHub API response for a valid OAuth token.
-func handleActiveOAuthToken(ctx context.Context, body io.Reader) finding.VerificationResult {
+// decodeOAuthUser parses the GitHub API response for a valid OAuth token.
+func decodeOAuthUser(body io.Reader) (map[string]string, string, error) {
 	var user struct {
 		Login string `json:"login"`
 	}
-
-	if err := json.NewDecoder(httpx.LimitReader(body)).Decode(&user); err != nil {
-		slog.ErrorContext(ctx, "github oauth verifier: failed to decode response", slog.String("error", err.Error()))
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("200 OK but failed to decode response body: %v", err),
-		}
+	if err := json.NewDecoder(body).Decode(&user); err != nil {
+		return nil, "", err
 	}
-
-	extra := map[string]string{
-		"login": user.Login,
-	}
-
-	slog.InfoContext(
-		ctx, "github oauth verifier: token is active",
-		slog.String("login", user.Login),
-	)
-
-	return finding.VerificationResult{
-		Status:    finding.StatusVerifiedActive,
-		Message:   "GitHub OAuth token is active",
-		ExtraData: extra,
-	}
+	return map[string]string{"login": user.Login}, "", nil
 }

@@ -6,9 +6,7 @@ package bitbucket
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 
 	"github.com/cemililik/leakwatch/internal/detector"
@@ -62,95 +60,27 @@ func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.
 		}
 	}
 
-	apiURL := v.apiURL
-	if apiURL == "" {
-		apiURL = defaultAPIURL
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL+"/2.0/user", nil)
-	if err != nil {
-		slog.ErrorContext(ctx, "bitbucket verifier: failed to create request", slog.String("error", err.Error()))
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("failed to create request: %v", err),
-		}
-	}
-	req.SetBasicAuth(username, token)
-	req.Header.Set("User-Agent", "leakwatch-verifier")
-
-	client := v.httpClient
-	if client == nil {
-		client = httpx.Client()
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		slog.ErrorContext(ctx, "bitbucket verifier: request failed", slog.String("error", err.Error()))
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("request failed: %v", err),
-		}
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// A redirect from an API endpoint means the credential context is wrong
-	// (for example a login redirect or a moved host). The shared client does
-	// not follow redirects so the credential is never re-sent to the redirect
-	// target; treat it as a verification error rather than an active secret.
-	if httpx.IsRedirect(resp.StatusCode) {
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("unexpected redirect (status %d)", resp.StatusCode),
-		}
-	}
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return handleActivePassword(ctx, resp.Body)
-	case http.StatusUnauthorized:
-		slog.DebugContext(ctx, "bitbucket verifier: app password is inactive")
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifiedInactive,
-			Message: "Bitbucket app password is invalid or revoked",
-		}
-	default:
-		slog.ErrorContext(
-			ctx, "bitbucket verifier: unexpected status code",
-			slog.Int("status_code", resp.StatusCode),
-		)
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("unexpected status code: %d", resp.StatusCode),
-		}
-	}
+	apiURL := httpx.BaseURL(v.apiURL, defaultAPIURL)
+	return httpx.VerifyToken(ctx, v.httpClient, token, httpx.TokenSpec{
+		Name: "bitbucket",
+		Request: httpx.Request{
+			URL:           apiURL + "/2.0/user",
+			BasicAuthUser: username,
+			BasicAuthPass: token,
+		},
+		ActiveMessage:   "Bitbucket app password is active",
+		InactiveMessage: "Bitbucket app password is invalid or revoked",
+		Decode:          decodeUser,
+	})
 }
 
-// handleActivePassword parses the Bitbucket API response for a valid password.
-func handleActivePassword(ctx context.Context, body io.Reader) finding.VerificationResult {
+// decodeUser reports the account display name as display_name.
+func decodeUser(body io.Reader) (map[string]string, string, error) {
 	var user struct {
 		DisplayName string `json:"display_name"`
 	}
-
-	if err := json.NewDecoder(httpx.LimitReader(body)).Decode(&user); err != nil {
-		slog.ErrorContext(ctx, "bitbucket verifier: failed to decode response", slog.String("error", err.Error()))
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("200 OK but failed to decode response body: %v", err),
-		}
+	if err := json.NewDecoder(body).Decode(&user); err != nil {
+		return nil, "", err
 	}
-
-	extra := map[string]string{
-		"display_name": user.DisplayName,
-	}
-
-	slog.InfoContext(
-		ctx, "bitbucket verifier: app password is active",
-		slog.String("display_name", user.DisplayName),
-	)
-
-	return finding.VerificationResult{
-		Status:    finding.StatusVerifiedActive,
-		Message:   "Bitbucket app password is active",
-		ExtraData: extra,
-	}
+	return map[string]string{"display_name": user.DisplayName}, "", nil
 }

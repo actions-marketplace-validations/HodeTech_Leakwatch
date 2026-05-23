@@ -5,9 +5,7 @@ package heroku
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 
 	"github.com/cemililik/leakwatch/internal/detector"
@@ -43,103 +41,30 @@ func (v *Verifier) Type() string {
 // Raw contains the token value.
 func (v *Verifier) Verify(ctx context.Context, raw detector.RawFinding) finding.VerificationResult {
 	token := string(raw.Raw)
-	if token == "" {
-		return finding.VerificationResult{
-			Status:  finding.StatusUnverified,
-			Message: "empty token",
-		}
-	}
+	apiURL := httpx.BaseURL(v.apiURL, defaultAPIURL)
 
-	apiURL := v.apiURL
-	if apiURL == "" {
-		apiURL = defaultAPIURL
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL+"/account", nil)
-	if err != nil {
-		slog.ErrorContext(ctx, "heroku verifier: failed to create request", slog.String("error", err.Error()))
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("failed to create request: %v", err),
-		}
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/vnd.heroku+json; version=3")
-	req.Header.Set("User-Agent", "leakwatch-verifier")
-
-	client := v.httpClient
-	if client == nil {
-		client = httpx.Client()
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		slog.ErrorContext(ctx, "heroku verifier: request failed", slog.String("error", err.Error()))
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("request failed: %v", err),
-		}
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// A redirect from an API endpoint means the credential context is wrong
-	// (for example a login redirect or a moved host). The shared client does
-	// not follow redirects so the credential is never re-sent to the redirect
-	// target; treat it as a verification error rather than an active secret.
-	if httpx.IsRedirect(resp.StatusCode) {
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("unexpected redirect (status %d)", resp.StatusCode),
-		}
-	}
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return handleActiveToken(ctx, resp.Body)
-	case http.StatusUnauthorized:
-		slog.DebugContext(ctx, "heroku verifier: token is inactive")
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifiedInactive,
-			Message: "Heroku API key is invalid or revoked",
-		}
-	default:
-		slog.ErrorContext(
-			ctx, "heroku verifier: unexpected status code",
-			slog.Int("status_code", resp.StatusCode),
-		)
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("unexpected status code: %d", resp.StatusCode),
-		}
-	}
+	return httpx.VerifyToken(ctx, v.httpClient, token, httpx.TokenSpec{
+		Name: "heroku",
+		Request: httpx.Request{
+			URL: apiURL + "/account",
+			Header: map[string]string{
+				"Authorization": "Bearer " + token,
+				"Accept":        "application/vnd.heroku+json; version=3",
+			},
+		},
+		ActiveMessage:   "Heroku API key is active",
+		InactiveMessage: "Heroku API key is invalid or revoked",
+		Decode:          decodeAccount,
+	})
 }
 
-// handleActiveToken parses the Heroku API response for a valid token.
-func handleActiveToken(ctx context.Context, body io.Reader) finding.VerificationResult {
+// decodeAccount parses the Heroku API response for a valid token.
+func decodeAccount(body io.Reader) (map[string]string, string, error) {
 	var account struct {
 		Email string `json:"email"`
 	}
-
-	if err := json.NewDecoder(httpx.LimitReader(body)).Decode(&account); err != nil {
-		slog.ErrorContext(ctx, "heroku verifier: failed to decode response", slog.String("error", err.Error()))
-		return finding.VerificationResult{
-			Status:  finding.StatusVerifyError,
-			Message: fmt.Sprintf("200 OK but failed to decode response body: %v", err),
-		}
+	if err := json.NewDecoder(body).Decode(&account); err != nil {
+		return nil, "", err
 	}
-
-	extra := map[string]string{
-		"email": account.Email,
-	}
-
-	slog.InfoContext(
-		ctx, "heroku verifier: token is active",
-		slog.String("email", account.Email),
-	)
-
-	return finding.VerificationResult{
-		Status:    finding.StatusVerifiedActive,
-		Message:   "Heroku API key is active",
-		ExtraData: extra,
-	}
+	return map[string]string{"email": account.Email}, "", nil
 }
