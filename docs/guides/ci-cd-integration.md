@@ -107,7 +107,7 @@ jobs:
           go-version: '1.25'
 
       - name: Leakwatch Scan
-        uses: HodeTech/leakwatch-action@v1
+        uses: HodeTech/Leakwatch@v1
         with:
           scan-type: fs
           only-verified: true
@@ -146,7 +146,7 @@ jobs:
           go-version: '1.25'
 
       - name: Leakwatch Scan
-        uses: HodeTech/leakwatch-action@v1
+        uses: HodeTech/Leakwatch@v1
         with:
           scan-type: git
           format: sarif
@@ -254,7 +254,7 @@ jobs:
           go-version: '1.25'
 
       - name: Full history scan
-        uses: HodeTech/leakwatch-action@v1
+        uses: HodeTech/Leakwatch@v1
         with:
           scan-type: git
           format: sarif
@@ -342,7 +342,7 @@ jobs:
           go-version: '1.25'
 
       - name: Filesystem scan
-        uses: HodeTech/leakwatch-action@v1
+        uses: HodeTech/Leakwatch@v1
         with:
           scan-type: fs
           format: sarif
@@ -364,7 +364,7 @@ jobs:
           go-version: '1.25'
 
       - name: Full history scan
-        uses: HodeTech/leakwatch-action@v1
+        uses: HodeTech/Leakwatch@v1
         with:
           scan-type: git
           format: sarif

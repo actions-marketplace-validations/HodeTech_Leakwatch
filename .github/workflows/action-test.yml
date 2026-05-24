@@ -1,0 +1,106 @@
+name: Action Test
+
+# Validates the composite GitHub Action (install → scan → exit-code/outputs) on
+# real runners, plus lints all workflow files. Runs when the action or this
+# workflow changes. The action installs the latest released leakwatch binary, so
+# this exercises the action mechanics rather than the CLI in this PR (the CLI has
+# its own unit tests in CI).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'action.yml'
+      - '.github/workflows/action-test.yml'
+  pull_request:
+    paths:
+      - 'action.yml'
+      - '.github/workflows/action-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.10'
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@latest
+      # shellcheck is preinstalled on ubuntu runners, so actionlint also lints
+      # the run: scripts inside the workflows.
+      - name: Run actionlint
+        run: |
+          GOBIN="$(go env GOPATH)/bin"
+          "$GOBIN/actionlint" -color
+
+  run-action:
+    name: run-action (${{ matrix.os }})
+    needs: actionlint
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build the fixture at runtime so no secret-shaped literal is ever committed
+      # (which would trip push protection / secret scanning). Reassembled at
+      # runtime, the canonical AWS docs example key triggers the
+      # aws-access-key-id detector.
+      - name: Create fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _lwtest _lwclean
+          printf 'AWS_ACCESS_KEY_ID=%s%s\n' 'AKIA' 'IOSFODNN7EXAMPLE' > _lwtest/leak.env
+          echo 'just some harmless text, no secrets here' > _lwclean/ok.txt
+
+      - name: Scan dirty fixture (expect a finding)
+        id: detect
+        uses: ./
+        with:
+          scan-type: fs
+          path: _lwtest
+          format: sarif
+          no-verify: 'true'
+          fail-on-findings: 'false'
+
+      - name: Assert a finding was reported
+        shell: bash
+        env:
+          COUNT: ${{ steps.detect.outputs.findings-count }}
+          SARIF: ${{ steps.detect.outputs.sarif-file }}
+        run: |
+          set -euo pipefail
+          echo "findings-count=$COUNT sarif-file=$SARIF"
+          [ "$COUNT" = "1" ] || { echo "::error::expected findings-count=1, got '$COUNT'"; exit 1; }
+          [ -n "$SARIF" ] && [ -f "$SARIF" ] || { echo "::error::expected SARIF file at '$SARIF'"; exit 1; }
+          echo "OK: finding detected and SARIF written"
+
+      - name: Scan clean fixture (expect no findings)
+        id: clean
+        uses: ./
+        with:
+          scan-type: fs
+          path: _lwclean
+          format: table
+          no-verify: 'true'
+          fail-on-findings: 'true'
+
+      - name: Assert no findings reported
+        shell: bash
+        env:
+          COUNT: ${{ steps.clean.outputs.findings-count }}
+        run: |
+          set -euo pipefail
+          [ "$COUNT" = "0" ] || { echo "::error::expected findings-count=0, got '$COUNT'"; exit 1; }
+          echo "OK: clean directory reported no findings"

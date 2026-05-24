@@ -45,3 +45,29 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      # Move the floating major tag (e.g. v1) to this release so consumers can
+      # pin `uses: HodeTech/Leakwatch@v1` and always get the latest v1.x. Skipped
+      # for pre-releases (tags containing a hyphen, e.g. v1.5.0-rc.1). Uses the
+      # REST API via gh so it works with the persist-credentials: false checkout.
+      - name: Update major version tag
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          MAJOR="${TAG%%.*}"   # v1.5.0 -> v1
+          if [ "$MAJOR" = "$TAG" ] || [ -z "$MAJOR" ]; then
+            echo "Could not derive a major tag from '$TAG'; skipping."
+            exit 0
+          fi
+          echo "Pointing ${MAJOR} at ${SHA} (${TAG})"
+          if gh api "repos/${REPO}/git/refs/tags/${MAJOR}" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/${REPO}/git/refs/tags/${MAJOR}" -f sha="${SHA}" -F force=true >/dev/null
+          else
+            gh api -X POST "repos/${REPO}/git/refs" -f ref="refs/tags/${MAJOR}" -f sha="${SHA}" >/dev/null
+          fi
+          echo "Major tag ${MAJOR} now points at ${TAG}."

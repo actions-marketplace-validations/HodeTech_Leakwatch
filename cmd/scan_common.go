@@ -24,6 +24,7 @@ import (
 	"github.com/HodeTech/leakwatch/internal/filter"
 	"github.com/HodeTech/leakwatch/internal/output"
 	csvout "github.com/HodeTech/leakwatch/internal/output/csv"
+	githubout "github.com/HodeTech/leakwatch/internal/output/github"
 	jsonout "github.com/HodeTech/leakwatch/internal/output/json"
 	sarifout "github.com/HodeTech/leakwatch/internal/output/sarif"
 	tableout "github.com/HodeTech/leakwatch/internal/output/table"
@@ -224,6 +225,11 @@ func selectFormatter(format string, showRaw bool, colorEnabled bool) output.Form
 		return &csvout.Formatter{ShowRaw: showRaw}
 	case "table":
 		return &tableout.Formatter{ShowRaw: showRaw, ColorEnabled: colorEnabled}
+	case "github":
+		// The GitHub annotations formatter intentionally ignores showRaw: it
+		// only ever emits the redacted value, since annotations render in the
+		// (often public) PR UI and run logs.
+		return &githubout.Formatter{}
 	default:
 		return &jsonout.Formatter{ShowRaw: showRaw}
 	}
