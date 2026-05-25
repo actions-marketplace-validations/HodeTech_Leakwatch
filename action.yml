@@ -289,12 +289,12 @@ runs:
         # Do NOT echo the assembled args: path/extra-args may carry credentials
         # (tokens, authenticated URLs) that GitHub log masking would not catch.
         echo "Running leakwatch scan (type=${INPUT_SCAN_TYPE}, format=${INPUT_FORMAT})"
-        # GitHub invokes bash with -e; findings legitimately exit 1, so disable
-        # errexit around the scan and map the exit code ourselves below (otherwise
-        # the step would abort here and fail-on-findings: false would be ignored).
-        set +e
-        leakwatch "${ARGS[@]}"
-        EXIT_CODE=$?
+        # GitHub invokes bash with -e, and findings legitimately exit 1. Capture
+        # the exit code without disabling errexit globally (via `|| EXIT_CODE=$?`),
+        # so later commands in this step still fail fast. Without this, the step
+        # would abort here and fail-on-findings: false would be ignored.
+        EXIT_CODE=0
+        leakwatch "${ARGS[@]}" || EXIT_CODE=$?
 
         # ---- Job summary ------------------------------------------------------
         if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
@@ -310,7 +310,7 @@ runs:
                 echo ""
                 echo "| Level | Detector | Location |"
                 echo "| --- | --- | --- |"
-                jq -r '.runs[].results[] | "| \(.level) | \(.ruleId) | \((.locations[0].physicalLocation.artifactLocation.uri // "-"))\(if .locations[0].physicalLocation.region.startLine then ":" + (.locations[0].physicalLocation.region.startLine | tostring) else "" end) |"' "$OUT" 2>/dev/null | head -50
+                jq -r '.runs[].results[] | "| \(.level) | \(.ruleId) | \((.locations[0].physicalLocation.artifactLocation.uri // "-"))\(if .locations[0].physicalLocation.region.startLine then ":" + (.locations[0].physicalLocation.region.startLine | tostring) else "" end) |"' "$OUT" 2>/dev/null | head -50 || true
                 if [ "${total:-0}" -gt 50 ] 2>/dev/null; then
                   echo ""
                   echo "_…showing the first 50 of ${total} findings._"

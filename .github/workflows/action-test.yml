@@ -142,10 +142,14 @@ jobs:
           set -uo pipefail
           mkdir -p _fx
           printf 'AWS_ACCESS_KEY_ID=%s%s\n' 'AKIA' 'IOSFODNN7EXAMPLE' > _fx/leak.env
-          # leakwatch exits 1 on findings; `|| true` so the capture doesn't abort
-          # the step under bash -e (GitHub's default shell flags).
-          out="$("${RUNNER_TEMP}/leakwatch" scan fs _fx --format github --no-verify 2>/dev/null || true)"
+          # leakwatch exits 1 on findings (expected here); capture the code so the
+          # step doesn't abort under bash -e, but still fail on a real error (>=2).
+          rc=0
+          out="$("${RUNNER_TEMP}/leakwatch" scan fs _fx --format github --no-verify 2>/dev/null)" || rc=$?
           echo "$out"
+          if [ "$rc" -ge 2 ]; then
+            echo "::error::leakwatch exited with $rc (a hard error, not findings)"; exit 1
+          fi
           echo "$out" | grep -q '^::error .*aws-access-key-id' \
-            || { echo "::error::expected an ::error annotation for aws-access-key-id"; exit 1; }
+            || { echo "::error::expected an ::error annotation for aws-access-key-id (exit was $rc)"; exit 1; }
           echo "OK: --format github emitted an inline annotation"
