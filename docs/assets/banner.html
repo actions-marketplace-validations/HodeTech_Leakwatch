@@ -19,8 +19,7 @@
   body { width:1200px; height:480px; overflow:hidden; }
   .banner {
     width:1200px; height:480px; position:relative; overflow:hidden;
-    background:
-      linear-gradient(135deg, #0c0d10 0%, #0a0b0d 100%);
+    background:linear-gradient(135deg, #0c0d10 0%, #0a0b0d 100%);
     font-family:'Space Grotesk', sans-serif; color:#f1eee5;
   }
   .grid {
@@ -30,29 +29,21 @@
       linear-gradient(90deg, #23272e 1px, transparent 1px);
     background-size:40px 40px; opacity:.35;
   }
-  .classbar {
-    position:absolute; top:0; left:0; right:0; height:32px; background:#e6394d;
-    display:flex; align-items:center; padding-left:64px;
-    font-family:'JetBrains Mono', monospace; font-weight:700; font-size:13px;
-    letter-spacing:5px; color:#0a0b0d;
+  /* Thin brand accent rule (replaces the old CLASSIFIED bar). */
+  .accent {
+    position:absolute; top:0; left:0; right:0; height:5px;
+    background:linear-gradient(90deg, #e6394d 0%, #ff6377 100%);
   }
-  .content { position:absolute; left:64px; right:64px; top:92px; }
-  .brand { display:flex; align-items:center; gap:18px; margin-bottom:40px; }
+  .content { position:absolute; left:64px; right:64px; top:88px; }
+  .brand { display:flex; align-items:center; gap:18px; margin-bottom:38px; }
   .brand svg { width:50px; height:50px; }
-  .wordmark { font-weight:700; font-size:56px; letter-spacing:-1px; line-height:1; }
+  .wordmark { font-weight:700; font-size:54px; letter-spacing:-1px; line-height:1; }
   .wordmark b { color:#ff6377; font-weight:700; }
-  .headline { font-weight:700; font-size:48px; letter-spacing:-1px; line-height:1.15; }
-  .redact {
-    display:inline-block; border-radius:4px; padding:0 .28em; color:transparent;
-    position:relative; vertical-align:baseline; background:#15181d;
-  }
-  .redact::after {
-    content:""; position:absolute; inset:0; border-radius:4px;
-    background:repeating-linear-gradient(45deg, #2c3138 0, #2c3138 7px, #15181d 7px, #15181d 14px);
-  }
+  .headline { font-weight:700; font-size:52px; letter-spacing:-1.5px; line-height:1.12; }
+  .headline .t { color:#ff6377; }
   .subtitle {
-    font-family:'JetBrains Mono', monospace; font-weight:400; font-size:23px;
-    color:#8b9098; margin-top:26px;
+    font-family:'JetBrains Mono', monospace; font-weight:400; font-size:22px;
+    color:#8b9098; margin-top:24px; line-height:1.5;
   }
   .stats {
     position:absolute; left:64px; bottom:74px;
@@ -70,7 +61,7 @@
 <body>
   <div class="banner">
     <div class="grid"></div>
-    <div class="classbar">CLASSIFIED — LEAKWATCH FIELD REPORT</div>
+    <div class="accent"></div>
     <div class="content">
       <div class="brand">
         <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -81,8 +72,8 @@
         </svg>
         <span class="wordmark">Leak<b>watch</b></span>
       </div>
-      <div class="headline">Some secrets shouldn't be <span class="redact">visible</span>.</div>
-      <div class="subtitle">Leakwatch finds the ones that are — detect · verify · report.</div>
+      <div class="headline">Find leaked secrets<br>before <span class="t">attackers</span> do.</div>
+      <div class="subtitle">Detect · verify · report — across code, git history, containers &amp; cloud.</div>
     </div>
     <div class="stats">
       <span class="g">63 detectors</span><span class="sep">·</span>
