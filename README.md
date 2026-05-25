@@ -229,7 +229,7 @@ That's **54 of 63 detectors (85.7%)** with verification. Verification is on by d
 | `sarif` | GitHub Code Scanning / security tooling (v2.1.0) |
 | `csv` | Spreadsheets (sanitized against formula injection) |
 | `table` | Human-readable terminal output (severity-colored) |
-| `github` | Inline pull-request annotations in GitHub Actions |
+| `github` | Inline pull request annotations in GitHub Actions |
 
 ## Configuration
 
