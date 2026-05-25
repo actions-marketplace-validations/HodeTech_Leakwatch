@@ -11,7 +11,7 @@ Open source (MIT) · single binary · built for CI.
 [![Go Report Card](https://goreportcard.com/badge/github.com/HodeTech/leakwatch)](https://goreportcard.com/report/github.com/HodeTech/leakwatch)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Leakwatch-2ea44f?logo=github)](https://github.com/marketplace/actions/leakwatch-secret-scanner)
 
-[Quick Start](#-quick-start) · [GitHub Action](#-github-action) · [Verification](#-is-it-still-live) · [Detectors](#-detectors) · [Docs](https://hodetech.github.io/Leakwatch/)
+[Quick Start](#quick-start) · [GitHub Action](#github-action) · [Verification](#is-it-still-live) · [Detectors](#detectors) · [Docs](https://hodetech.github.io/Leakwatch/)
 
 </div>
 
@@ -33,19 +33,19 @@ CRITICAL  aws-access-key-id           config.env  ****MPLE                      
 Found 3 secrets (3 critical).
 ```
 
-> Secret values are **redacted by default** and never written to disk or logs. See [Security](#-security).
+> Secret values are **redacted by default** and never written to disk or logs. See [Security](#security).
 
-## ✨ Features
+## Features
 
-- 🔎 **6 scan sources** — filesystem, Git history (every commit), container images, AWS S3, Google Cloud Storage, Slack
-- 🧠 **63 built-in detectors** + **YAML custom rules** (no Go code needed)
-- ✅ **54 live verifiers (85.7%)** — confirms whether a secret is *still active*, not just present
-- 📦 **5 output formats** — JSON, SARIF, CSV, terminal table, and **GitHub inline annotations**
-- 🚀 **Drop-in distribution** — GitHub Action (Marketplace), Docker image, Homebrew, `go install`, single static binary
-- 🔒 **Secret-safe** — redacted output by default; secrets are never logged or stored
-- 🏎️ **Fast & CI-ready** — Aho-Corasick keyword pre-filter + Shannon entropy, concurrent worker pool, exit-code aware, SARIF → Code Scanning
+- **6 scan sources** — filesystem, Git history (every commit), container images, AWS S3, Google Cloud Storage, Slack
+- **63 built-in detectors** + **YAML custom rules** (no Go code needed)
+- **54 live verifiers (85.7%)** — confirms whether a secret is *still active*, not just present
+- **5 output formats** — JSON, SARIF, CSV, terminal table, and **GitHub inline annotations**
+- **Drop-in distribution** — GitHub Action (Marketplace), Docker image, Homebrew, `go install`, single static binary
+- **Secret-safe** — redacted output by default; secrets are never logged or stored
+- **Fast & CI-ready** — Aho-Corasick keyword pre-filter + Shannon entropy, concurrent worker pool, exit-code aware, SARIF → Code Scanning
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # Homebrew (macOS/Linux)
@@ -83,7 +83,7 @@ leakwatch scan fs . --remediation            # include rotation steps & doc link
 
 </details>
 
-## 🤖 GitHub Action
+## GitHub Action
 
 Add secret scanning to any workflow in one line — published on the [GitHub Marketplace](https://github.com/marketplace/actions/leakwatch-secret-scanner):
 
@@ -102,7 +102,7 @@ Exit codes (used for CI gating): **`0`** no findings · **`1`** findings reporte
 
 Full inputs and recipes: **[CI/CD Integration guide](docs/guides/ci-cd-integration.md)**.
 
-## 🔬 Is it still live?
+## Is it still live?
 
 Detection is only half the job — a key that was already rotated isn't an incident. For most secret types, Leakwatch makes a **controlled, read-only API call** to the provider to confirm status:
 
@@ -114,7 +114,7 @@ Detection is only half the job — a key that was already rotated isn't an incid
 
 That's **54 of 63 detectors (85.7%)** with verification. Verification is on by default for the CLI and off by default in the Action (to keep CI fast and offline) — flip it with `no-verify`.
 
-## 🆚 Why Leakwatch?
+## Why Leakwatch?
 
 | | **Leakwatch** | TruffleHog | Gitleaks |
 |---|---|---|---|
@@ -131,7 +131,7 @@ That's **54 of 63 detectors (85.7%)** with verification. Verification is on by d
 [^gl]: The Gitleaks CLI is MIT; the official `gitleaks-action` runs under a commercial EULA and needs a (free) license key for **organization** accounts.
 [^th]: TruffleHog emits JSON / plain / GitHub-Actions output and has no native SARIF formatter. All three tools use Aho-Corasick pre-filtering, Shannon-entropy filtering, and support custom rules.
 
-## 🧩 Detectors
+## Detectors
 
 **63 built-in detectors** across these categories, plus your own [YAML custom rules](docs/guides/custom-rules.md):
 
@@ -219,7 +219,7 @@ That's **54 of 63 detectors (85.7%)** with verification. Verification is on by d
 
 </details>
 
-## 📤 Output formats
+## Output formats
 
 `--format` selects the output; `--output`/`-o` writes to a file instead of stdout.
 
@@ -231,7 +231,7 @@ That's **54 of 63 detectors (85.7%)** with verification. Verification is on by d
 | `table` | Human-readable terminal output (severity-colored) |
 | `github` | Inline pull-request annotations in GitHub Actions |
 
-## ⚙️ Configuration
+## Configuration
 
 Generate a starter file with `leakwatch init`, or write `.leakwatch.yaml`:
 
@@ -253,13 +253,13 @@ output:
 
 Use `.leakwatchignore` and `# leakwatch:ignore` markers to suppress known false positives. Details: **[Configuration guide](docs/guides/configuration.md)**.
 
-## 🔒 Security
+## Security
 
 - Secret values are **redacted by default** (e.g. `AKIA****MPLE`) and are **never written to disk or logs**. The raw value is only emitted if you explicitly pass `--show-raw`.
 - Verification uses **controlled, read-only** API calls to providers; it makes no state-changing requests.
 - Found a vulnerability? Please report it privately via a [GitHub security advisory](https://github.com/HodeTech/Leakwatch/security/advisories/new).
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 flowchart LR
@@ -287,7 +287,7 @@ flowchart LR
 
 Deep dive: [Architecture](docs/architecture/03-ARCHITECTURE.md) · [ADRs](docs/decisions/README.md)
 
-## 📚 Documentation
+## Documentation
 
 Full bilingual (EN/TR) manuals are at **[hodetech.github.io/Leakwatch](https://hodetech.github.io/Leakwatch/)**. Quick links:
 
@@ -304,7 +304,7 @@ Full bilingual (EN/TR) manuals are at **[hodetech.github.io/Leakwatch](https://h
 [VS Code Extension](docs/guides/vscode-extension.md) ·
 [Roadmap](docs/05-ROADMAP.md)
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -313,6 +313,6 @@ git clone https://github.com/HodeTech/Leakwatch.git
 cd Leakwatch && go mod download && go test ./...
 ```
 
-## 📄 License
+## License
 
 [MIT](LICENSE) © HodeTech — Leakwatch is maintained by [HodeTech](https://github.com/HodeTech).

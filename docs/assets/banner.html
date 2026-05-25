@@ -1,0 +1,96 @@
+<!doctype html>
+<!-- Source for docs/assets/banner.png. Re-render (2x) with:
+     chrome --headless --screenshot=docs/assets/banner.png \
+       --window-size=1200,480 --force-device-scale-factor=2 \
+       --default-background-color=00000000 --virtual-time-budget=3000 \
+       file://$PWD/docs/assets/banner.html -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family:'Space Grotesk'; font-weight:700; font-display:block;
+    src:url('../../site/assets/fonts/space-grotesk-700-latin.woff2') format('woff2'); }
+  @font-face { font-family:'JetBrains Mono'; font-weight:400; font-display:block;
+    src:url('../../site/assets/fonts/jetbrains-mono-400-latin.woff2') format('woff2'); }
+  @font-face { font-family:'JetBrains Mono'; font-weight:700; font-display:block;
+    src:url('../../site/assets/fonts/jetbrains-mono-700-latin.woff2') format('woff2'); }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { width:1200px; height:480px; overflow:hidden; }
+  .banner {
+    width:1200px; height:480px; position:relative; overflow:hidden;
+    background:
+      linear-gradient(135deg, #0c0d10 0%, #0a0b0d 100%);
+    font-family:'Space Grotesk', sans-serif; color:#f1eee5;
+  }
+  .grid {
+    position:absolute; inset:0;
+    background-image:
+      linear-gradient(#23272e 1px, transparent 1px),
+      linear-gradient(90deg, #23272e 1px, transparent 1px);
+    background-size:40px 40px; opacity:.35;
+  }
+  .classbar {
+    position:absolute; top:0; left:0; right:0; height:32px; background:#e6394d;
+    display:flex; align-items:center; padding-left:64px;
+    font-family:'JetBrains Mono', monospace; font-weight:700; font-size:13px;
+    letter-spacing:5px; color:#0a0b0d;
+  }
+  .content { position:absolute; left:64px; right:64px; top:92px; }
+  .brand { display:flex; align-items:center; gap:18px; margin-bottom:40px; }
+  .brand svg { width:50px; height:50px; }
+  .wordmark { font-weight:700; font-size:56px; letter-spacing:-1px; line-height:1; }
+  .wordmark b { color:#ff6377; font-weight:700; }
+  .headline { font-weight:700; font-size:48px; letter-spacing:-1px; line-height:1.15; }
+  .redact {
+    display:inline-block; border-radius:4px; padding:0 .28em; color:transparent;
+    position:relative; vertical-align:baseline; background:#15181d;
+  }
+  .redact::after {
+    content:""; position:absolute; inset:0; border-radius:4px;
+    background:repeating-linear-gradient(45deg, #2c3138 0, #2c3138 7px, #15181d 7px, #15181d 14px);
+  }
+  .subtitle {
+    font-family:'JetBrains Mono', monospace; font-weight:400; font-size:23px;
+    color:#8b9098; margin-top:26px;
+  }
+  .stats {
+    position:absolute; left:64px; bottom:74px;
+    font-family:'JetBrains Mono', monospace; font-weight:700; font-size:22px;
+    display:flex; gap:34px; align-items:center;
+  }
+  .stats .sep { color:#3a3f47; font-weight:400; }
+  .g { color:#34d39a; } .y { color:#f0b429; } .b { color:#5aa9e6; } .r { color:#ff6377; }
+  .footer {
+    position:absolute; left:64px; bottom:34px;
+    font-family:'JetBrains Mono', monospace; font-weight:400; font-size:18px; color:#5b616b;
+  }
+</style>
+</head>
+<body>
+  <div class="banner">
+    <div class="grid"></div>
+    <div class="classbar">CLASSIFIED — LEAKWATCH FIELD REPORT</div>
+    <div class="content">
+      <div class="brand">
+        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2.5" y="2.5" width="27" height="27" rx="6" fill="#16191e" stroke="#e6394d" stroke-width="1.8"/>
+          <rect x="7.5" y="10.6" width="17" height="3.6" rx="1.2" fill="#0a0b0d"/>
+          <rect x="7.5" y="16.6" width="10.5" height="3.6" rx="1.2" fill="#0a0b0d"/>
+          <circle cx="22" cy="18.9" r="2.7" fill="none" stroke="#34d39a" stroke-width="1.8"/>
+        </svg>
+        <span class="wordmark">Leak<b>watch</b></span>
+      </div>
+      <div class="headline">Some secrets shouldn't be <span class="redact">visible</span>.</div>
+      <div class="subtitle">Leakwatch finds the ones that are — detect · verify · report.</div>
+    </div>
+    <div class="stats">
+      <span class="g">63 detectors</span><span class="sep">·</span>
+      <span class="y">54 live verifiers</span><span class="sep">·</span>
+      <span class="b">6 sources</span><span class="sep">·</span>
+      <span class="r">5 output formats</span>
+    </div>
+    <div class="footer">github.com/HodeTech/Leakwatch · MIT</div>
+  </div>
+</body>
+</html>
