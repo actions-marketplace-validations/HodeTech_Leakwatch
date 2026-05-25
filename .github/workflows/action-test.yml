@@ -144,8 +144,13 @@ jobs:
           printf 'AWS_ACCESS_KEY_ID=%s%s\n' 'AKIA' 'IOSFODNN7EXAMPLE' > _fx/leak.env
           # leakwatch exits 1 on findings (expected here); capture the code so the
           # step doesn't abort under bash -e, but still fail on a real error (>=2).
-          rc=0
-          out="$("${RUNNER_TEMP}/leakwatch" scan fs _fx --format github --no-verify 2>/dev/null)" || rc=$?
+          # Explicit if/else makes the exit-code capture obvious (an assignment's
+          # status mirrors its command substitution).
+          if out="$("${RUNNER_TEMP}/leakwatch" scan fs _fx --format github --no-verify 2>/dev/null)"; then
+            rc=0
+          else
+            rc=$?
+          fi
           echo "$out"
           if [ "$rc" -ge 2 ]; then
             echo "::error::leakwatch exited with $rc (a hard error, not findings)"; exit 1

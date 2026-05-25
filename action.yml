@@ -310,7 +310,7 @@ runs:
                 echo ""
                 echo "| Level | Detector | Location |"
                 echo "| --- | --- | --- |"
-                jq -r '.runs[].results[] | "| \(.level) | \(.ruleId) | \((.locations[0].physicalLocation.artifactLocation.uri // "-"))\(if .locations[0].physicalLocation.region.startLine then ":" + (.locations[0].physicalLocation.region.startLine | tostring) else "" end) |"' "$OUT" 2>/dev/null | head -50 || true
+                jq -r '.runs[].results[] | "| \(.level) | \(.ruleId) | \((.locations[0].physicalLocation.artifactLocation.uri // "-"))\(if .locations[0].physicalLocation.region.startLine then ":" + (.locations[0].physicalLocation.region.startLine | tostring) else "" end) |"' "$OUT" 2>/dev/null | head -50 || echo "_(could not render the findings table; see the SARIF artifact)_"
                 if [ "${total:-0}" -gt 50 ] 2>/dev/null; then
                   echo ""
                   echo "_…showing the first 50 of ${total} findings._"
