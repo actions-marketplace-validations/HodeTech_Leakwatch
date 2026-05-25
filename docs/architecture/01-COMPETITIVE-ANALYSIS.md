@@ -195,11 +195,12 @@ While existing open-source tools (TruffleHog, Gitleaks) are strong in certain ar
 | **Custom Rules** | YAML config | TOML (easy) | Plugin (Python) | Limited | Enterprise | **YAML (easy)** |
 | **Allowlist/Ignore** | Basic | Advanced | Baseline | None | Yes | **Advanced** |
 | **License** | AGPL-3.0 | MIT* | Apache 2.0 | Commercial | Commercial | **MIT** |
-
-> \* The Gitleaks CLI is MIT-licensed; the official `gitleaks-action` runs under a commercial EULA and requires a free license key for **organization** accounts (personal accounts are exempt).
-> **TruffleHog notes:** it fully uses Aho-Corasick keyword pre-filtering (`pkg/engine/ahocorasick/`); it has **no native SARIF** output (JSON / plain / GitHub-Actions only); and it **does** support custom detectors via a YAML `config.yaml` (`detectors:` block) — not "Go code only".
 | **Single Binary** | Yes | Yes | No (Python) | N/A | No (Python) | **Yes** |
 | **Remediation** | No | No | No | Partner revoke | Dashboard | **Planned** |
+
+> \* The Gitleaks CLI is MIT-licensed; the official `gitleaks-action` runs under a commercial EULA and requires a free license key for **organization** accounts (personal accounts are exempt).
+>
+> **TruffleHog notes:** it fully uses Aho-Corasick keyword pre-filtering (`pkg/engine/ahocorasick/`); it has **no native SARIF** output (JSON / plain / GitHub-Actions only); and it **does** support custom detectors via a YAML `config.yaml` (`detectors:` block) — not "Go code only".
 
 ---
 

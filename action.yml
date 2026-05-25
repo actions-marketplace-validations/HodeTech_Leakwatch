@@ -74,7 +74,7 @@ inputs:
 
 outputs:
   findings-count:
-    description: 'Number of secrets found (0 or 1; mirrors the leakwatch exit code).'
+    description: 'Whether secrets were reported: 1 if any finding was reported, else 0 (mirrors the leakwatch exit code; not a count).'
     value: ${{ steps.scan.outputs.findings-count }}
   sarif-file:
     description: 'Path to the SARIF output file relative to the repository root (set when format=sarif).'
@@ -109,13 +109,15 @@ runs:
 
         # ---- Resolve the release tag ------------------------------------------
         if [ "$LW_VERSION" = "latest" ]; then
-          eff="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/${LW_REPO}/releases/latest")"
+          # `|| true` so a 404 (repo has no releases) does not abort under set -e
+          # before the curated error below can run.
+          eff="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/${LW_REPO}/releases/latest" || true)"
           TAG="${eff##*/}"
         else
           TAG="$LW_VERSION"
         fi
         if [ -z "$TAG" ] || [ "$TAG" = "latest" ] || [ "$TAG" = "releases" ]; then
-          echo "::error::Could not resolve a Leakwatch release tag (got '$TAG')."
+          echo "::error::Could not resolve the latest release tag for ${LW_REPO}. Does it have any releases? See https://github.com/${LW_REPO}/releases"
           exit 1
         fi
         VER="${TAG#v}"  # goreleaser archive names omit the leading 'v'
@@ -248,8 +250,16 @@ runs:
               echo "::error::scan-diff: true but no base commit is available for event '${GH_EVENT_NAME}'. Use pull_request/push and checkout with fetch-depth: 0."; exit 1
             fi
             echo "::notice::scan-diff: auto found no base commit for '${GH_EVENT_NAME}'; scanning full history."
-          else
+          elif git -C "$INPUT_PATH" cat-file -e "${base}^{commit}" 2>/dev/null; then
             ARGS+=(--since-commit "$base")
+          elif [ "$INPUT_SCAN_DIFF" = "true" ]; then
+            # The base exists upstream but not in this clone (default fetch-depth: 1).
+            # leakwatch would hard-fail (exit 2); since the user forced diff, fail
+            # with actionable guidance rather than silently scanning everything.
+            echo "::error::scan-diff: true but base commit ${base} is not in the local clone. Check out with fetch-depth: 0."; exit 1
+          else
+            # auto: degrade gracefully instead of hard-failing a pipeline.
+            echo "::warning::scan-diff: auto could not find base commit ${base} locally (shallow checkout?); scanning full history. Use fetch-depth: 0 for diff scans."
           fi
         fi
 
@@ -260,9 +270,11 @@ runs:
           # shellcheck disable=SC2206
           extra=($INPUT_EXTRA_ARGS)
           for a in "${extra[@]}"; do
+            # Prefix-match so combined shorthand (-fcsv, -o/tmp/x) and =forms are
+            # all caught. -f/-o are format/output here and have no other meaning.
             case "$a" in
-              -f|--format|--format=*|-o|--output|--output=*|--config|--config=*|--show-raw|--show-raw=*)
-                echo "::error::extra-args may not contain '${a%%=*}'; use the dedicated action input (format/output/config) instead."
+              -f*|--format*|-o*|--output*|--config*|--show-raw*)
+                echo "::error::extra-args may not set format/output/config/show-raw ('$a'); use the dedicated action inputs instead."
                 exit 1 ;;
             esac
           done

@@ -314,6 +314,15 @@ func renderResult(cfg *scanConfig, result *engine.ScanResult, sourceType, ignore
 		result.Findings = []finding.Finding{}
 	}
 
+	// The "github" format emits GitHub Actions workflow commands, which only take
+	// effect on the live stdout stream — writing them to a file does nothing. If an
+	// output file was configured (e.g. output.file in .leakwatch.yaml), ignore it
+	// so the annotations always reach stdout instead of being silently swallowed.
+	if cfg.format == "github" && cfg.outputFile != "" {
+		slog.Debug("ignoring output file for github format; annotations are written to stdout", "file", cfg.outputFile)
+		cfg.outputFile = ""
+	}
+
 	colorEnabled := resolveColorEnabled(cfg.format, cfg.outputFile)
 	formatter := selectFormatter(cfg.format, cfg.showRaw, colorEnabled)
 
