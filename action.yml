@@ -310,7 +310,17 @@ runs:
                 echo ""
                 echo "| Level | Detector | Location |"
                 echo "| --- | --- | --- |"
-                jq -r '.runs[].results[] | "| \(.level) | \(.ruleId) | \((.locations[0].physicalLocation.artifactLocation.uri // "-"))\(if .locations[0].physicalLocation.region.startLine then ":" + (.locations[0].physicalLocation.region.startLine | tostring) else "" end) |"' "$OUT" 2>/dev/null | head -50 || echo "_(could not render the findings table; see the SARIF artifact)_"
+                # Render to a temp file first, then take the first 50 lines from
+                # it. Piping jq directly into `head` would give jq a SIGPIPE once
+                # head closes (after 50 lines), and under pipefail that non-zero
+                # status would trip the fallback even though the table rendered.
+                tbl="$(mktemp)"
+                if jq -r '.runs[].results[] | "| \(.level) | \(.ruleId) | \((.locations[0].physicalLocation.artifactLocation.uri // "-"))\(if .locations[0].physicalLocation.region.startLine then ":" + (.locations[0].physicalLocation.region.startLine | tostring) else "" end) |"' "$OUT" > "$tbl" 2>/dev/null && [ -s "$tbl" ]; then
+                  head -n 50 "$tbl"
+                else
+                  echo "_(could not render the findings table; see the SARIF artifact)_"
+                fi
+                rm -f "$tbl"
                 if [ "${total:-0}" -gt 50 ] 2>/dev/null; then
                   echo ""
                   echo "_…showing the first 50 of ${total} findings._"
