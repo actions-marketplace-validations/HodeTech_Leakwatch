@@ -14,13 +14,15 @@ package detector_test
 //     rules at runtime (detector.RegisterIfAbsent) and is therefore not part of
 //     the compile-time count.
 //
-// If you add or remove a detector, update wantDetectorCount below and keep the
-// blank-import block in sync with cmd/imports.go.
+// If you add or remove a detector, update internal/meta.Detectors (the single
+// source of truth for the published count) and keep the blank-import block in
+// sync with cmd/imports.go.
 
 import (
 	"testing"
 
 	"github.com/HodeTech/leakwatch/internal/detector"
+	"github.com/HodeTech/leakwatch/internal/meta"
 	"github.com/stretchr/testify/assert"
 
 	// Each blank import runs the package's init(), registering its detector(s)
@@ -88,9 +90,6 @@ import (
 	_ "github.com/HodeTech/leakwatch/internal/detector/vercel"       // register vercel detector
 )
 
-// wantDetectorCount is the expected number of compile-time registered detectors.
-const wantDetectorCount = 63
-
 // registeredAtInit snapshots the registry right after every blank-imported
 // detector package has run its init(), but before any test can mutate the
 // global registry (the in-package registry_test.go calls detector.Reset()).
@@ -102,8 +101,8 @@ func init() {
 }
 
 func TestAll_RegisteredDetectorCount_MatchesGolden(t *testing.T) {
-	assert.Len(t, registeredAtInit, wantDetectorCount,
-		"compile-time registered detector count drifted; update wantDetectorCount and cmd/imports.go together")
+	assert.Len(t, registeredAtInit, meta.Detectors,
+		"compile-time registered detector count drifted; update internal/meta.Detectors and cmd/imports.go together")
 
 	// Every registered detector must have a unique, non-empty ID.
 	ids := make(map[string]bool, len(registeredAtInit))
