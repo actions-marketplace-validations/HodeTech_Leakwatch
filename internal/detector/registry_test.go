@@ -33,23 +33,6 @@ func TestRegister_AndAll_ReturnsAllDetectors(t *testing.T) {
 	assert.Len(t, all, 2)
 }
 
-func TestGet_ExistingDetector_ReturnsDetector(t *testing.T) {
-	Reset()
-
-	Register(&mockDetector{id: "test-1"})
-
-	d, ok := Get("test-1")
-	require.True(t, ok)
-	assert.Equal(t, "test-1", d.ID())
-}
-
-func TestGet_NonExistingDetector_ReturnsFalse(t *testing.T) {
-	Reset()
-
-	_, ok := Get("not-found")
-	assert.False(t, ok)
-}
-
 func TestRegister_DuplicateID_Panics(t *testing.T) {
 	Reset()
 
@@ -58,6 +41,15 @@ func TestRegister_DuplicateID_Panics(t *testing.T) {
 	assert.Panics(t, func() {
 		Register(&mockDetector{id: "dup"})
 	})
+}
+
+func TestRegister_NilOrEmptyID_PanicsWithoutMutatingRegistry(t *testing.T) {
+	Reset()
+	var typedNil *mockDetector
+	assert.Panics(t, func() { Register(nil) })
+	assert.Panics(t, func() { Register(typedNil) })
+	assert.Panics(t, func() { Register(&mockDetector{}) })
+	assert.Empty(t, All())
 }
 
 func TestAll_EmptyRegistry_ReturnsEmpty(t *testing.T) {

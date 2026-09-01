@@ -28,7 +28,7 @@ go install github.com/HodeTech/leakwatch@latest
 İkili dosya `$(go env GOPATH)/bin` dizinine yerleştirilir. Bu dizinin `PATH` değişkeninde olduğundan emin olun.
 
 :::note
-`go install` her zaman en son etiketli sürümü getirir. Belirli bir sürüme sabitlemek için `@latest` yerine `@v1.5.0` gibi bir etiket kullanın.
+`go install` her zaman en son etiketli sürümü getirir. Belirli bir sürüme sabitlemek için `@latest` yerine güncel sürüm etiketi olan `@v1.8.0` değerini kullanın.
 :::
 
 ## Docker
@@ -47,8 +47,8 @@ Kullanılabilir etiketler:
 | Etiket | Açıklama |
 |--------|----------|
 | `:latest` | En son sürüm |
-| `:v1.5.0` | Tam sürüm sabitleme |
-| `:v1.5` | Küçük sürüm sabitleme (yama sürümlerini takip eder) |
+| `:v1.8.0` | Güncel sürüme tam sabitleme |
+| `:v1.7` | Güncel küçük sürüme sabitleme (yama sürümlerini takip eder) |
 
 Taramak istediğiniz dizini konteyner içindeki `/scan` dizinine bağlayın. Bayraklar ve seçenekler yerel ikili dosyayla tamamen aynı şekilde çalışır — tam liste için [CLI Referansı](#/reference/cli-reference) sayfasına bakın.
 
@@ -71,6 +71,10 @@ sudo mv leakwatch /usr/local/bin/leakwatch
 
 Platform adlandırması `leakwatch_<OS>_<ARCH>.tar.gz` kalıbını izler; `<OS>` değeri `Linux`, `Darwin` veya `Windows`, `<ARCH>` değeri ise `amd64` veya `arm64` olabilir.
 
+:::tip
+Her sürüm ayrıca her arşiv için bir Yazılım Malzeme Listesi (SBOM) ve sürümün sağlama toplamları dosyası üzerinde bir [Sigstore/cosign](https://github.com/sigstore/cosign) anahtarsız imza (`checksums.txt.sig` / `checksums.txt.pem`) yayımlar; böylece indirilen bir ikili dosyanın kökeni, tedarik zinciri açısından hassas ortamlarda doğrulanabilir.
+:::
+
 ## Kurulumu doğrulama
 
 Herhangi bir kurulum yönteminin ardından ikili dosyanın erişilebilir olduğunu doğrulayın ve sürümü kontrol edin:
@@ -82,7 +86,7 @@ leakwatch version
 Beklenen çıktı:
 
 ```text
-leakwatch v1.5.0 (commit: a3f9c12, built: 2026-05-10T08:22:00Z)
+leakwatch v1.8.0 (commit: 1a2b3c4, built: 2026-08-11T12:00:00Z)
 ```
 
 Komut bulunamazsa kurulum dizininin `PATH` değişkeninde olup olmadığını kontrol edin.

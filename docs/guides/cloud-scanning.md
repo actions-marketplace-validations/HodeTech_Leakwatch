@@ -1,10 +1,12 @@
 # Leakwatch - Cloud Storage Scanning Guide
 
-> **Document Version:** 1.0
-> **Date:** 2026-03-24
+> **Document Version:** 1.1
+> **Date:** 2026-08-11
 > **Status:** Approved
 
 ---
+
+> **Documentation role:** Supplemental operations deep dive. The [cloud-storage user manual](../user-manuals/en/scanning/cloud-storage.md) is authoritative for current source behavior and flags.
 
 ## Table of Contents
 
@@ -493,6 +495,7 @@ leakwatch scan gcs my-bucket --min-severity critical
 | **SARIF** | `--format sarif` | GitHub Security, IDE integration |
 | **CSV** | `--format csv` | Spreadsheet tools, Excel |
 | **Table** | `--format table` | Human-readable output in the terminal |
+| **GitHub** | `--format github` | Inline pull-request annotations in GitHub Actions |
 
 ### 6.2 Results in SARIF Format
 

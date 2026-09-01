@@ -1,6 +1,6 @@
 <div align="center">
 
-<a href="https://hodetech.github.io/Leakwatch/"><img src="docs/assets/banner.png" alt="Leakwatch — detect, verify & report leaked secrets" width="100%"></a>
+<a href="https://hodetech.github.io/Leakwatch/"><img src="docs/assets/banner.svg" alt="Leakwatch — detect, verify & report leaked secrets" width="100%"></a>
 
 **Detect, verify & report leaked secrets across code, Git history, containers, and the cloud.**
 Open source (MIT) · single binary · built for CI.
@@ -19,27 +19,45 @@ Open source (MIT) · single binary · built for CI.
 
 ## What is Leakwatch?
 
-Leaked API keys, tokens, and passwords are one of the most common causes of breaches. **Leakwatch** finds them across your **codebase, full Git history, container images, and cloud storage** — and then *verifies whether each secret is still live*, so you spend time on real incidents instead of triaging noise.
+Leaked API keys, tokens, and passwords are one of the most common causes of breaches. **Leakwatch** finds them across your **codebase, full Git history, container images, and cloud storage** — and, where the provider contract and required context allow it, *checks whether a secret is still live*, so you can prioritize confirmed incidents without hiding unverified risk.
 
 ```console
 $ leakwatch scan fs .
+[
+  {
+    "id": "0fc548d39e866fc47779ed3bdee3caf5",
+    "detector_id": "github-token",
+    "severity": "critical",
+    "redacted": "****cdEF",
+    "source": { "source_type": "filesystem", "file_path": "config.env", "line": 1 },
+    "verification": { "status": "unverified" },
+    "detected_at": "2026-07-16T05:20:12.397435+03:00",
+    "entropy": 4.52
+  },
+  {
+    "id": "adb4fe5fa4583bc9a37656e21522de8a",
+    "detector_id": "database-connection-string",
+    "severity": "critical",
+    "redacted": "postgres://admin:****@db.prod.internal:5432/app",
+    "source": { "source_type": "filesystem", "file_path": "config.env", "line": 2 },
+    "verification": { "status": "unverified" },
+    "detected_at": "2026-07-16T05:20:12.397452+03:00",
+    "entropy": 4.39
+  }
+]
 
-SEVERITY  DETECTOR                    FILE        REDACTED                                         STATUS      REMEDIATION
---------  --------                    ----        --------                                         ------      -----------
-CRITICAL  github-token                config.env  ****cdEF                                         unverified  -
-CRITICAL  database-connection-string  config.env  postgres://admin:****@db.prod.internal:5432/app  unverified  -
-CRITICAL  aws-access-key-id           config.env  ****MPLE                                         unverified  -
-
-Found 3 secrets (3 critical).
+── Scan Summary ─────────────────────────────────
+  Findings:        2
+─────────────────────────────────────────────────
 ```
 
-> Secret values are **redacted by default** and never written to disk or logs. See [Security](#security).
+> Output is **JSON by default** — pipe it to `jq`, or add `--format table` for a human-readable terminal view. Secret values are **redacted by default** and never written to disk or logs. See [Security](#security) and [Output formats](#output-formats).
 
 ## Features
 
 - **6 scan sources** — filesystem, Git history (every commit), container images, AWS S3, Google Cloud Storage, Slack
-- **63 built-in detectors** + **YAML custom rules** (no Go code needed)
-- **54 live verifiers (85.7%)** — confirms whether a secret is *still active*, not just present
+- **65 built-in detectors** + **YAML custom rules** (no Go code needed)
+- **39 direct live checks** + **9 context-required checks** + **6 offline format validators** — registry presence is never overstated as live capability
 - **5 output formats** — JSON, SARIF, CSV, terminal table, and **GitHub inline annotations**
 - **Drop-in distribution** — GitHub Action (Marketplace), Docker image, Homebrew, `go install`, single static binary
 - **Secret-safe** — redacted output by default; secrets are never logged or stored
@@ -98,28 +116,29 @@ Add secret scanning to any workflow in one line — published on the [GitHub Mar
 - **`format: sarif` + `sarif-upload: true`** → findings show up as **Code Scanning alerts** (needs `permissions: security-events: write`).
 - **`scan-diff: auto`** (git scans) → scans only the commits a PR/push introduces.
 
-Exit codes (used for CI gating): **`0`** no findings · **`1`** findings reported · **`2`** error.
+Exit codes (used for CI gating): **`0`** no findings · **`1`** findings reported · **`2`** error · **`3`** interrupted (Ctrl-C/SIGTERM).
 
-Full inputs and recipes: **[CI/CD Integration guide](docs/guides/ci-cd-integration.md)**.
+Full inputs and recipes: **[CI/CD manual](docs/user-manuals/en/ci-cd/github-action.md)**.
 
 ## Is it still live?
 
-Detection is only half the job — a key that was already rotated isn't an incident. For most secret types, Leakwatch makes a **controlled, read-only API call** to the provider to confirm status:
+Detection is only half the job — a key that was already rotated isn't an incident. For most secret types, Leakwatch makes a **controlled, non-destructive provider check** to confirm status:
 
 | Tier | What it means | Coverage |
 |------|---------------|----------|
-| **Live verified** | Read-only API call confirms the key is active / inactive | ~49 detectors |
-| **Format checked** | Structurally validated where no safe live check exists | 5 detectors |
-| **Not verifiable** | No public API (e.g. JWTs, private keys) — detected & triaged manually | 9 detectors |
+| **Direct live** | Non-destructive provider check can confirm the key in the normal production path | 39 detectors |
+| **Context required** | A safe issuer, region, or paired credential must be supplied first | 9 detectors |
+| **Format checked** | Structurally validated where no safe live check exists | 6 detectors |
+| **Not verifiable** | No safe provider check (e.g. JWTs, private keys) — detected & triaged manually | 11 detectors |
 
-That's **54 of 63 detectors (85.7%)** with verification. Verification is on by default for the CLI and off by default in the Action (to keep CI fast and offline) — flip it with `no-verify`.
+Leakwatch registers verifier implementations for **54 of 65 detectors (83.1%)**, but only **39** are direct live checks. The remaining registered implementations are context-required or format-only and therefore must not be interpreted as proof of live coverage. Verification is on by default for the CLI and off by default in the Action (to keep CI fast and offline) — flip it with `no-verify`.
 
 ## Why Leakwatch?
 
 | | **Leakwatch** | TruffleHog | Gitleaks |
 |---|---|---|---|
 | License | **MIT** | AGPL-3.0 | MIT [^gl] |
-| Live secret verification | **Yes (54 verifiers)** | Yes | No |
+| Live secret verification | **Yes (39 direct-live; 9 context-required)** | Yes | No |
 | Container image scanning | **Yes** | Yes | No |
 | Cloud sources (S3 / GCS / Slack) | **Yes** | No | No |
 | SARIF output | **Yes** | No [^th] | Yes |
@@ -133,7 +152,7 @@ That's **54 of 63 detectors (85.7%)** with verification. Verification is on by d
 
 ## Detectors
 
-**63 built-in detectors** across these categories, plus your own [YAML custom rules](docs/guides/custom-rules.md):
+**65 built-in detectors** across these categories, plus your own [YAML custom rules](docs/user-manuals/en/detectors/custom-rules.md):
 
 | Category | Examples |
 |----------|----------|
@@ -149,7 +168,7 @@ That's **54 of 63 detectors (85.7%)** with verification. Verification is on by d
 | **Generic & Custom** | high-entropy generic keys · LaunchDarkly · SonarCloud · your YAML rules |
 
 <details>
-<summary><b>Full detector catalog (63) with IDs, severity &amp; verification</b></summary>
+<summary><b>Full detector catalog (65) with IDs, severity &amp; verification</b></summary>
 
 | Category | Detector | ID | Severity |
 |----------|----------|----|----------|
@@ -166,7 +185,7 @@ That's **54 of 63 detectors (85.7%)** with verification. Verification is on by d
 | AI/ML | Hugging Face Token | `huggingface-token` | Critical |
 | AI/ML | DeepSeek API Key | `deepseek-api-key` | Critical |
 | DevTools | GitHub PAT | `github-token` | Critical |
-| DevTools | GitHub OAuth Token | `github-oauth-token` | Critical |
+| DevTools | GitHub OAuth & Installation Token (incl. stateless `ghs_`) | `github-oauth-token` | Critical |
 | DevTools | GitLab PAT | `gitlab-pat` | Critical |
 | DevTools | Bitbucket App Password | `bitbucket-app-password` | Critical |
 | DevTools | NPM Token | `npm-token` | High |
@@ -178,6 +197,7 @@ That's **54 of 63 detectors (85.7%)** with verification. Verification is on by d
 | Communication | Slack Bot Token | `slack-token` | Critical |
 | Communication | Slack Webhook | `slack-webhook` | High |
 | Communication | Discord Bot Token | `discord-bot-token` | Critical |
+| Communication | Discord Webhook URL | `discord-webhook-url` | Critical |
 | Communication | Telegram Bot Token | `telegram-bot-token` | High |
 | Communication | MS Teams Webhook | `teams-webhook` | High |
 | Email | SendGrid API Key | `sendgrid-api-key` | Critical |
@@ -191,7 +211,7 @@ That's **54 of 63 detectors (85.7%)** with verification. Verification is on by d
 | Database | Redis Connection | `redis-connection-string` | Critical |
 | Database | Snowflake Credentials | `snowflake-credentials` | Critical |
 | Database | RabbitMQ Connection | `rabbitmq-connection-string` | Critical |
-| Database | Supabase Service Key | `supabase-service-key` | Critical |
+| DevTools | Supabase Personal Access Token | `supabase-service-key` | Critical |
 | Infrastructure | FTP/SFTP Credentials | `ftp-credentials` | Critical |
 | Infrastructure | LDAP Credentials | `ldap-credentials` | Critical |
 | Infrastructure | Databricks PAT | `databricks-token` | Critical |
@@ -206,7 +226,7 @@ That's **54 of 63 detectors (85.7%)** with verification. Verification is on by d
 | Monitoring | New Relic API Key | `newrelic-api-key` | High |
 | Monitoring | Sentry Auth Token | `sentry-token` | High |
 | Security | Snyk API Key | `snyk-api-key` | High |
-| Security | Twilio API Key | `twilio-api-key` | Critical |
+| Security | Twilio API Key Secret | `twilio-api-key` | Critical |
 | Secrets Mgmt | Doppler Service Token | `doppler-token` | Critical |
 | Feature Flags | LaunchDarkly SDK Key | `launchdarkly-sdk-key` | High |
 | Code Quality | SonarCloud Token | `sonarcloud-token` | High |
@@ -216,6 +236,7 @@ That's **54 of 63 detectors (85.7%)** with verification. Verification is on by d
 | SaaS | Figma PAT | `figma-pat` | High |
 | SaaS | Airtable PAT | `airtable-pat` | High |
 | Generic | Generic API Key | `generic-api-key` | Medium |
+| Generic | Structured Configuration Secret | `structured-config-secret` | High |
 
 </details>
 
@@ -251,12 +272,12 @@ output:
   show-raw: false
 ```
 
-Use `.leakwatchignore` and `# leakwatch:ignore` markers to suppress known false positives. Details: **[Configuration guide](docs/guides/configuration.md)**.
+Use `.leakwatchignore` and `# leakwatch:ignore` markers to suppress known false positives. Details: **[Ignoring findings](docs/user-manuals/en/configuration/ignoring-findings.md)**.
 
 ## Security
 
 - Secret values are **redacted by default** (e.g. `AKIA****MPLE`) and are **never written to disk or logs**. The raw value is only emitted if you explicitly pass `--show-raw`.
-- Verification uses **controlled, read-only** API calls to providers; it makes no state-changing requests.
+- Verification uses **controlled, non-destructive** provider checks; it makes no state-changing requests.
 - Found a vulnerability? Please report it privately via a [GitHub security advisory](https://github.com/HodeTech/Leakwatch/security/advisories/new).
 
 ## Architecture
@@ -276,9 +297,10 @@ flowchart LR
         E2["Regex"]
         E3["Shannon entropy"]
     end
-    subgraph Verify["Verification (54 verifiers)"]
-        V1["Live API"]
-        V2["Format validation"]
+    subgraph Verify["Verification (54 registered implementations)"]
+        V1["39 direct live"]
+        V2["9 context-required"]
+        V3["6 format-only"]
     end
     Sources -->|chunks| Engine
     Engine -->|findings| Verify
@@ -289,19 +311,15 @@ Deep dive: [Architecture](docs/architecture/03-ARCHITECTURE.md) · [ADRs](docs/d
 
 ## Documentation
 
-Full bilingual (EN/TR) manuals are at **[hodetech.github.io/Leakwatch](https://hodetech.github.io/Leakwatch/)**. Quick links:
+The bilingual site is at **[hodetech.github.io/Leakwatch](https://hodetech.github.io/Leakwatch/)**. The English user manual is the authoritative product-behavior source; Turkish is its reviewed translation, and the site bundles are generated from both.
 
-[Getting Started](docs/guides/getting-started.md) ·
-[Configuration](docs/guides/configuration.md) ·
-[CI/CD](docs/guides/ci-cd-integration.md) ·
-[Custom Rules](docs/guides/custom-rules.md) ·
-[Container Scanning](docs/guides/container-scanning.md) ·
-[Cloud Scanning](docs/guides/cloud-scanning.md) ·
-[Git Scanning](docs/guides/git-scanning.md) ·
-[Slack Scanning](docs/guides/slack-scanning.md) ·
-[Verification](docs/guides/secret-verification.md) ·
-[Docker](docs/guides/docker-usage.md) ·
-[VS Code Extension](docs/guides/vscode-extension.md) ·
+[Introduction](docs/user-manuals/en/getting-started/introduction.md) ·
+[Installation](docs/user-manuals/en/getting-started/installation.md) ·
+[Configuration](docs/user-manuals/en/configuration/config-file.md) ·
+[CLI Reference](docs/user-manuals/en/reference/cli-reference.md) ·
+[Verification](docs/user-manuals/en/verification/how-verification-works.md) ·
+[Detector Catalog](docs/user-manuals/en/detectors/detector-catalog.md) ·
+[Supplemental Guides](docs/guides/README.md) ·
 [Roadmap](docs/05-ROADMAP.md)
 
 ## Contributing

@@ -20,7 +20,7 @@ go install github.com/HodeTech/leakwatch@latest
 Yeniden üretilebilir derlemeler için belirli bir sürüme sabitleyin:
 
 ```bash
-go install github.com/HodeTech/leakwatch@v1.5.0
+go install github.com/HodeTech/leakwatch@v1.8.0
 ```
 
 ### Docker imajı aracılığıyla (Go gerekmez)
@@ -39,13 +39,14 @@ sudo mv leakwatch /usr/local/bin/leakwatch
 
 ## Çıkış kodları
 
-Leakwatch, CI pipeline'larının ve kabuk betiklerinin çıktıyı ayrıştırmadan tarama sonuçlarına göre hareket edebilmesi için iyi tanımlanmış üç çıkış kodu kullanır:
+Leakwatch, bir CI derlemesini başarısız kılmanın birincil mekanizması olan dört koddan biriyle çıkar:
 
 | Kod | Anlam | Önerilen CI eylemi |
 |-----|-------|-------------------|
 | `0` | Bulgu yok | Pipeline aşamasını geç |
 | `1` | Sırlar bulundu | Pipeline aşamasını başarısız kıl |
 | `2` | Ciddi hata (hatalı yapılandırma, okunamaz yol vb.) | Pipeline aşamasını başarısız kıl |
+| `3` | Tamamlanmadan (`Ctrl+C` / `SIGTERM`) kesildi, hiçbir bulgu raporlanmadı | Pipeline aşamasını başarısız kıl — tarama tamamlanmadığından temiz bir sonuca güvenilemez |
 
 Çıkış koduna göre dallanma yapan genel bir kabuk parçacığı:
 
@@ -61,7 +62,7 @@ elif [ "$EXIT_CODE" -eq 1 ]; then
   echo "Sırlar bulundu — derlemeyi başarısız kılıyorum."
   exit 1
 else
-  echo "Tarama hatası (çıkış $EXIT_CODE) — derlemeyi başarısız kılıyorum."
+  echo "Tarama hatası veya kesintisi (çıkış $EXIT_CODE) — derlemeyi başarısız kılıyorum."
   exit "$EXIT_CODE"
 fi
 ```
@@ -75,13 +76,13 @@ leakwatch:
   stage: test
   image: golang:1.25-alpine
   script:
-    - go install github.com/HodeTech/leakwatch@v1.5.0
+    - go install github.com/HodeTech/leakwatch@v1.8.0
     - leakwatch scan fs . --format json -o leakwatch.json --no-verify
   artifacts:
     when: always
     paths:
       - leakwatch.json
-    expire_in: 7 gün
+    expire_in: 7 days
   allow_failure: false
 ```
 
@@ -107,14 +108,14 @@ leakwatch scan fs . --no-verify --format sarif -o results.sarif
 
 ```yaml
 - script: |
-    go install github.com/HodeTech/leakwatch@v1.5.0
+    go install github.com/HodeTech/leakwatch@v1.8.0
     leakwatch scan fs . --format sarif -o $(Build.ArtifactStagingDirectory)/leakwatch.sarif --no-verify
   displayName: "Leakwatch sır taraması"
 
 - task: PublishBuildArtifacts@1
   inputs:
     pathToPublish: "$(Build.ArtifactStagingDirectory)"
-    artifactName: "leakwatch-sonuclari"
+    artifactName: "leakwatch-results"
 ```
 
 ## Jenkins örneği
@@ -123,7 +124,7 @@ leakwatch scan fs . --no-verify --format sarif -o results.sarif
 stage('Sır taraması') {
     steps {
         sh '''
-            go install github.com/HodeTech/leakwatch@v1.5.0
+            go install github.com/HodeTech/leakwatch@v1.8.0
             leakwatch scan fs . --format json -o leakwatch.json --no-verify
         '''
         archiveArtifacts artifacts: 'leakwatch.json', allowEmptyArchive: true

@@ -13,10 +13,10 @@ Go ile yazılmıştır, çalışma zamanı bağımlılığı olmayan tek bir sta
 
 Tek bir commit'te sızan bir kimlik bilgisi — sonradan silinse bile — Git geçmişinde sonsuza dek erişilebilir kalabilir ve push edildikten dakikalar sonra istismar edilebilir. Leakwatch, bu sırları erken yakalamak ve hangilerinin *gerçekten tehlikeli* olduğunu söylemek için tasarlanmıştır:
 
-- **Geniş tespit** — bulut sağlayıcılarını, yapay zekâ API'lerini, ödeme platformlarını, veritabanlarını, mesajlaşma araçlarını ve daha fazlasını kapsayan 63 yerleşik dedektör; ayrıca kendi YAML özel kurallarınız.
-- **Yalnızca tespit değil, doğrulama** — 54 dedektör türü için Leakwatch, bulunan bir sırrın *hâlâ etkin* olup olmadığını sağlayıcıya kontrollü, salt-okunur bir çağrı yaparak teyit edebilir. Etkin olduğu doğrulanmış bir anahtar bir olaydır; etkin olmayan bir anahtar ise gürültüdür.
+- **Geniş tespit** — bulut sağlayıcılarını, yapay zekâ API'lerini, ödeme platformlarını, veritabanlarını, mesajlaşma araçlarını, yapılandırılmış config dosyalarını ve daha fazlasını kapsayan 65 yerleşik dedektör; ayrıca kendi YAML özel kurallarınız.
+- **Dürüst doğrulama kabiliyeti** — 39 dedektör türü doğrudan canlı kontrole sahiptir, 9'u güvenilir issuer/bölge/eşlik eden bağlam gerektirir, 6'sı çevrimdışı format doğrular. Registry sayısı hiçbir zaman canlı kapsam gibi sunulmaz.
 - **Çok sayıda kaynak** — yerel dosya sistemi, eksiksiz bir Git geçmişi, bir OCI/Docker imajı, AWS S3, Google Cloud Storage ve Slack mesajları.
-- **CI-uyumlu çıktı** — JSON, SARIF (GitHub Code Scanning için), CSV ve renklendirilmiş terminal tablosu.
+- **CI-uyumlu çıktı** — JSON, SARIF (GitHub Code Scanning için), CSV, renklendirilmiş bir terminal tablosu ve satır içi GitHub Actions ek açıklamaları.
 - **Tasarımı gereği sır-güvenli** — bulunan sırlar varsayılan olarak maskelenir ve asla loglanmaz, önbelleğe alınmaz veya diske yazılmaz.
 
 ## Neleri tarar
@@ -37,7 +37,7 @@ Leakwatch, büyük girdilerde bile hızlı kalmak için katmanlı bir hat kullan
 
 1. **Aho-Corasick anahtar kelime ön-filtresi** — tek bir çok-desenli otomat, bir parçayı hangi dedektörlerin eşleştirebileceğine hızla karar verir; böylece dedektörlerin çoğu regex'ini hiç çalıştırmaz.
 2. **Regex doğrulaması** — yalnızca kısa listeye alınan dedektörler kesin desenlerini çalıştırır.
-3. **Entropi** — Shannon entropisi gösterim için hesaplanır (ve özel kurallar tarafından düşük rastgelelikteki eşleşmeleri elemek için kullanılır).
+3. **Entropi** — Shannon entropisi gösterim için hesaplanır ve yerleşik `generic-api-key` dedektörü ile kendi entropi eşiğine sahip her özel kuralı kapılayarak düşük rastgelelikteki yer tutucu eşleşmeleri eler. Diğer her (yapısal) yerleşik dedektör entropi tarafından hiçbir zaman kapılanmaz.
 4. **Doğrulama** — uygun bulgular canlı sağlayıcı API'sine karşı kontrol edilir.
 
 :::tip
@@ -49,8 +49,8 @@ Leakwatch'ı kullanmak için bu hattı anlamanız gerekmez — ancak taramaları
 Beklentileri doğru belirlemek için:
 
 - Git geçmişini yeniden yazmaz veya sırları sizin için **kaldırmaz** — onları bulup raporlar ve (`--remediation` ile) nasıl döndüreceğinizi söyler.
-- Slack taraması yalnızca **mesaj metnini** kapsar; yüklenen dosyaların *içeriğini* taramak uygulanmamıştır.
-- Doğrulama, birçok sır türü için mevcuttur ancak hepsi için değil — 9 dedektör türü (JWT'ler ve genel API anahtarları gibi) güvenli biçimde doğrulanamaz ve her zaman doğrulanmamış olarak raporlanır.
+- Slack varsayılan olarak mesaj metnini tarar; boyutu sınırlı metin benzeri ekler `--include-files` ve `files:read` kapsamıyla isteğe bağlıdır.
+- Doğrulama, birçok sır türü için mevcuttur ancak hepsi için değil — 11 dedektör türü (JWT'ler ve genel API anahtarları gibi) güvenli biçimde doğrulanamaz ve her zaman doğrulanmamış olarak raporlanır.
 
 ## Sonraki adımlar
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/HodeTech/leakwatch/pkg/finding"
 )
@@ -18,18 +19,29 @@ type Formatter struct {
 	ShowRaw bool
 }
 
-// findingJSON is the wire type used to opt the raw secret value back into JSON
-// output when ShowRaw is enabled. It embeds finding.Finding (whose Raw field is
-// json:"-") and re-adds a "raw" field that mirrors finding.Finding.Raw.
+// findingJSON is the wire type used to opt the raw secret value and non-secret
+// extra metadata back into JSON output when ShowRaw is enabled. It embeds
+// finding.Finding (whose Raw and ExtraData fields are both json:"-") and
+// re-adds a "raw" field mirroring finding.Finding.Raw plus an "extra_data"
+// field mirroring finding.Finding.ExtraData. ExtraData is defense-in-depth
+// gated the same way Raw is: it must never carry secret material (see
+// finding.Finding's doc comment), but it is still opt-in behind --show-raw
+// alongside Raw so it does not appear in default output either.
+type findingAlias finding.Finding
+
 type findingJSON struct {
-	finding.Finding
-	Raw string `json:"raw,omitempty"`
+	findingAlias
+	Raw        string            `json:"raw,omitempty"`
+	ExtraData  map[string]string `json:"extra_data,omitempty"`
+	DetectedAt *time.Time        `json:"detected_at,omitempty"`
+	Entropy    *float64          `json:"entropy,omitempty"`
 }
 
 // Format writes findings as JSON to the given writer.
-// When ShowRaw is false, finding.Finding is marshaled directly and the raw
-// secret is omitted by its json:"-" tag. When ShowRaw is true, each finding is
-// marshaled via findingJSON so the raw value is explicitly included.
+// When ShowRaw is false, finding.Finding is marshaled directly and both the
+// raw secret and ExtraData are omitted by their json:"-" tags. When ShowRaw is
+// true, each finding is marshaled via findingJSON so the raw value and any
+// non-secret ExtraData are explicitly included.
 func (f *Formatter) Format(w io.Writer, findings []finding.Finding) error {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
@@ -43,7 +55,14 @@ func (f *Formatter) Format(w io.Writer, findings []finding.Finding) error {
 
 	output := make([]findingJSON, len(findings))
 	for i, fd := range findings {
-		output[i] = findingJSON{Finding: fd, Raw: fd.Raw}
+		wire := findingJSON{findingAlias: findingAlias(fd), Raw: fd.Raw, ExtraData: fd.ExtraData}
+		if !fd.DetectedAt.IsZero() {
+			wire.DetectedAt = &fd.DetectedAt
+		}
+		if fd.EntropyCalculated || fd.Entropy != 0 {
+			wire.Entropy = &fd.Entropy
+		}
+		output[i] = wire
 	}
 	if err := encoder.Encode(output); err != nil {
 		return fmt.Errorf("failed to write JSON output: %w", err)

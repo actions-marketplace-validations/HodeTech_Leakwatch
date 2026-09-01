@@ -14,19 +14,23 @@ After the scan engine collects findings, the verifier pool picks them up. Each f
 - If a verifier exists, it runs and returns a status.
 - If no verifier is registered for that detector type, the finding passes through unchanged with status `unverified`.
 
-## Two verification modes
+## Three verification modes
 
-Not all secrets can be verified the same way. Leakwatch uses two distinct approaches depending on what is safe for each credential type.
+Not all secrets can be verified the same way. Leakwatch distinguishes direct live checks, checks that require trusted or companion context, and offline format validation. Registry presence is therefore not treated as proof of live capability.
 
 ### Live API verification
 
-For approximately 49 detector types, Leakwatch makes a **controlled, read-only API call** to the provider — for example, calling `sts:GetCallerIdentity` for AWS keys or `GET /user` for GitHub tokens. The call uses only the minimum endpoint required to confirm identity; it never modifies data, creates resources, or triggers billing events.
+For 39 detector types, Leakwatch can make a **controlled, non-destructive provider check** in the normal production path — for example, calling `sts:GetCallerIdentity` for AWS keys or a fixed provider identity endpoint for OpenAI keys. The call uses only the minimum endpoint required to confirm identity; it never modifies data or creates resources, though it may consume provider quota.
 
-If the provider returns a success response, the finding is marked `verified_active`. If the provider rejects the credential (for example with HTTP 401 or 403), the finding is marked `verified_inactive`.
+If the provider returns a contract-valid success response, the finding is marked `verified_active`. A finding is marked `verified_inactive` only when the provider response is definitive under that verifier's contract. Permission denial and ambiguous responses remain `verify_error`; for example, SendGrid treats only HTTP `401` as inactive, while `403` remains inconclusive.
+
+### Trusted or companion context required
+
+Nine registered implementations cannot safely make a live request from a bare detector finding. Auth0, GitLab, Grafana, GitHub/GHES, Datadog, and Snyk require a trusted issuer/site/API origin. Twilio findings already contain the explicitly paired API Key Secret and non-secret Key SID, but still require a trusted regional origin. Shopify requires an operator-trusted issuing-store origin; finding metadata cannot select it. Supply these targets only with the repeatable `--verifier-origin detector-id=https://host` command-line flag (`--grafana-instance-url` is also retained for Grafana). Project configuration, environment variables, repository URLs, and token claims cannot set a verification target. Without explicit context Leakwatch sends no request and returns `unverified`.
 
 ### Format validation only
 
-For five credential types, no safe live check exists — the provider has no anonymous identity endpoint, or a real call would have side effects. For these, Leakwatch validates the structure of the credential without making any network request:
+For six credential types, no safe live check exists — the provider has no anonymous identity endpoint, a real call would have side effects, or (for `coinbase-api-key`) the live API requires HMAC request signing with a paired secret that cannot be reliably associated with the key. For these, Leakwatch validates the structure of the credential without making any network request:
 
 | Detector ID | What is validated |
 |-------------|------------------|
@@ -35,6 +39,7 @@ For five credential types, no safe live check exists — the provider has no ano
 | `snowflake-credentials` | Format check only — a valid format proves nothing, result is always `unverified` |
 | `azure-storage-key` | Format check |
 | `azure-entra-secret` | Format check |
+| `coinbase-api-key` | Character-set and length check |
 
 :::note
 Even when the format check passes, the result remains `unverified`. A structurally valid credential may be expired or revoked. These findings always require manual triage.
@@ -48,7 +53,7 @@ Every finding in Leakwatch output carries one of four statuses:
 |--------|---------|-------------------|
 | `verified_active` | The secret was confirmed live by the provider. | Treat as an active incident. Rotate immediately. |
 | `verified_inactive` | The provider rejected the credential. | Likely already rotated. Review context and close. |
-| `unverified` | No verifier exists for this type, or format validation returned no result, or verification was disabled. | Triage manually; context determines risk. |
+| `unverified` | No verifier exists, required context is absent, a format-only verifier cannot prove liveness, or verification was disabled. | Triage manually; context determines risk. |
 | `verify_error` | The verifier ran but encountered a network error, timeout, or unexpected response. | Treat as potentially active. Retry or triage manually. |
 
 ## The verification engine
@@ -58,8 +63,8 @@ Verification runs in a dedicated concurrent worker pool, isolated from the scan 
 | Setting | Default | Config key |
 |---------|---------|-----------|
 | Worker count | 4 | `verification.concurrency` |
-| Global rate limit | 10 requests/second | `verification.rate-limit` |
-| Per-request timeout | 10 s | `verification.timeout` |
+| Global + per-detector request ceilings | 10 requests/second each | `verification.rate-limit` |
+| Per-finding verification-operation timeout | 10 s | `verification.timeout` |
 
 All three values are tunable under the `verification:` block in `.leakwatch.yaml`:
 
@@ -67,13 +72,15 @@ All three values are tunable under the `verification:` block in `.leakwatch.yaml
 verification:
   enabled: true
   concurrency: 4
-  rate-limit: 10.0   # requests per second (global)
+  rate-limit: 10.0   # requests per second (global and per detector)
   timeout: 10s
 ```
 
 :::tip
-If you are scanning a repository that triggers hundreds of findings, consider lowering `rate-limit` to 5 or enabling `--only-verified` to keep the verified-active set small and actionable.
+For repositories with hundreds of findings, keep the provider-safe rate ceiling and reduce `concurrency` if you need gentler traffic. `--only-verified` changes only output filtering; it does not reduce verification requests.
 :::
+
+Admission occurs immediately before an actual provider request. Format-only and missing-context results do not consume limiter capacity. The per-detector bucket constrains that detector's own request rate, while the shared global bucket constrains aggregate traffic; this does not guarantee fair scheduling between providers.
 
 ## Controlling verification at the command line
 

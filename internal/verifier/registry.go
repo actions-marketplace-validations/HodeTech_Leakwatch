@@ -14,15 +14,28 @@ var (
 // Each verifier package calls this function in its init() function.
 // Panics if a verifier with the same Type() is already registered.
 func Register(v Verifier) {
+	if v == nil || isNilVerifier(v) {
+		panic("cannot register a nil verifier")
+	}
+	typeID := v.Type()
+	if typeID == "" {
+		panic("cannot register a verifier with an empty type")
+	}
 	mu.Lock()
 	defer mu.Unlock()
-	if _, exists := verifiers[v.Type()]; exists {
-		panic("duplicate verifier type: " + v.Type())
+	if _, exists := verifiers[typeID]; exists {
+		panic("duplicate verifier type: " + typeID)
 	}
-	verifiers[v.Type()] = v
+	verifiers[typeID] = v
 }
 
 // Get returns the verifier registered for the given detector ID.
+//
+// It is the public single-lookup counterpart to All (which the engine uses to
+// snapshot every verifier). Get is retained for callers that need to resolve a
+// single verifier by detector ID directly against the global registry (for
+// example an ad-hoc single-secret verification path) without constructing an
+// Engine.
 func Get(detectorID string) (Verifier, bool) {
 	mu.RLock()
 	defer mu.RUnlock()

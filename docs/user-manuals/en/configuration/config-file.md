@@ -15,7 +15,7 @@ Leakwatch resolves the config file in the following order:
 2. **Current directory** — `.leakwatch.yaml` in the directory where the command is run.
 3. **Home directory** — `~/.leakwatch.yaml` as a fallback.
 
-If no file is found, built-in defaults are used for every setting.
+If no file is found, built-in defaults are used for every setting. If a file **is** found (or `--config` points at one) but fails to parse as valid YAML, that is a fatal error — the scan does not silently fall back to defaults, since doing so could silently widen detection scope beyond what the operator configured.
 
 ## Generating a starter file
 
@@ -87,7 +87,8 @@ detection:
     # Enable Shannon entropy calculation for each candidate match.
     enabled: true
 
-    # Entropy threshold used for display and custom-rule gating.
+    # Entropy threshold used for display, and to gate the built-in
+    # generic-api-key detector plus any custom rule with its own entropy field.
     # Range: 0–8. Default: 4.0.
     # See note below about built-in findings.
     threshold: 4.0
@@ -98,7 +99,8 @@ verification:
   # Enable live verification against provider APIs.
   enabled: true
 
-  # Per-request HTTP timeout. Must be >= 1ms when verification is enabled.
+  # Per-finding verification-operation timeout, including bounded fallback and
+  # request admission. Must be >= 1ms when verification is enabled.
   # Use a duration string (e.g. "10s", "500ms") — a bare integer is
   # treated as nanoseconds and will fail validation.
   timeout: 10s
@@ -119,7 +121,9 @@ filter:
   # the named directory at any depth. Each pattern is tested against both the
   # full path and the base filename, so simple patterns like "*.min.js" match
   # nested files without a leading path prefix.
-  # Applies to all scan sources. (On `scan fs` the --exclude flag also sets this.)
+  # Applies to all scan sources. (The --exclude flag, available on every scan
+  # subcommand except `scan slack`, adds to this list at run time rather than
+  # replacing it.)
   # Default: [] (no exclusions beyond the built-in binary/lock-file skips).
   exclude-paths:
     - "vendor/**"
@@ -132,17 +136,22 @@ filter:
 
   # Detector IDs to disable entirely. Findings from listed detectors are never
   # produced regardless of other settings. Default: [].
+  # The --exclude-detectors flag, available on every scan subcommand, adds to
+  # this list at run time rather than replacing it.
   exclude-detectors: []
 
 # ── Output ────────────────────────────────────────────────────────────────────
 
 output:
-  # Output format. One of: json, sarif, csv, table. Default: json.
+  # Output format. One of: json, sarif, csv, table, github. Default: json.
   # The --format / -f flag overrides this at run time.
   format: json
 
   # Write output to this file path instead of stdout. Default: "" (stdout).
-  # The --output / -o flag overrides this at run time.
+  # The --output / -o flag overrides this at run time. A bare path with no
+  # extension is auto-suffixed with the format's own extension, and the file
+  # is written with 0600 permissions. Ignored when format is "github", which
+  # always writes to stdout.
   file: ""
 
   # Drop findings below this severity level.
@@ -168,7 +177,7 @@ custom-rules: []
 ```
 
 :::note
-`detection.entropy.threshold` controls which entropy value is displayed alongside a finding and acts as a gate for custom rules (a custom rule match whose entropy falls below the threshold is suppressed). It does **not** suppress findings from built-in detectors — built-in detectors have their own match criteria and are never dropped by this setting.
+`detection.entropy.enabled` controls whether a computed entropy value is present alongside findings. `detection.entropy.threshold` does not control display; it gates detectors that opt into engine entropy heuristics — currently only the built-in `generic-api-key` detector. A match whose entropy falls below that threshold is suppressed as a likely placeholder. Custom rules that declare an `entropy` field apply their own independent per-rule threshold. Every structural/format-anchored built-in detector — `aws-access-key-id`, `github-token`, and the rest — is **never** dropped by the engine threshold, regardless of entropy.
 :::
 
 ## Validation
@@ -179,7 +188,7 @@ Leakwatch validates the loaded configuration before starting a scan and exits wi
 |---|---|
 | `scan.concurrency < 1` | Invalid concurrency value |
 | `scan.max-file-size < 1` | Invalid max-file-size value |
-| `output.format` not in `json\|sarif\|csv\|table` | Unsupported output format |
+| `output.format` not in `json\|sarif\|csv\|table\|github` | Unsupported output format |
 | `detection.entropy.threshold` outside 0–8 | Invalid entropy threshold |
 | `output.severity-threshold` not a valid level (when non-empty) | Invalid severity-threshold |
 | `verification.timeout < 1ms` (when verification enabled) | Invalid verification timeout |

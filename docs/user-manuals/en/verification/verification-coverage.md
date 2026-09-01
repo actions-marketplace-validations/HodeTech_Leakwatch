@@ -1,29 +1,26 @@
 ---
 title: "Verification Coverage"
-description: "Which of the 63 built-in detectors are live-verified, format-validated only, or not verifiable — and what that means for triage."
+description: "Which of the 65 built-in detectors are live-verified, context-required, format-only, or not verifiable — and what that means for triage."
 ---
 
 # Verification Coverage
 
-Leakwatch ships 63 built-in detectors and 54 verifiers, giving a coverage rate of **85.7%** (54 of 63 detector types have some form of verification). This page maps every detector to its verification status so you know what to expect in your output.
+Leakwatch ships **65 built-in detectors** and 54 registered verifier implementations. Registry presence is not the same as live capability: **39** detectors can make a live check in the normal production path, **9** require trusted operator or companion context, **6** perform offline format validation only, and **11** have no verifier. This page maps every detector to its actual verification contract.
 
-## Live-verified (49 detector types)
+## Live-verified (39 detector types)
 
-For these types, Leakwatch makes a controlled, read-only API call to the provider and returns `verified_active` or `verified_inactive`. No data is created or modified; the call uses the minimum endpoint needed to confirm identity.
+For these types, Leakwatch can make a controlled, non-destructive provider check in the normal production path. A contract-valid success can return `verified_active`; only a definitive authentication rejection on the correct issuer can return `verified_inactive`. Ambiguous responses remain `verify_error`.
 
 | Detector type | Provider |
 |--------------|---------|
 | `aws-access-key-id` | AWS STS (`GetCallerIdentity`) |
-| `github-token` | GitHub REST API |
-| `github-oauth-token` | GitHub REST API |
-| `gitlab-pat` | GitLab REST API |
 | `slack-token` | Slack Web API |
 | `openai-api-key` | OpenAI API |
 | `anthropic-api-key` | Anthropic API |
 | `deepseek-api-key` | DeepSeek API |
 | `huggingface-token` | Hugging Face API |
-| `sendgrid-api-key` | SendGrid Web API |
-| `mailgun-api-key` | Mailgun API |
+| `sendgrid-api-key` | SendGrid Web API (`401` is inactive; `403`, including permission denial, remains `verify_error`) |
+| `mailgun-api-key` | Mailgun API (auto-detects and calls the correct EU vs. US regional endpoint) |
 | `postmark-server-token` | Postmark API |
 | `stripe-api-key-live` | Stripe API |
 | `stripe-api-key-test` | Stripe API |
@@ -41,31 +38,42 @@ For these types, Leakwatch makes a controlled, read-only API call to the provide
 | `telegram-bot-token` | Telegram Bot API |
 | `sentry-token` | Sentry API |
 | `pagerduty-api-key` | PagerDuty API |
-| `newrelic-api-key` | New Relic API |
-| `grafana-api-key` | Grafana API |
-| `datadog-api-key` | Datadog API |
-| `snyk-api-key` | Snyk API |
-| `twilio-api-key` | Twilio API |
+| `newrelic-api-key` | New Relic NerdGraph (bounded official US/EU fallback; inactive only when both regions return `401`) |
 | `doppler-token` | Doppler API |
 | `launchdarkly-sdk-key` | LaunchDarkly API |
 | `sonarcloud-token` | SonarCloud API |
-| `shopify-access-token` | Shopify Admin API |
 | `notion-token` | Notion API |
 | `linear-api-key` | Linear API |
 | `figma-pat` | Figma REST API |
 | `airtable-pat` | Airtable API |
-| `okta-api-token` | Okta API |
-| `auth0-management-token` | Auth0 Management API |
-| `databricks-token` | Databricks REST API |
+| `okta-api-token` | Okta API (targets the org domain captured alongside the token) |
+| `databricks-token` | Databricks REST API (calls the workspace host captured alongside the token) |
 | `bitbucket-app-password` | Bitbucket REST API |
-| `coinbase-api-key` | Coinbase API |
-| `supabase-service-key` | Supabase API |
+| `supabase-service-key` | Supabase Management API (`sbp_` personal access token; `401` is inactive, `403` remains `verify_error`) |
 | `infura-api-key` | Infura API |
 | `teams-webhook` | Microsoft Teams |
 
-## Format-validated only (5 detector types)
+## Requires trusted or companion context (9 detector types)
 
-These verifiers run entirely offline. No network request is made. Because a valid format does not prove a credential is active, all five always return `unverified` regardless of whether the format check passes or fails.
+These implementations are registered, but a bare detector finding is not enough to choose a safe issuer or authenticate the verification request. When the required context is absent, Leakwatch makes no unsafe guess and returns `unverified`.
+
+Supply an origin only through the repeatable command-line flag `--verifier-origin detector-id=https://host`. This routing input is intentionally ignored in project configuration files and environment variables, so scanned content cannot redirect credentials. The older `--grafana-instance-url` flag remains a Grafana-only alias.
+
+| Detector ID | Required context | Production behavior |
+|-------------|------------------|---------------------|
+| `auth0-management-token` | Operator-trusted Auth0 tenant or custom-domain origin | Configure with `--verifier-origin auth0-management-token=https://tenant`. The detector emits a complete three-segment Management JWT, but unverified JWT claims and repository URLs never select a request target. The verifier uses a read-only clients probe and only `401` is inactive. |
+| `gitlab-pat` | Operator-trusted GitLab.com or self-managed API origin | Configure with `--verifier-origin gitlab-pat=https://gitlab.example`. Repository content and finding metadata never select the request target. Only `glpat-` personal access tokens have the safe `/api/v4/user` probe; all other recognized GitLab token subtypes remain `unverified`. After active identity proof, a best-effort `/personal_access_tokens/self` call adds bounded, validated, sorted standard or GitLab 19.2+ granular scopes and ISO expiry to `verification.extra_data`; unavailable or malformed metadata never erases the active proof. A `401` is inactive only when its strict JSON body is GitLab's standard invalid-token response; DPoP challenges remain `verify_error`. |
+| `grafana-api-key` | Trusted Grafana instance origin supplied with `--grafana-instance-url` | Calls only the validated HTTPS instance. Repository content and finding metadata cannot choose the target; `401` is inactive only on that trusted issuer. |
+| `twilio-api-key` | Paired API Key SID plus an operator-trusted regional API origin (US1/IE1/AU1) | Configure with `--verifier-origin twilio-api-key=https://api.twilio.com` (or the correct regional Twilio origin). A bare `SK...` SID is a public identifier and is not reported. The detector emits an opaque, explicitly assigned secret only when it pairs one-to-one with a nearby assigned SID. Only `401` is inactive and permission `403` remains `verify_error`. |
+| `shopify-access-token` | Operator-trusted issuing store origin | Configure with `--verifier-origin shopify-access-token=https://store.myshopify.com`. Finding metadata is never trusted for routing. The verifier uses the pinned 2026-07 Admin GraphQL shop identity query; only `401` on the selected store is inactive. |
+| `github-token` | Trusted GitHub.com or GitHub Enterprise Server API origin | Configure with `--verifier-origin github-token=https://api.github.com` or the GHES origin. GHES uses the same `ghp_` and `github_pat_` formats as GitHub.com; repository metadata cannot choose the issuer. Validated scope/count and expiry response headers are added to `verification.extra_data` when the issuer provides them. |
+| `github-oauth-token` | Trusted GitHub.com or GitHub Enterprise Server API origin | Configure with `--verifier-origin github-oauth-token=https://api.github.com` or the GHES origin. `gho_`/`ghu_` use `/user` and receive the same safe scope/expiry enrichment; `ghs_` uses the installation repositories endpoint. `ghr_` refresh tokens remain `unverified` without a request because exchanging one rotates it. |
+| `datadog-api-key` | Trusted Datadog site/API origin | Configure the exact official site with `--verifier-origin datadog-api-key=https://api.datadoghq.com` (or its regional/FED host). Arbitrary hosts are rejected; a wrong region's rejection is not used as revocation evidence. |
+| `snyk-api-key` | Trusted Snyk regional, government, or private API origin | Configure with `--verifier-origin snyk-api-key=https://api.snyk.io` (or the correct regional/private origin). A wrong region's rejection is not proof of revocation. Only `401` proves inactivity; `403` remains `verify_error` because it can mean a valid token lacks API-plan or endpoint permission. |
+
+## Format-validated only (6 detector types)
+
+These verifiers run entirely offline. No network request is made. Because a valid format does not prove a credential is active, all six always return `unverified` regardless of whether the format check passes or fails.
 
 | Detector ID | What is validated | Why no live check |
 |-------------|------------------|------------------|
@@ -74,8 +82,9 @@ These verifiers run entirely offline. No network request is made. Because a vali
 | `snowflake-credentials` | Password length and host substring check | Live check requires a JDBC/ODBC database connection |
 | `azure-storage-key` | Format check | Requires per-account HMAC signing; no generic identity endpoint |
 | `azure-entra-secret` | Format check | Client credential flow would create sessions |
+| `coinbase-api-key` | Character-set and length check | Coinbase's legacy API authenticates with HMAC-SHA256 request signing that requires the paired secret, which the detector cannot reliably associate with the key; live verification is not attempted so a real key is never misreported as inactive |
 
-## Not verifiable (9 detector types)
+## Not verifiable (11 detector types)
 
 These detector types have no verifier at all. Findings from them are always `unverified`. This is **not** because they are unimportant — they are detected and reported in full — but because no public verification API exists, or because any verification attempt would have side effects.
 
@@ -90,20 +99,23 @@ These detector types have no verifier at all. Findings from them are always `unv
 | `ldap-credentials` | LDAP bind would create an authenticated session |
 | `slack-webhook` | Confirming a webhook is active requires sending a message |
 | `hashicorp-vault-token` | Vault token validation requires knowing the Vault endpoint |
+| `discord-webhook-url` | Confirming a webhook is active requires posting a message to it |
+| `structured-config-secret` | Contextual fallback can identify a secret role but not the credential provider or issuer |
 
 :::note
-"Not verifiable" does not mean "not found". All 9 of these types are still detected and appear in your output. They require manual triage to determine whether the credential is live and whether it needs rotation.
+"Not verifiable" does not mean "not found". All 11 of these types are still detected and appear in your output. They require manual triage to determine whether the credential is live and whether it needs rotation.
 :::
 
 ## Coverage summary
 
 | Category | Count |
 |----------|-------|
-| Live-verified | 49 |
-| Format-validated only | 5 |
-| Not verifiable | 9 |
-| **Total detectors** | **63** |
-| **Verifiers (any coverage)** | **54 (85.7%)** |
+| Live-verified | 39 |
+| Requires trusted/companion context | 9 |
+| Format-validated only | 6 |
+| Not verifiable | 11 |
+| **Total detectors** | **65** |
+| **Registered verifier implementations** | **54 (83.1%)** |
 
 ## See also
 

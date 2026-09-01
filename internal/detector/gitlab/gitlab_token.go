@@ -2,6 +2,7 @@
 package gitlab
 
 import (
+	"bytes"
 	"context"
 	"regexp"
 
@@ -9,7 +10,15 @@ import (
 	"github.com/HodeTech/leakwatch/pkg/finding"
 )
 
-var gitlabPATPattern = regexp.MustCompile(`glpat-[A-Za-z0-9_\-]{20}`)
+// gitlabTokenPattern matches the classic personal access token (glpat-) as
+// well as the newer routable prefixed token families: deploy (gldt-), runner
+// (glrt-/glrtr-), CI/CD build & trigger (glcbt-/glptt-), incoming mail
+// (glimt-), agent (glagent-), workhorse (glwt-), service-account
+// (glsoat-), feature-flags client (glffct-), OAuth application secret
+// (gloas-), and feed (glft-) tokens. The body quantifier is open-ended
+// ({20,}) so token-length changes under an existing prefix do not silently
+// drop the match.
+var gitlabTokenPattern = regexp.MustCompile(`(?:glpat|gldt|glrt|glrtr|glcbt|glptt|glimt|glagent|glwt|glsoat|glffct|gloas|glft)-[A-Za-z0-9_\-]{20,}`)
 
 // Detector detects GitLab Personal Access Tokens.
 type Detector struct{}
@@ -18,24 +27,33 @@ func (d *Detector) ID() string { return "gitlab-pat" }
 
 func (d *Detector) Description() string { return "GitLab Personal Access Token" }
 
-func (d *Detector) Keywords() []string { return []string{"glpat-"} }
+func (d *Detector) Keywords() []string {
+	return []string{
+		"glpat-", "gldt-", "glrt-", "glrtr-", "glcbt-", "glptt-",
+		"glimt-", "glagent-", "glwt-", "glsoat-", "glffct-", "gloas-", "glft-",
+	}
+}
 
 func (d *Detector) Severity() finding.Severity { return finding.SeverityCritical }
 
-// Scan searches the data for GitLab Personal Access Token patterns.
+// Scan searches the data for GitLab token patterns.
 func (d *Detector) Scan(_ context.Context, data []byte) []detector.RawFinding {
-	matches := gitlabPATPattern.FindAll(data, -1)
+	matches := gitlabTokenPattern.FindAll(data, -1)
 	if len(matches) == 0 {
 		return nil
 	}
 
 	findings := make([]detector.RawFinding, 0, len(matches))
 	for _, match := range matches {
-		findings = append(findings, detector.RawFinding{
+		// Preserve the actual prefix (up to and including the "-") in the
+		// redacted form; every match contains a "-" by construction.
+		prefixEnd := bytes.IndexByte(match, '-') + 1
+		f := detector.RawFinding{
 			DetectorID: d.ID(),
-			Raw:        match,
-			Redacted:   "glpat-****" + string(match[len(match)-4:]),
-		})
+			Raw:        bytes.Clone(match),
+			Redacted:   string(match[:prefixEnd]) + "****" + string(match[len(match)-4:]),
+		}
+		findings = append(findings, f)
 	}
 	return findings
 }

@@ -1,12 +1,20 @@
 package verifier
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/HodeTech/leakwatch/internal/detector"
+	"github.com/HodeTech/leakwatch/internal/verifier/internal/httpx"
 	"github.com/HodeTech/leakwatch/pkg/finding"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,12 +26,44 @@ type testVerifier struct {
 	result     finding.VerificationResult
 	delay      time.Duration
 	callCount  atomic.Int64
+
+	// inFlight tracks how many Verify calls are currently executing, and
+	// maxInFlight records the peak. They let tests assert genuine concurrency
+	// deterministically without timing real sleeps.
+	inFlight    atomic.Int64
+	maxInFlight atomic.Int64
+}
+
+type httpRetryTestVerifier struct {
+	detectorID string
+	client     *http.Client
+	url        string
+}
+
+func (v *httpRetryTestVerifier) Type() string { return v.detectorID }
+func (v *httpRetryTestVerifier) Verify(ctx context.Context, raw detector.RawFinding) finding.VerificationResult {
+	token := string(raw.Raw)
+	return httpx.VerifyToken(ctx, v.client, token, httpx.TokenSpec{
+		Name:          "engine-retry-test",
+		Request:       httpx.Request{URL: v.url, Header: map[string]string{"Authorization": "Bearer " + token}},
+		ActiveMessage: "active after bounded retry",
+	})
 }
 
 func (v *testVerifier) Type() string { return v.detectorID }
 
 func (v *testVerifier) Verify(ctx context.Context, _ detector.RawFinding) finding.VerificationResult {
 	v.callCount.Add(1)
+
+	cur := v.inFlight.Add(1)
+	defer v.inFlight.Add(-1)
+	for {
+		peak := v.maxInFlight.Load()
+		if cur <= peak || v.maxInFlight.CompareAndSwap(peak, cur) {
+			break
+		}
+	}
+
 	if v.delay > 0 {
 		select {
 		case <-time.After(v.delay):
@@ -35,6 +75,74 @@ func (v *testVerifier) Verify(ctx context.Context, _ detector.RawFinding) findin
 		}
 	}
 	return v.result
+}
+
+// gatedTestVerifier models a verifier that may make several outbound attempts.
+// It calls the engine gate immediately before each simulated request and records
+// admission timestamps so request pacing can be asserted without real network
+// calls.
+type gatedTestVerifier struct {
+	*testVerifier
+	requestBudget int
+	budgetPanic   string
+	attempts      int
+	admittedMu    sync.Mutex
+	admittedAt    []time.Time
+}
+
+func (v *gatedTestVerifier) VerificationRequestBudget() int {
+	if v.budgetPanic != "" {
+		panic(v.budgetPanic)
+	}
+	return v.requestBudget
+}
+
+func (v *gatedTestVerifier) VerifyWithRequestGate(
+	ctx context.Context,
+	raw detector.RawFinding,
+	gate RequestGate,
+) finding.VerificationResult {
+	for attempt := 0; attempt < v.attempts; attempt++ {
+		if rejection := gate(); rejection != nil {
+			return *rejection
+		}
+		v.admittedMu.Lock()
+		v.admittedAt = append(v.admittedAt, time.Now())
+		v.admittedMu.Unlock()
+	}
+	return v.Verify(ctx, raw)
+}
+
+func (v *gatedTestVerifier) admissionTimes() []time.Time {
+	v.admittedMu.Lock()
+	defer v.admittedMu.Unlock()
+	return append([]time.Time(nil), v.admittedAt...)
+}
+
+// panicVerifier is a mock verifier whose Verify always panics, used to prove the
+// engine recovers instead of crashing the whole scan.
+type panicVerifier struct {
+	detectorID string
+	callCount  atomic.Int64
+	panicRaw   bool
+}
+
+type panicTypeVerifier struct{ payload string }
+
+func (v *panicTypeVerifier) Type() string { panic(v.payload) }
+
+func (v *panicTypeVerifier) Verify(context.Context, detector.RawFinding) finding.VerificationResult {
+	return finding.VerificationResult{Status: finding.StatusVerifiedActive}
+}
+
+func (v *panicVerifier) Type() string { return v.detectorID }
+
+func (v *panicVerifier) Verify(_ context.Context, raw detector.RawFinding) finding.VerificationResult {
+	v.callCount.Add(1)
+	if v.panicRaw {
+		panic(string(raw.Raw))
+	}
+	panic("boom: simulated verifier defect")
 }
 
 func makePair(detectorID, redacted string) VerifyPair {
@@ -93,6 +201,204 @@ func TestVerifyAll_MatchingVerifier_UpdatesFinding(t *testing.T) {
 	assert.Equal(t, finding.StatusVerifiedActive, results[0].Verification.Status)
 	assert.Equal(t, "token is active", results[0].Verification.Message)
 	assert.Equal(t, int64(1), v.callCount.Load())
+}
+
+func TestVerifyAll_NoRequestVerifierConsumesNoLimiterCapacity(t *testing.T) {
+	const detectorID = "format-only-provider"
+	v := &testVerifier{
+		detectorID: detectorID,
+		result: finding.VerificationResult{
+			Status:  finding.StatusUnverified,
+			Message: "format-only verification",
+		},
+	}
+	engine := NewEngine(Config{Enabled: true, Timeout: time.Second, Concurrency: 1, RateLimit: 1}, []Verifier{v})
+
+	results := engine.VerifyAll(context.Background(), []VerifyPair{makePair(detectorID, "format****only")})
+	require.Len(t, results, 1)
+	assert.Equal(t, finding.StatusUnverified, results[0].Verification.Status)
+	assert.Equal(t, int64(1), v.callCount.Load())
+	assert.True(t, engine.rateLimiter.Allow(), "a verifier that sends no request must not consume the global token")
+	_, created := engine.perDetector[detectorID]
+	assert.False(t, created, "a verifier that sends no request must not create or consume a provider bucket")
+}
+
+func TestVerifyAll_GatedVerifierDoesNotReserveUnusedFallbackToken(t *testing.T) {
+	base := &testVerifier{
+		detectorID: "regional-provider",
+		result:     finding.VerificationResult{Status: finding.StatusVerifiedActive},
+	}
+	v := &gatedTestVerifier{testVerifier: base, requestBudget: 2, attempts: 1}
+	engine := NewEngine(Config{Enabled: true, Timeout: 250 * time.Millisecond, Concurrency: 1, RateLimit: 1}, []Verifier{v})
+
+	results := engine.VerifyAll(context.Background(), []VerifyPair{makePair("regional-provider", "regional****key")})
+	require.Len(t, results, 1)
+	assert.Equal(t, finding.StatusVerifiedActive, results[0].Verification.Status)
+	assert.Equal(t, int64(1), base.callCount.Load())
+	assert.Len(t, v.admissionTimes(), 1, "unused fallback must consume no limiter token")
+}
+
+func TestVerifyAll_GatedFallbackRequestsArePacedAtSendTime(t *testing.T) {
+	base := &testVerifier{
+		detectorID: "regional-provider",
+		result:     finding.VerificationResult{Status: finding.StatusVerifiedActive},
+	}
+	v := &gatedTestVerifier{testVerifier: base, requestBudget: 2, attempts: 2}
+	engine := NewEngine(Config{Enabled: true, Timeout: 2 * time.Second, Concurrency: 1, RateLimit: 1}, []Verifier{v})
+
+	results := engine.VerifyAll(context.Background(), []VerifyPair{makePair("regional-provider", "regional****key")})
+	require.Len(t, results, 1)
+	assert.Equal(t, finding.StatusVerifiedActive, results[0].Verification.Status)
+	times := v.admissionTimes()
+	require.Len(t, times, 2)
+	assert.GreaterOrEqual(t, times[1].Sub(times[0]), 900*time.Millisecond,
+		"fallback request must pass the limiter at its actual send point")
+}
+
+func TestVerifyAll_TimeoutIncludesFallbackRateLimitAdmission(t *testing.T) {
+	base := &testVerifier{
+		detectorID: "regional-provider",
+		result:     finding.VerificationResult{Status: finding.StatusVerifiedActive},
+	}
+	v := &gatedTestVerifier{testVerifier: base, requestBudget: 2, attempts: 2}
+	engine := NewEngine(Config{Enabled: true, Timeout: 50 * time.Millisecond, Concurrency: 1, RateLimit: 1}, []Verifier{v})
+	started := time.Now()
+
+	results := engine.VerifyAll(context.Background(), []VerifyPair{makePair("regional-provider", "regional****key")})
+	require.Len(t, results, 1)
+	assert.Equal(t, finding.StatusVerifyError, results[0].Verification.Status)
+	assert.Less(t, time.Since(started), 500*time.Millisecond,
+		"configured timeout must bound limiter admission and provider fallback together")
+	assert.Zero(t, base.callCount.Load(), "provider result must not run after fallback admission fails")
+}
+
+func TestVerificationRequestBudget_IsBounded(t *testing.T) {
+	tests := []struct {
+		name    string
+		budget  int
+		want    int
+		wantErr bool
+	}{
+		{name: "zero fails closed", budget: 0, wantErr: true},
+		{name: "negative fails closed", budget: -1, wantErr: true},
+		{name: "declared budget", budget: 2, want: 2},
+		{name: "excessive fails closed", budget: 1000, wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := verificationRequestBudget(&gatedTestVerifier{
+				testVerifier:  &testVerifier{detectorID: "regional-provider"},
+				requestBudget: tc.budget,
+			})
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestVerifyAll_ExcessiveRequestBudgetFailsClosed(t *testing.T) {
+	base := &testVerifier{detectorID: "unsafe-regional-provider", result: finding.VerificationResult{Status: finding.StatusVerifiedActive}}
+	v := &gatedTestVerifier{testVerifier: base, requestBudget: maxVerificationRequestBudget + 1, attempts: 1}
+	engine := NewEngine(Config{Enabled: true, Timeout: time.Second, Concurrency: 1, RateLimit: 100}, []Verifier{v})
+
+	results := engine.VerifyAll(context.Background(), []VerifyPair{makePair(v.detectorID, "unsafe****key")})
+	require.Len(t, results, 1)
+	assert.Equal(t, finding.StatusVerifyError, results[0].Verification.Status)
+	assert.Zero(t, base.callCount.Load(), "verifier with an unsafe request budget must not run")
+}
+
+func TestVerifyAll_GatedVerifierCannotExceedDeclaredBudget(t *testing.T) {
+	base := &testVerifier{detectorID: "runaway-provider", result: finding.VerificationResult{Status: finding.StatusVerifiedActive}}
+	v := &gatedTestVerifier{testVerifier: base, requestBudget: 2, attempts: 3}
+	engine := NewEngine(Config{Enabled: true, Timeout: time.Second, Concurrency: 1, RateLimit: 1000}, []Verifier{v})
+
+	results := engine.VerifyAll(context.Background(), []VerifyPair{makePair(v.detectorID, "runaway****key")})
+	require.Len(t, results, 1)
+	assert.Equal(t, finding.StatusVerifyError, results[0].Verification.Status)
+	assert.Zero(t, base.callCount.Load(), "verifier result must not run after it exceeds the request budget")
+	assert.Len(t, v.admissionTimes(), 2)
+}
+
+func TestVerifyAll_RequestBudgetPanicFailsClosedWithoutPayload(t *testing.T) {
+	const canary = "budget-panic-secret-canary-7rQ2mN9p"
+	base := &testVerifier{detectorID: "panic-budget-provider", result: finding.VerificationResult{Status: finding.StatusVerifiedActive}}
+	v := &gatedTestVerifier{testVerifier: base, requestBudget: 2, attempts: 1, budgetPanic: canary}
+	engine := NewEngine(Config{Enabled: true, Timeout: time.Second, Concurrency: 1, RateLimit: 100}, []Verifier{v})
+
+	results := engine.VerifyAll(context.Background(), []VerifyPair{makePair(v.detectorID, "budget****canary")})
+	require.Len(t, results, 1)
+	assert.Equal(t, finding.StatusVerifyError, results[0].Verification.Status)
+	assert.NotContains(t, results[0].Verification.Message, canary)
+	assert.Zero(t, base.callCount.Load())
+}
+
+func TestWaitRateLimit_GlobalFailureRefundsUnusedProviderReservation(t *testing.T) {
+	engine := NewEngine(Config{Enabled: true, Timeout: time.Second, Concurrency: 1, RateLimit: 1}, nil)
+	require.True(t, engine.rateLimiter.Allow(), "consume the global limiter's initial token")
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	rejection := engine.waitRateLimit(ctx, "refunded-provider")
+	require.NotNil(t, rejection)
+	assert.Equal(t, finding.StatusVerifyError, rejection.Status)
+
+	// Replace only the global limiter with an immediately available one. The
+	// second admission can succeed under a short deadline only if the failed
+	// combined reservation refunded the provider token.
+	engine.rateLimiter = rate.NewLimiter(rate.Inf, 1)
+	secondCtx, secondCancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer secondCancel()
+	assert.Nil(t, engine.waitRateLimit(secondCtx, "refunded-provider"))
+}
+
+func TestVerifyAll_HTTP429RetryUsesGlobalAndProviderLimiters(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		globalRate   rate.Limit
+		providerRate rate.Limit
+	}{
+		{name: "provider limiter is enforced", globalRate: 1000, providerRate: 10},
+		{name: "global limiter is enforced", globalRate: 10, providerRate: 1000},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				mu      sync.Mutex
+				callsAt []time.Time
+			)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				mu.Lock()
+				callsAt = append(callsAt, time.Now())
+				call := len(callsAt)
+				mu.Unlock()
+				if call == 1 {
+					w.Header().Set("Retry-After", "0")
+					w.WriteHeader(http.StatusTooManyRequests)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			const detectorID = "http-retry-provider"
+			v := &httpRetryTestVerifier{detectorID: detectorID, client: server.Client(), url: server.URL}
+			engine := NewEngine(Config{Enabled: true, Timeout: time.Second, Concurrency: 1, RateLimit: 1000}, []Verifier{v})
+			engine.rateLimiter = rate.NewLimiter(tc.globalRate, 1)
+			engine.perDetector[detectorID] = rate.NewLimiter(tc.providerRate, 1)
+
+			results := engine.VerifyAll(context.Background(), []VerifyPair{makePair(detectorID, "http****retry")})
+			require.Len(t, results, 1)
+			assert.Equal(t, finding.StatusVerifiedActive, results[0].Verification.Status)
+			mu.Lock()
+			defer mu.Unlock()
+			require.Len(t, callsAt, 2)
+			assert.GreaterOrEqual(t, callsAt[1].Sub(callsAt[0]), 85*time.Millisecond,
+				"retry must pass the limiting bucket at its actual send point")
+		})
+	}
 }
 
 func TestVerifyAll_NoMatchingVerifier_LeavesUnverified(t *testing.T) {
@@ -165,18 +471,19 @@ func TestVerifyAll_MultipleFindings_VerifiesConcurrently(t *testing.T) {
 		pairs[i] = makePair("aws-access-key-id", "AKIA****XXXX")
 	}
 
-	start := time.Now()
 	results := engine.VerifyAll(context.Background(), pairs)
-	elapsed := time.Since(start)
 
 	require.Len(t, results, 8)
 	for _, r := range results {
 		assert.Equal(t, finding.StatusVerifiedActive, r.Verification.Status)
 	}
 
-	// With 4 workers and 50ms delay each, 8 items should take ~100ms, not ~400ms.
-	assert.Less(t, elapsed, 300*time.Millisecond,
-		"concurrent verification should be faster than sequential")
+	// Deterministic concurrency check: with 4 workers and a delay that keeps
+	// each call in flight, at least two verifications must overlap. This avoids
+	// the flakiness of asserting a wall-clock elapsed-time bound over real
+	// sleeps under loaded CI.
+	assert.Greater(t, v.maxInFlight.Load(), int64(1),
+		"verifications should run concurrently, not sequentially")
 	assert.Equal(t, int64(8), v.callCount.Load())
 }
 
@@ -262,6 +569,82 @@ func TestVerifyAll_MixedVerifiers_RoutesCorrectly(t *testing.T) {
 	assert.Equal(t, int64(1), ghVerifier.callCount.Load())
 }
 
+func TestVerifyAll_PanickingVerifier_RecoversAsVerifyError(t *testing.T) {
+	pv := &panicVerifier{detectorID: "panic-detector"}
+
+	engine := NewEngine(Config{
+		Enabled:     true,
+		Timeout:     5 * time.Second,
+		Concurrency: 1,
+		RateLimit:   100,
+	}, []Verifier{pv})
+
+	pairs := []VerifyPair{makePair("panic-detector", "PANIC****0000")}
+
+	// The call must return normally (not crash the process) and convert the
+	// panic into a StatusVerifyError.
+	results := engine.VerifyAll(context.Background(), pairs)
+
+	require.Len(t, results, 1)
+	assert.Equal(t, finding.StatusVerifyError, results[0].Verification.Status)
+	assert.Equal(t, int64(1), pv.callCount.Load())
+}
+
+func TestVerifyAll_PanicPayloadCannotLeakRawSecretToLogs(t *testing.T) {
+	const canary = "panic-payload-secret-canary-9mN2pQ7r"
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
+	pv := &panicVerifier{detectorID: "panic-secret-detector", panicRaw: true}
+	engine := NewEngine(Config{Enabled: true, Timeout: time.Second, Concurrency: 1, RateLimit: 100}, []Verifier{pv})
+	pair := makePair(pv.detectorID, "panic****canary")
+	pair.Raw.Raw = []byte(canary)
+
+	results := engine.VerifyAll(context.Background(), []VerifyPair{pair})
+	require.Len(t, results, 1)
+	assert.Equal(t, finding.StatusVerifyError, results[0].Verification.Status)
+	assert.NotContains(t, logs.String(), canary)
+	assert.Contains(t, logs.String(), "verifier panicked; recovered to protect the scan")
+}
+
+func TestVerifyAll_PanickingVerifier_OtherFindingsStillComplete(t *testing.T) {
+	pv := &panicVerifier{detectorID: "panic-detector"}
+	good := &testVerifier{
+		detectorID: "aws-access-key-id",
+		result: finding.VerificationResult{
+			Status:  finding.StatusVerifiedActive,
+			Message: "key is active",
+		},
+	}
+
+	engine := NewEngine(Config{
+		Enabled:     true,
+		Timeout:     5 * time.Second,
+		Concurrency: 4,
+		RateLimit:   1000,
+	}, []Verifier{pv, good})
+
+	pairs := []VerifyPair{
+		makePair("panic-detector", "PANIC****1111"),
+		makePair("aws-access-key-id", "AKIA****2222"),
+		makePair("panic-detector", "PANIC****3333"),
+		makePair("aws-access-key-id", "AKIA****4444"),
+	}
+
+	results := engine.VerifyAll(context.Background(), pairs)
+
+	require.Len(t, results, 4)
+	// Panicking-verifier findings become verify errors; the healthy verifier's
+	// findings are unaffected and complete normally.
+	assert.Equal(t, finding.StatusVerifyError, results[0].Verification.Status)
+	assert.Equal(t, finding.StatusVerifiedActive, results[1].Verification.Status)
+	assert.Equal(t, finding.StatusVerifyError, results[2].Verification.Status)
+	assert.Equal(t, finding.StatusVerifiedActive, results[3].Verification.Status)
+	assert.Equal(t, int64(2), good.callCount.Load())
+}
+
 func TestVerifyAll_RaceDetectorStress_ManyConcurrentWrites(t *testing.T) {
 	v := &testVerifier{
 		detectorID: "stress-detector",
@@ -300,4 +683,22 @@ func TestNewEngine_DefaultValues_AppliedForZeroConfig(t *testing.T) {
 	assert.Equal(t, DefaultConcurrency, engine.concurrency)
 	assert.Equal(t, DefaultTimeout, engine.timeout)
 	assert.True(t, engine.enabled)
+}
+
+func TestNewEngine_InvalidVerifierEntriesCannotCrashConstruction(t *testing.T) {
+	const canary = "type-panic-secret-canary-5pN8qR2m"
+	var typedNil *testVerifier
+	var engine *Engine
+	assert.NotPanics(t, func() {
+		engine = NewEngine(Config{Enabled: true}, []Verifier{
+			typedNil,
+			&panicTypeVerifier{payload: canary},
+		})
+	})
+	require.NotNil(t, engine)
+	assert.Empty(t, engine.verifiers)
+
+	results := engine.VerifyAll(context.Background(), []VerifyPair{makePair("invalid-provider", "invalid****key")})
+	require.Len(t, results, 1)
+	assert.Equal(t, finding.StatusUnverified, results[0].Verification.Status)
 }

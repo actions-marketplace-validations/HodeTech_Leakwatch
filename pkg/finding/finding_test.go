@@ -28,6 +28,33 @@ func TestSeverity_String(t *testing.T) {
 	}
 }
 
+func TestParseSeverity(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected Severity
+		ok       bool
+	}{
+		{"low", SeverityLow, true},
+		{"medium", SeverityMedium, true},
+		{"high", SeverityHigh, true},
+		{"critical", SeverityCritical, true},
+		{"HIGH", SeverityLow, false},   // case-sensitive: not recognized
+		{"crital", SeverityLow, false}, // typo: not recognized
+		{"", SeverityLow, false},       // empty: not recognized
+		{"unknown", SeverityLow, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			sev, ok := ParseSeverity(tt.input)
+			assert.Equal(t, tt.ok, ok)
+			if tt.ok {
+				assert.Equal(t, tt.expected, sev)
+			}
+		})
+	}
+}
+
 func TestVerificationStatus_String(t *testing.T) {
 	tests := []struct {
 		status   VerificationStatus
@@ -188,8 +215,8 @@ func TestFinding_JSONMarshalUnmarshal_SeverityAsString(t *testing.T) {
 			Status: StatusUnverified,
 		},
 		DetectedAt: now,
-		Entropy:    4.5,
 	}
+	f.SetEntropy(4.5)
 
 	data, err := json.Marshal(f)
 	require.NoError(t, err)
@@ -216,7 +243,56 @@ func TestFinding_JSONMarshalUnmarshal_SeverityAsString(t *testing.T) {
 	assert.Equal(t, f.SourceMetadata.FilePath, decoded.SourceMetadata.FilePath)
 	assert.Equal(t, f.SourceMetadata.Line, decoded.SourceMetadata.Line)
 	assert.Equal(t, f.Verification.Status, decoded.Verification.Status)
+	assert.True(t, decoded.EntropyCalculated)
+	assert.Equal(t, 4.5, decoded.Entropy)
 	assert.Empty(t, decoded.Raw) // Raw is never serialized via json:"-"
+}
+
+func TestFinding_JSONNullableEntropyAndDetectedAt(t *testing.T) {
+	t.Run("missing values are omitted", func(t *testing.T) {
+		data, err := json.Marshal(Finding{ID: "test-1"})
+		require.NoError(t, err)
+
+		var object map[string]any
+		require.NoError(t, json.Unmarshal(data, &object))
+		assert.NotContains(t, object, "detected_at")
+		assert.NotContains(t, object, "entropy")
+		assert.NotContains(t, string(data), "0001-01-01")
+	})
+
+	t.Run("computed zero is present and round trips", func(t *testing.T) {
+		original := Finding{ID: "test-2"}
+		original.SetEntropy(0)
+
+		data, err := json.Marshal(original)
+		require.NoError(t, err)
+		var object map[string]any
+		require.NoError(t, json.Unmarshal(data, &object))
+		value, exists := object["entropy"]
+		require.True(t, exists)
+		assert.Equal(t, float64(0), value)
+
+		var decoded Finding
+		require.NoError(t, json.Unmarshal(data, &decoded))
+		assert.True(t, decoded.EntropyCalculated)
+		assert.Zero(t, decoded.Entropy)
+	})
+
+	t.Run("legacy non-zero entropy remains source compatible", func(t *testing.T) {
+		data, err := json.Marshal(Finding{ID: "test-3", Entropy: 3.5})
+		require.NoError(t, err)
+		assert.Contains(t, string(data), `"entropy":3.5`)
+	})
+
+	t.Run("missing values clear a reused destination", func(t *testing.T) {
+		destination := Finding{DetectedAt: time.Now().UTC()}
+		destination.SetEntropy(4.2)
+		require.NoError(t, json.Unmarshal([]byte(`{"id":"replacement"}`), &destination))
+		assert.Equal(t, "replacement", destination.ID)
+		assert.True(t, destination.DetectedAt.IsZero())
+		assert.Zero(t, destination.Entropy)
+		assert.False(t, destination.EntropyCalculated)
+	})
 }
 
 func TestFinding_JSONOmitsEmptyRaw(t *testing.T) {
@@ -259,4 +335,85 @@ func TestFinding_JSONNeverSerializesRaw(t *testing.T) {
 
 	_, hasRaw := m["raw"]
 	assert.False(t, hasRaw, "raw field must never appear in JSON regardless of value")
+}
+
+// TestFinding_JSONNeverSerializesExtraData verifies the defense-in-depth gate:
+// even if a detector mistakenly stashes secret material in ExtraData, standard
+// json.Marshal of a Finding (the default, non --show-raw output path) MUST NOT
+// emit it. This mirrors the Raw protection above.
+func TestFinding_JSONNeverSerializesExtraData(t *testing.T) {
+	f := Finding{
+		ID:       "test-1",
+		Redacted: "snowflakecomputing.com?password=****",
+		ExtraData: map[string]string{
+			"password": "SuperSecretPW1", // fake value; must never reach output
+		},
+	}
+
+	data, err := json.Marshal(f)
+	require.NoError(t, err)
+
+	assert.NotContains(t, string(data), "SuperSecretPW1",
+		"ExtraData must never appear in default JSON output")
+
+	var m map[string]interface{}
+	err = json.Unmarshal(data, &m)
+	require.NoError(t, err)
+
+	_, hasExtra := m["extra_data"]
+	assert.False(t, hasExtra, "extra_data must never appear in default JSON output")
+}
+
+// TestSourceMetadata_JSONOmitsZeroDate verifies that a non-git source (which
+// never sets Date) does not serialize a bogus zero timestamp. omitempty is a
+// no-op on time.Time, so this is enforced by the custom MarshalJSON.
+func TestSourceMetadata_JSONOmitsZeroDate(t *testing.T) {
+	f := Finding{
+		ID:         "test-1",
+		DetectedAt: time.Date(2023, 5, 1, 12, 0, 0, 0, time.UTC),
+		SourceMetadata: SourceMetadata{
+			SourceType: "filesystem",
+			FilePath:   "config.yaml",
+			Line:       42,
+		},
+	}
+
+	data, err := json.Marshal(f)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "0001-01-01",
+		"a zero source Date must never serialize as 0001-01-01T00:00:00Z")
+
+	var m map[string]interface{}
+	err = json.Unmarshal(data, &m)
+	require.NoError(t, err)
+	source, ok := m["source"].(map[string]interface{})
+	require.True(t, ok)
+	_, hasDate := source["date"]
+	assert.False(t, hasDate, "date key must be absent when Date is the zero time")
+}
+
+// TestSourceMetadata_JSONIncludesNonZeroDate verifies that a git source's real
+// commit date is still serialized under the "date" key.
+func TestSourceMetadata_JSONIncludesNonZeroDate(t *testing.T) {
+	when := time.Date(2023, 5, 1, 12, 0, 0, 0, time.UTC)
+	f := Finding{
+		ID: "test-1",
+		SourceMetadata: SourceMetadata{
+			SourceType: "git",
+			Repository: "example/repo",
+			Date:       when,
+		},
+	}
+
+	data, err := json.Marshal(f)
+	require.NoError(t, err)
+
+	var m map[string]interface{}
+	err = json.Unmarshal(data, &m)
+	require.NoError(t, err)
+	source, ok := m["source"].(map[string]interface{})
+	require.True(t, ok)
+	date, hasDate := source["date"]
+	require.True(t, hasDate, "date key must be present when Date is set")
+	assert.Equal(t, "2023-05-01T12:00:00Z", date)
 }

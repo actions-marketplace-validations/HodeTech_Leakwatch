@@ -37,7 +37,7 @@ window.LW_DETECTORS = [
     ],
     "patterns": [
       {
-        "src": "(?:AUTH0_MANAGEMENT_TOKEN|AUTH0_API_TOKEN|auth0_token)\\s*[=:]\\s*['\"]?([A-Za-z0-9_-]{30,})['\"]?"
+        "src": "(?:[\"']?(?:AUTH0_MANAGEMENT_TOKEN|AUTH0_API_TOKEN|auth0_token)[\"']?)[ \\t]*[=:][ \\t]*[\"']?([A-Za-z0-9_-]{16,}\\.[A-Za-z0-9_-]{16,}\\.[A-Za-z0-9_-]{8,})"
       }
     ]
   },
@@ -79,7 +79,7 @@ window.LW_DETECTORS = [
     ],
     "patterns": [
       {
-        "src": "DefaultEndpointsProtocol=https?;AccountName=[^;]+;AccountKey=[A-Za-z0-9+/=]{86,88};"
+        "src": "DefaultEndpointsProtocol=https?;AccountName=([^;]+);AccountKey=([A-Za-z0-9+/=]{86,88});"
       }
     ]
   },
@@ -93,7 +93,11 @@ window.LW_DETECTORS = [
     ],
     "patterns": [
       {
-        "src": "(?:BITBUCKET_APP_PASSWORD|bitbucket_app_password|bitbucket)\\s*[=:]\\s*['\"]?([A-Za-z0-9]{18,24})['\"]?"
+        "src": "(?:BITBUCKET_APP_PASSWORD|bitbucket_app_password|bitbucket_password)\\s*[=:]\\s*['\"]?([A-Za-z0-9]{18,24})['\"]?"
+      },
+      {
+        "src": "(?:BITBUCKET_USERNAME|BITBUCKET_USER|ATLASSIAN_USERNAME|ATLASSIAN_USER)\\s*[=:]\\s*['\"]?([A-Za-z0-9._-]+)['\"]?",
+        "flags": "i"
       }
     ]
   },
@@ -116,8 +120,6 @@ window.LW_DETECTORS = [
     "severity": "critical",
     "keywords": [
       "cloudflare",
-      "CLOUDFLARE",
-      "CF_API_TOKEN",
       "cf_api_token",
       "cf_api_key"
     ],
@@ -157,10 +159,10 @@ window.LW_DETECTORS = [
     ],
     "patterns": [
       {
-        "src": "(postgres|mysql|mongodb(\\+srv)?|redis)://[^\\s'\"]+@[^\\s'\"]+"
+        "src": "(postgres|mysql|mongodb(\\+srv)?|redis)://[^\\s'\"@:]+:[^\\s'\"@]+@[^\\s'\"]+"
       },
       {
-        "src": "(?:Host|Server|Data Source)=[^;]+;[^'\"]*(?:Password|Pwd)=([^;'\"\\s]+)",
+        "src": "(?:(?:Host|Server|Data Source)=[^;]+;[^'\"]*(?:Password|Pwd)=([^;'\"\\s]+)|(?:Password|Pwd)=([^;'\"\\s]+)[^'\"]*;[^'\"]*(?:Host|Server|Data Source)=)",
         "flags": "i"
       }
     ]
@@ -174,6 +176,9 @@ window.LW_DETECTORS = [
     "patterns": [
       {
         "src": "dapi[a-f0-9]{32}(-[0-9])?"
+      },
+      {
+        "src": "https://[A-Za-z0-9.-]+\\.(?:cloud\\.databricks\\.com|azuredatabricks\\.net|gcp\\.databricks\\.com)"
       }
     ]
   },
@@ -228,6 +233,19 @@ window.LW_DETECTORS = [
     ]
   },
   {
+    "id": "discord-webhook-url",
+    "severity": "critical",
+    "keywords": [
+      "discord.com/api/webhooks",
+      "discordapp.com/api/webhooks"
+    ],
+    "patterns": [
+      {
+        "src": "discord(?:app)?\\.com/api/webhooks/\\d+/[A-Za-z0-9_-]+"
+      }
+    ]
+  },
+  {
     "id": "dockerhub-pat",
     "severity": "critical",
     "keywords": [
@@ -243,11 +261,11 @@ window.LW_DETECTORS = [
     "id": "doppler-token",
     "severity": "critical",
     "keywords": [
-      "dp.st."
+      "dp."
     ],
     "patterns": [
       {
-        "src": "dp\\.st\\.[a-zA-Z0-9_-]{40,}"
+        "src": "dp\\.(st|pt|ct|scim)\\.[a-zA-Z0-9_-]{40,}"
       }
     ]
   },
@@ -273,7 +291,7 @@ window.LW_DETECTORS = [
     ],
     "patterns": [
       {
-        "src": "(?:s?ftps?)://[^\\s'\"]+:[^\\s'\"]+@[^\\s'\"]+"
+        "src": "(?:s?ftps?)://[^\\s'\"]{1,256}:[^\\s'\"]{1,256}@[^\\s'\"]{1,256}"
       }
     ]
   },
@@ -288,12 +306,6 @@ window.LW_DETECTORS = [
     "patterns": [
       {
         "src": "\"type\"\\s*:\\s*\"service_account\""
-      },
-      {
-        "src": "\"private_key_id\"\\s*:\\s*\"([^\"]+)\""
-      },
-      {
-        "src": "\"client_email\"\\s*:\\s*\"([^\"]+)\""
       }
     ]
   },
@@ -308,7 +320,7 @@ window.LW_DETECTORS = [
     ],
     "patterns": [
       {
-        "src": "gh[orus]_[A-Za-z0-9_]{36,}"
+        "src": "ghs_[A-Za-z0-9_-]{8,}(?:\\.[A-Za-z0-9_-]{8,}){2}|gh[orus]_[A-Za-z0-9_]{36,}"
       }
     ]
   },
@@ -316,11 +328,12 @@ window.LW_DETECTORS = [
     "id": "github-token",
     "severity": "critical",
     "keywords": [
-      "ghp_"
+      "ghp_",
+      "github_pat_"
     ],
     "patterns": [
       {
-        "src": "ghp_[A-Za-z0-9_]{36,100}"
+        "src": "ghp_[A-Za-z0-9_]{36,100}|github_pat_[A-Za-z0-9_]{22,}"
       }
     ]
   },
@@ -328,11 +341,23 @@ window.LW_DETECTORS = [
     "id": "gitlab-pat",
     "severity": "critical",
     "keywords": [
-      "glpat-"
+      "glpat-",
+      "gldt-",
+      "glrt-",
+      "glrtr-",
+      "glcbt-",
+      "glptt-",
+      "glimt-",
+      "glagent-",
+      "glwt-",
+      "glsoat-",
+      "glffct-",
+      "gloas-",
+      "glft-"
     ],
     "patterns": [
       {
-        "src": "glpat-[A-Za-z0-9_\\-]{20}"
+        "src": "(?:glpat|gldt|glrt|glrtr|glcbt|glptt|glimt|glagent|glwt|glsoat|glffct|gloas|glft)-[A-Za-z0-9_\\-]{20,}"
       }
     ]
   },
@@ -372,7 +397,8 @@ window.LW_DETECTORS = [
     ],
     "patterns": [
       {
-        "src": "(?:HEROKU_API_KEY|heroku_api_key|heroku)\\s*[=:]\\s*['\"]?([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})['\"]?"
+        "src": "(?:HEROKU_API_KEY|heroku_api_key|heroku)\\s*[=:]\\s*['\"]?([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})['\"]?",
+        "flags": "i"
       }
     ]
   },
@@ -437,7 +463,7 @@ window.LW_DETECTORS = [
     ],
     "patterns": [
       {
-        "src": "ldaps?://[^\\s'\"]+:[^\\s'\"]+@[^\\s'\"]+"
+        "src": "(?i:ldaps?)://[^\\s'\"]+:[^\\s'\"]+@[^\\s'\"]+"
       }
     ]
   },
@@ -489,9 +515,6 @@ window.LW_DETECTORS = [
     "patterns": [
       {
         "src": "ntn_[A-Za-z0-9]{43,}"
-      },
-      {
-        "src": "secret_[A-Za-z0-9]{43,}"
       }
     ]
   },
@@ -517,11 +540,11 @@ window.LW_DETECTORS = [
     ],
     "patterns": [
       {
-        "src": "(?:okta|SSWS)",
-        "flags": "i"
+        "src": "00[A-Za-z0-9_-]{40}"
       },
       {
-        "src": "00[A-Za-z0-9_-]{40}"
+        "src": "(?:https?://)?([a-z0-9][a-z0-9-]*\\.(?:okta|oktapreview|okta-emea)\\.com)",
+        "flags": "i"
       }
     ]
   },
@@ -529,11 +552,13 @@ window.LW_DETECTORS = [
     "id": "openai-api-key",
     "severity": "critical",
     "keywords": [
-      "sk-proj-"
+      "sk-proj-",
+      "sk-svcacct-",
+      "sk-"
     ],
     "patterns": [
       {
-        "src": "sk-proj-[A-Za-z0-9_-]{50,}"
+        "src": "sk-proj-[A-Za-z0-9_-]{50,}|sk-svcacct-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{20,}"
       }
     ]
   },
@@ -574,14 +599,15 @@ window.LW_DETECTORS = [
       "-----BEGIN DSA PRIVATE",
       "-----BEGIN EC PRIVATE",
       "-----BEGIN PGP PRIVATE",
-      "-----BEGIN PRIVATE KEY"
+      "-----BEGIN PRIVATE KEY",
+      "-----BEGIN ENCRYPTED PRIVATE"
     ],
     "patterns": [
       {
-        "src": "-----BEGIN\\s+(RSA |OPENSSH |DSA |EC |PGP )?PRIVATE KEY( BLOCK)?-----"
+        "src": "-----BEGIN\\s+(?:[A-Z0-9]+\\s+)*PRIVATE KEY( BLOCK)?-----"
       },
       {
-        "src": "-----END\\s+(?:RSA |OPENSSH |DSA |EC |PGP )?PRIVATE KEY(?: BLOCK)?-----"
+        "src": "-----END\\s+(?:[A-Z0-9]+\\s+)*PRIVATE KEY(?: BLOCK)?-----"
       }
     ]
   },
@@ -593,7 +619,7 @@ window.LW_DETECTORS = [
     ],
     "patterns": [
       {
-        "src": "pypi-[A-Za-z0-9_-]{16,}"
+        "src": "pypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]{50,}"
       }
     ]
   },
@@ -667,7 +693,7 @@ window.LW_DETECTORS = [
     ],
     "patterns": [
       {
-        "src": "shpat_[a-f0-9]{32}"
+        "src": "\\bshpat_[a-f0-9]{32}\\b"
       }
     ]
   },
@@ -706,7 +732,7 @@ window.LW_DETECTORS = [
     ],
     "patterns": [
       {
-        "src": "snowflakecomputing\\.com[^\\s]*(?:password|pwd|PWD|PASSWORD)\\s*=\\s*([^\u0026\\s'\"]+)"
+        "src": "snowflakecomputing\\.com[^\\s]{0,512}(?:password|pwd|PWD|PASSWORD)\\s*=\\s*([^\u0026\\s'\"]+)"
       }
     ]
   },
@@ -770,7 +796,7 @@ window.LW_DETECTORS = [
     ],
     "patterns": [
       {
-        "src": "sbp_[a-f0-9]{40}"
+        "src": "\\bsbp_[a-f0-9]{40}\\b"
       }
     ]
   },
@@ -783,7 +809,7 @@ window.LW_DETECTORS = [
     ],
     "patterns": [
       {
-        "src": "https://[a-zA-Z0-9-]+\\.webhook\\.office\\.com/webhookb2/[a-f0-9-]+/IncomingWebhook/[a-f0-9]+/[a-f0-9-]+"
+        "src": "https://([a-zA-Z0-9-]+)\\.webhook\\.office\\.com/webhookb2/[a-f0-9-]+/IncomingWebhook/[a-f0-9]+/[a-f0-9-]+"
       }
     ]
   },
@@ -815,18 +841,26 @@ window.LW_DETECTORS = [
     "id": "twilio-api-key",
     "severity": "critical",
     "keywords": [
-      "twilio",
-      "TWILIO",
-      "twilio_api"
+      "secret"
     ],
     "patterns": [
       {
-        "src": "SK[a-f0-9]{32}"
-      },
-      {
-        "src": "AC[a-f0-9]{32}"
+        "src": "(?:^|[^0-9A-Za-z_])(?:(?:[a-z0-9]+[._-]+)*twilio[._-]*|x[._-]*)?api[._-]*(?:key[._-]*)?secret[\"']?\\s*[:=]\\s*(?:\"([^\"\\r\\n]{1,512})\"|'([^'\\r\\n]{1,512})'|([^\"' \\t\\r\\n,;}#]{1,512})(?:[ \\t\\r\\n,;}#]|$))",
+        "flags": "i"
       }
-    ]
+    ],
+    "correlation": {
+      "requiredNearby": [
+        {
+          "src": "(?:^|[^0-9A-Za-z_])(?:(?:[a-z0-9]+[._-]+)*twilio[._-]*|x[._-]*)?api[._-]*(?:key[._-]*)?sid[\"']?\\s*[:=]\\s*[\"']?(SK[0-9a-f]{32})(?:[\"']|[ \\t\\r\\n,;}#]|$)",
+          "flags": "i"
+        }
+      ],
+      "proximityBytes": 512,
+      "sameLogicalBlock": true,
+      "rejectPlaceholders": true,
+      "oneToOne": true
+    }
   },
   {
     "id": "vercel-token",

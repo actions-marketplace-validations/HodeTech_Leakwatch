@@ -2,7 +2,10 @@
 package jwt
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"regexp"
 
 	"github.com/HodeTech/leakwatch/internal/detector"
@@ -10,6 +13,12 @@ import (
 )
 
 var jwtPattern = regexp.MustCompile(`eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}`)
+
+// ghsPrefix marks a GitHub stateless installation token (ghs_APPID_<jwt>). The
+// embedded JWT also matches jwtPattern, but it is already reported in full by
+// the github-oauth-token detector, so this detector suppresses it to avoid
+// splitting one secret into two findings (see isGitHubStatelessBody).
+var ghsPrefix = []byte("ghs_")
 
 // JWT detects JSON Web Tokens.
 type JWT struct{}
@@ -28,22 +37,122 @@ func (d *JWT) Severity() finding.Severity { return finding.SeverityHigh }
 
 // Scan scans the given data for JSON Web Token patterns.
 func (d *JWT) Scan(_ context.Context, data []byte) []detector.RawFinding {
-	matches := jwtPattern.FindAll(data, -1)
-	if len(matches) == 0 {
+	locs := jwtPattern.FindAllIndex(data, -1)
+	if len(locs) == 0 {
 		return nil
 	}
 
-	findings := make([]detector.RawFinding, 0, len(matches))
-	for _, match := range matches {
+	findings := make([]detector.RawFinding, 0, len(locs))
+	for _, loc := range locs {
+		start, end := loc[0], loc[1]
+		// Skip JWTs that are the body of a GitHub stateless installation token
+		// (ghs_APPID_<jwt>); those are reported in full by github-oauth-token.
+		if isGitHubStatelessBody(data, start) {
+			continue
+		}
+		match := data[start:end]
+		// Reject loose regex matches that aren't structurally a JWT (three
+		// dot-separated base64url segments that merely start with "eyJ" but
+		// don't decode to JSON, e.g. build hashes or source-map identifiers).
+		if !isStructurallyValidJWT(match) {
+			continue
+		}
 		// Reveal only the trailing characters to avoid exposing the JWT
-		// header, payload, or signature.
+		// header, payload, or signature. Raw is cloned so the finding does not
+		// alias (and pin in memory) the full scanned chunk buffer.
 		findings = append(findings, detector.RawFinding{
 			DetectorID: d.ID(),
-			Raw:        match,
+			Raw:        bytes.Clone(match),
 			Redacted:   detector.RedactBytes(match),
 		})
 	}
+	if len(findings) == 0 {
+		return nil
+	}
 	return findings
+}
+
+// isStructurallyValidJWT reports whether match's header and payload segments
+// (the first two dot-separated fields) are valid base64url-encoded JSON
+// objects, with the header additionally required to carry an "alg" key — the
+// field every real JWT header carries (RFC 7519 §5.1). This rejects loose
+// regex matches — three dot-separated base64url-looking segments whose first
+// two merely happen to start with the literal "eyJ" prefix, plausible in
+// webpack/source-map hashes or other base64 data at scale — before they are
+// ever reported as a finding.
+//
+// The decoded bytes are used only for this boolean structural check: they are
+// never stored, logged, or included in the finding output, preserving the
+// secret-safety invariant that only the original, still-encoded match is ever
+// retained (and only in redacted form).
+func isStructurallyValidJWT(match []byte) bool {
+	parts := bytes.SplitN(match, []byte("."), 3)
+	if len(parts) != 3 {
+		return false
+	}
+	header, ok := decodeJSONObject(parts[0])
+	if !ok {
+		return false
+	}
+	if _, hasAlg := header["alg"]; !hasAlg {
+		return false
+	}
+	_, ok = decodeJSONObject(parts[1])
+	return ok
+}
+
+// decodeJSONObject base64url-decodes seg (unpadded, matching the JWT spec)
+// and reports whether it unmarshals into a JSON object. Any decode or parse
+// failure (invalid base64, truncated data, a JSON array/scalar instead of an
+// object) is treated as "not a valid JWT segment".
+func decodeJSONObject(seg []byte) (map[string]any, bool) {
+	// Decode straight from the byte slice: DecodeString would allocate an
+	// intermediate string for every candidate segment.
+	decoded := make([]byte, base64.RawURLEncoding.DecodedLen(len(seg)))
+	n, err := base64.RawURLEncoding.Decode(decoded, seg)
+	if err != nil {
+		return nil, false
+	}
+	var obj map[string]any
+	if err := json.Unmarshal(decoded[:n], &obj); err != nil {
+		return nil, false
+	}
+	return obj, true
+}
+
+// isGitHubStatelessBody reports whether the JWT beginning at start is the body
+// of a GitHub stateless installation token (ghs_APPID_<jwt>). RE2 has no
+// lookbehind, so it walks back over the contiguous token run (base64url plus the
+// ghs_/app-ID separators) immediately preceding the match and checks whether
+// that run contains the literal "ghs_".
+//
+// Contains rather than HasPrefix: the run may carry leading base64url bytes with
+// no delimiter (e.g. "xghs_APPID_"). Wherever "ghs_" appears in the run, the run
+// has no dots (dots are not token bytes) so it is glued straight onto this JWT,
+// forming a "ghs_...eyJ.eyJ.sig" shape that the github-oauth-token detector
+// captures in full — its per-segment floors ({8,}) are at or below this
+// detector's ({10,}). Suppressing here therefore only removes a duplicate of a
+// secret the github detector already reports; it can never drop one. (This
+// assumes the github-oauth-token detector is active, which it is by default.)
+func isGitHubStatelessBody(data []byte, start int) bool {
+	i := start
+	for i > 0 && isTokenByte(data[i-1]) {
+		i--
+	}
+	return bytes.Contains(data[i:start], ghsPrefix)
+}
+
+// isTokenByte reports whether b is part of a contiguous token run: a base64url
+// character or one of the separators ('_', '-') that appear in a ghs_ token.
+func isTokenByte(b byte) bool {
+	switch {
+	case b >= 'a' && b <= 'z', b >= 'A' && b <= 'Z', b >= '0' && b <= '9':
+		return true
+	case b == '_', b == '-':
+		return true
+	default:
+		return false
+	}
 }
 
 func init() {

@@ -2,9 +2,12 @@ package s3
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -16,12 +19,19 @@ import (
 
 // mockS3Client is a minimal mock for the s3Client interface.
 type mockS3Client struct {
-	objects []types.Object
-	data    map[string]string
-	headErr error
+	objects         []types.Object
+	data            map[string]string
+	headErr         error
+	listErr         error
+	headBlock       bool
+	headDeadline    time.Time
+	headHasDeadline bool
 }
 
 func (m *mockS3Client) ListObjectsV2(_ context.Context, input *s3.ListObjectsV2Input, _ ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
+	if m.listErr != nil {
+		return nil, m.listErr
+	}
 	var filtered []types.Object
 	for _, obj := range m.objects {
 		if input.Prefix != nil && obj.Key != nil && !strings.HasPrefix(*obj.Key, *input.Prefix) {
@@ -45,7 +55,12 @@ func (m *mockS3Client) GetObject(_ context.Context, input *s3.GetObjectInput, _ 
 	}, nil
 }
 
-func (m *mockS3Client) HeadBucket(_ context.Context, _ *s3.HeadBucketInput, _ ...func(*s3.Options)) (*s3.HeadBucketOutput, error) {
+func (m *mockS3Client) HeadBucket(ctx context.Context, _ *s3.HeadBucketInput, _ ...func(*s3.Options)) (*s3.HeadBucketOutput, error) {
+	m.headDeadline, m.headHasDeadline = ctx.Deadline()
+	if m.headBlock {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
 	return &s3.HeadBucketOutput{}, m.headErr
 }
 
@@ -80,9 +95,25 @@ func TestS3Source_New_WithOptions(t *testing.T) {
 	assert.Equal(t, "us-west-2", s.region)
 }
 
+func TestWithMaxFileSize_InvalidValue_NoOp(t *testing.T) {
+	s := New("my-bucket")
+	original := s.maxFileSize
+
+	WithMaxFileSize(0)(s)
+	assert.Equal(t, original, s.maxFileSize)
+
+	WithMaxFileSize(-1)(s)
+	assert.Equal(t, original, s.maxFileSize)
+}
+
+func TestWithMaxFileSize_ValidValue_Applied(t *testing.T) {
+	s := New("my-bucket", WithMaxFileSize(1024))
+	assert.Equal(t, int64(1024), s.maxFileSize)
+}
+
 func TestS3Source_Validate_EmptyBucket_ReturnsError(t *testing.T) {
 	s := New("")
-	err := s.Validate()
+	err := s.Validate(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bucket name is required")
 }
@@ -90,7 +121,32 @@ func TestS3Source_Validate_EmptyBucket_ReturnsError(t *testing.T) {
 func TestS3Source_Validate_AccessibleBucket_ReturnsNil(t *testing.T) {
 	s := New("my-bucket")
 	s.client = &mockS3Client{}
-	assert.NoError(t, s.Validate())
+	assert.NoError(t, s.Validate(context.Background()))
+}
+
+func TestS3Source_Validate_AppliesDefaultDeadline(t *testing.T) {
+	mock := &mockS3Client{}
+	s := New("my-bucket")
+	s.client = mock
+	started := time.Now()
+
+	require.NoError(t, s.Validate(context.Background()))
+	require.True(t, mock.headHasDeadline)
+	assert.WithinDuration(t, started.Add(validateTimeout), mock.headDeadline, time.Second)
+}
+
+func TestS3Source_Validate_CallerDeadlineCancelsRequest(t *testing.T) {
+	mock := &mockS3Client{headBlock: true}
+	s := New("my-bucket")
+	s.client = mock
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	started := time.Now()
+
+	err := s.Validate(ctx)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Less(t, time.Since(started), time.Second)
+	assert.WithinDuration(t, started.Add(20*time.Millisecond), mock.headDeadline, 50*time.Millisecond)
 }
 
 func TestS3Source_Chunks_SendsTextObjects(t *testing.T) {
@@ -190,6 +246,50 @@ func TestS3Source_Chunks_SkipsBinaryContent(t *testing.T) {
 
 	assert.Len(t, chunks, 1)
 	assert.Equal(t, "my-bucket/text.txt", chunks[0])
+}
+
+func TestS3Source_Err(t *testing.T) {
+	listFailure := fmt.Errorf("AccessDenied: bucket listing forbidden")
+
+	tests := []struct {
+		name    string
+		client  *mockS3Client
+		wantErr error
+	}{
+		{
+			name: "successful listing reports no error",
+			client: &mockS3Client{
+				objects: []types.Object{{Key: ptr("a.txt"), Size: ptr(int64(5))}},
+				data:    map[string]string{"a.txt": "hello"},
+			},
+			wantErr: nil,
+		},
+		{
+			name:    "list failure is captured as a terminal error",
+			client:  &mockS3Client{listErr: listFailure},
+			wantErr: listFailure,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := New("my-bucket")
+			s.client = tc.client
+
+			var count int
+			for range s.Chunks(context.Background()) {
+				count++
+			}
+
+			if tc.wantErr != nil {
+				require.Error(t, s.Err())
+				assert.ErrorIs(t, s.Err(), tc.wantErr, "the underlying list error must be wrapped")
+				assert.Zero(t, count, "a failed listing produces no chunks")
+			} else {
+				assert.NoError(t, s.Err())
+			}
+		})
+	}
 }
 
 func TestS3Source_Chunks_ContextCancellation(t *testing.T) {
@@ -318,6 +418,100 @@ func TestS3Source_Chunks_WithExcludePaths_FiltersObjects(t *testing.T) {
 func TestS3Source_New_WithExcludePaths_StoresPatterns(t *testing.T) {
 	s := New("my-bucket", WithExcludePaths([]string{"a/**", "b"}))
 	assert.Equal(t, []string{"a/**", "b"}, s.excludePaths)
+}
+
+// mockPaginatedS3Client implements the s3Client interface with genuine
+// ContinuationToken-based pagination across two pages, unlike mockS3Client
+// (which always returns every object on a single unpaginated page). It
+// records each ContinuationToken it receives so tests can assert the
+// manual pagination loop in listAndSendChunks threads the token correctly.
+type mockPaginatedS3Client struct {
+	pages          [][]types.Object
+	data           map[string]string
+	receivedTokens []*string
+}
+
+func (m *mockPaginatedS3Client) ListObjectsV2(_ context.Context, input *s3.ListObjectsV2Input, _ ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
+	m.receivedTokens = append(m.receivedTokens, input.ContinuationToken)
+
+	pageIdx := 0
+	if input.ContinuationToken != nil {
+		var err error
+		pageIdx, err = strconv.Atoi(*input.ContinuationToken)
+		if err != nil {
+			return nil, fmt.Errorf("mock: invalid continuation token %q: %w", *input.ContinuationToken, err)
+		}
+	}
+
+	if pageIdx >= len(m.pages) {
+		return &s3.ListObjectsV2Output{}, nil
+	}
+
+	out := &s3.ListObjectsV2Output{
+		Contents: m.pages[pageIdx],
+	}
+	if pageIdx+1 < len(m.pages) {
+		out.IsTruncated = ptr(true)
+		out.NextContinuationToken = ptr(strconv.Itoa(pageIdx + 1))
+	} else {
+		out.IsTruncated = ptr(false)
+	}
+	return out, nil
+}
+
+func (m *mockPaginatedS3Client) GetObject(_ context.Context, input *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+	key := *input.Key
+	content, ok := m.data[key]
+	if !ok {
+		content = ""
+	}
+	return &s3.GetObjectOutput{
+		Body: io.NopCloser(strings.NewReader(content)),
+	}, nil
+}
+
+func (m *mockPaginatedS3Client) HeadBucket(_ context.Context, _ *s3.HeadBucketInput, _ ...func(*s3.Options)) (*s3.HeadBucketOutput, error) {
+	return &s3.HeadBucketOutput{}, nil
+}
+
+func TestS3Source_Chunks_MultiPagePagination_ThreadsContinuationToken(t *testing.T) {
+	mock := &mockPaginatedS3Client{
+		pages: [][]types.Object{
+			{
+				{Key: ptr("page1-a.txt"), Size: ptr(int64(5))},
+				{Key: ptr("page1-b.txt"), Size: ptr(int64(5))},
+			},
+			{
+				{Key: ptr("page2-a.txt"), Size: ptr(int64(5))},
+			},
+		},
+		data: map[string]string{
+			"page1-a.txt": "aaaaa",
+			"page1-b.txt": "bbbbb",
+			"page2-a.txt": "ccccc",
+		},
+	}
+
+	s := New("my-bucket")
+	s.client = mock
+
+	ctx := context.Background()
+	var chunks []string
+	for chunk := range s.Chunks(ctx) {
+		chunks = append(chunks, chunk.SourceMetadata.FilePath)
+	}
+
+	assert.Len(t, chunks, 3)
+	assert.Contains(t, chunks, "my-bucket/page1-a.txt")
+	assert.Contains(t, chunks, "my-bucket/page1-b.txt")
+	assert.Contains(t, chunks, "my-bucket/page2-a.txt")
+
+	// The list call must happen exactly once per page, and the second call
+	// must carry the NextContinuationToken returned by the first.
+	require.Len(t, mock.receivedTokens, 2)
+	assert.Nil(t, mock.receivedTokens[0])
+	require.NotNil(t, mock.receivedTokens[1])
+	assert.Equal(t, "1", *mock.receivedTokens[1])
 }
 
 func TestS3Source_Chunks_WithPrefix_FiltersObjects(t *testing.T) {

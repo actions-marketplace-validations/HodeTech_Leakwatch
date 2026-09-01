@@ -9,6 +9,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/HodeTech/leakwatch/internal/meta"
 )
 
 var (
@@ -33,25 +35,23 @@ type FindingsExitError struct {
 }
 
 func (e *FindingsExitError) Error() string {
-	return "secrets found"
+	return fmt.Sprintf("%d secret(s) found", e.Count)
+}
+
+// InterruptedExitError indicates the scan was interrupted (SIGINT/SIGTERM) before
+// completing, so its partial results must not be trusted as a clean pass. It maps
+// to exit code 3, distinct from findings (1) and generic errors (2), so a CI
+// pipeline can never observe a clean exit 0 for a scan that did not finish.
+type InterruptedExitError struct{}
+
+func (e *InterruptedExitError) Error() string {
+	return "scan interrupted before completion"
 }
 
 var rootCmd = &cobra.Command{
 	Use:   "leakwatch",
 	Short: "Detects leaked secrets in codebases",
-	Long: `Leakwatch is a high-performance security tool that detects, verifies, and reports
-leaked secrets (API keys, passwords, certificates) in codebases, Git histories,
-container images, cloud storage buckets, and Slack workspaces.
-
-Features:
-  - 63 built-in secret detectors (60 packages) covering AWS, GitHub, Slack, Stripe, JWT, and more
-  - 54 verification checks to confirm whether discovered secrets are active
-  - Scans filesystems, Git repos, container images, S3, GCS, and Slack
-  - Multiple output formats: JSON, SARIF, CSV, and terminal table
-  - Aho-Corasick pre-filtering for fast multi-pattern matching
-  - Concurrent worker pool architecture for high throughput
-  - Custom rules via YAML configuration
-  - .leakwatchignore and inline ignore support`,
+	Long:  rootLongDescription(),
 	Example: `  # Quick scan of current directory
   leakwatch scan fs .
 
@@ -70,20 +70,73 @@ Features:
 	SilenceErrors: true,
 }
 
-// Execute runs the root command and returns the exit code.
+func rootLongDescription() string {
+	capabilities := meta.VerificationCapabilityCounts()
+	return fmt.Sprintf(`Leakwatch is a high-performance security tool that detects, verifies, and reports
+leaked secrets (API keys, passwords, certificates) in codebases, Git histories,
+container images, cloud storage buckets, and Slack workspaces.
+
+Features:
+  - %d built-in secret detectors covering AWS, GitHub, Slack, Stripe, JWT, and more
+  - %d verification implementations: %d direct-live, %d context-required, %d format-only
+  - Scans filesystems, Git repos, container images, S3, GCS, and Slack
+  - Multiple output formats: %s
+  - Aho-Corasick pre-filtering for fast multi-pattern matching
+  - Concurrent worker pool architecture for high throughput
+  - Custom rules via YAML configuration
+  - .leakwatchignore and inline ignore support`,
+		meta.Detectors,
+		meta.Verifiers,
+		capabilities.Live,
+		capabilities.RequiresContext,
+		capabilities.FormatOnly,
+		meta.OutputFormatList,
+	)
+}
+
+// Execute runs the root command and returns the process exit code:
+//
+//	0  clean, completed scan with no findings
+//	1  findings were reported (FindingsExitError)
+//	2  a generic error (bad flags, config parse failure, scan failure)
+//	3  the scan was interrupted before completing (InterruptedExitError)
 func Execute() int {
-	if err := rootCmd.Execute(); err != nil {
-		var fErr *FindingsExitError
-		if errors.As(err, &fErr) {
-			return 1
-		}
-		// Print user-friendly error with suggestion.
-		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
-		fmt.Fprintf(os.Stderr, "\nRun 'leakwatch --help' for usage information.\n")
-		slog.Debug("command failed", "error", err)
-		return 2
+	// ExecuteC returns the command that actually ran/failed so the error hint can
+	// point at that subcommand's own --help rather than the top-level one.
+	cmd, err := rootCmd.ExecuteC()
+	code := exitCodeForError(err)
+	if code == 0 || code == 1 {
+		return code
 	}
-	return 0
+
+	if code == 3 {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+		slog.Debug("scan interrupted", "error", err)
+		return 3
+	}
+
+	// Print user-friendly error pointing at the failing command's own help.
+	fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+	fmt.Fprintf(os.Stderr, "\nRun '%s --help' for usage information.\n", cmd.CommandPath())
+	slog.Debug("command failed", "error", err)
+	return 2
+}
+
+// exitCodeForError is the single testable mapping between typed command errors
+// and the process contract documented above.
+func exitCodeForError(err error) int {
+	if err == nil {
+		return 0
+	}
+	var findingsErr *FindingsExitError
+	if errors.As(err, &findingsErr) {
+		return 1
+	}
+	var interruptedErr *InterruptedExitError
+	if errors.As(err, &interruptedErr) {
+		return 3
+	}
+	return 2
 }
 
 func init() {

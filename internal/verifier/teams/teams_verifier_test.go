@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -164,6 +165,38 @@ func TestVerify_TransportError_DoesNotLeakWebhookURL(t *testing.T) {
 	assert.Contains(t, result.Message, "[REDACTED]")
 }
 
+// TestVerify_CancelledContext_ReturnsVerifyError mirrors vtest.Run's
+// "cancelled_context_is_not_inactive" case for this hand-rolled verifier: a
+// pre-cancelled context must yield StatusVerifyError, and must NEVER be
+// reported as StatusVerifiedInactive or StatusVerifiedActive (a network
+// failure is not evidence either way).
+func TestVerify_CancelledContext_ReturnsVerifyError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	v := &Verifier{httpClient: server.Client()}
+
+	raw := detector.RawFinding{
+		DetectorID: detectorID,
+		Raw:        []byte(server.URL),
+		Redacted:   "https://outlook.office.com/webhook/****",
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately.
+
+	result := v.Verify(ctx, raw)
+
+	require.NotEqual(t, finding.StatusVerifiedInactive, result.Status,
+		"a cancelled context must NOT be reported as verified-inactive")
+	require.NotEqual(t, finding.StatusVerifiedActive, result.Status,
+		"a cancelled context must NOT be reported as verified-active")
+	assert.Equal(t, finding.StatusVerifyError, result.Status,
+		"a cancelled context must be a verify error")
+}
+
 func TestVerify_Type_ReturnsCorrectID(t *testing.T) {
 	v := &Verifier{}
 	assert.Equal(t, "teams-webhook", v.Type())
@@ -182,4 +215,32 @@ func TestVerify_EmptyURL_ReturnsUnverified(t *testing.T) {
 
 	assert.Equal(t, finding.StatusUnverified, result.Status)
 	assert.Equal(t, "empty webhook URL", result.Message)
+}
+
+func TestVerifyWithRequestGate_AdmitsOnlyActualTeamsSend(t *testing.T) {
+	t.Run("empty URL consumes no admission", func(t *testing.T) {
+		gateCalls := 0
+		result := (&Verifier{}).VerifyWithRequestGate(context.Background(), detector.RawFinding{}, func() *finding.VerificationResult {
+			gateCalls++
+			return nil
+		})
+		assert.Equal(t, finding.StatusUnverified, result.Status)
+		assert.Zero(t, gateCalls)
+	})
+
+	t.Run("rejection prevents transport", func(t *testing.T) {
+		var calls atomic.Int64
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			calls.Add(1)
+			w.WriteHeader(http.StatusBadRequest)
+		}))
+		defer server.Close()
+		v := &Verifier{httpClient: server.Client()}
+
+		result := v.VerifyWithRequestGate(context.Background(), detector.RawFinding{Raw: []byte(server.URL)}, func() *finding.VerificationResult {
+			return &finding.VerificationResult{Status: finding.StatusVerifyError, Message: "admission rejected"}
+		})
+		assert.Equal(t, "admission rejected", result.Message)
+		assert.Zero(t, calls.Load())
+	})
 }

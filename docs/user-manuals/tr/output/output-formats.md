@@ -33,7 +33,7 @@ leakwatch scan fs ./src --format json --output findings.json
 
 ```json
 {
-  "id": "a3f9c12d-8e4b-4c7a-9f2e-1b5d3a7c9e0f",
+  "id": "447b5d2846d08ce25dd3d638cfe911ad",
   "detector_id": "github-token",
   "severity": "critical",
   "redacted": "ghp_****************************Xk9R",
@@ -49,6 +49,12 @@ leakwatch scan fs ./src --format json --output findings.json
   "detected_at": "2026-05-23T10:15:30Z"
 }
 ```
+
+`id`, düz 32 karakterlik küçük harfli bir hex dizesi olarak gösterilen, deterministik ve kısaltılmış bir SHA-256 değeridir — bir UUID **değildir** ve hiçbir zaman tire içermez. Nasıl hesaplandığı için [Nasıl Çalışır](#/getting-started/how-it-works) sayfasına bakın.
+
+`entropy` hesaplanmadığında atlanır; hesaplanan `0.0` değeri sıfır olarak yazılır. Zaman damgası olmayan kütüphane üretimi bulgularda `detected_at`, Go'nun 1. yıl sıfır zamanı yerine atlanır. Normal CLI bulguları zaman damgasını ayarlar.
+
+Sağlayıcı tarafından doğrulanmış kimlik, kapsam ve sona erme meta verisi mevcut olduğunda `verification.extra_data` altında görünür. Değerler sınırlı ve şema doğrulamalıdır; alanın olmaması token'ın izni veya sona ermesi olmadığı değil, sağlayıcının güvenli meta veri sunmadığı anlamına gelir.
 
 `--remediation` de ayarlandığında her bulgunun içine iç içe bir `"remediation"` nesnesi yerleştirilir. Bkz. [Düzeltme Rehberi](#/output/remediation).
 
@@ -83,8 +89,10 @@ Tam CI kurulumu için [GitHub Action](#/ci-cd/github-action) bölümüne bakın.
 **Sütunlar (varsayılan):**
 
 ```text
-id,detector_id,severity,redacted,file_path,commit,verification_status,remediation
+id,detector_id,severity,redacted,source,file_path,line,commit,verification_status,remediation
 ```
+
+`source`, bir bulgunun geldiği kaynak depoyu, konteyner imajını veya Slack kanalını tanımlayan, insan tarafından okunabilir bir etikettir (bir `scan repos` çalıştırması birden fazla depodan gelen bulguları tek bir CSV'de birleştirdiğinde kullanışlıdır); tek bir dizinin düz bir dosya sistemi taraması için boştur. `line` satır numarasıdır, uygulanamadığında boştur.
 
 `--show-raw` ayarlandığında, sona bir `raw` sütunu eklenir.
 
@@ -99,22 +107,24 @@ leakwatch scan git . --format csv --output findings.csv
 ### Örnek çıktı
 
 ```csv
-id,detector_id,severity,redacted,file_path,commit,verification_status,remediation
-a3f9c12d-...,github-token,critical,ghp_****Xk9R,scripts/deploy.sh,7d3e1f2,verified_active,Revoke GitHub Token
-b7d2e45a-...,aws-access-key-id,high,AKIA****K7NP,config/aws.yml,7d3e1f2,unverified,Rotate AWS Access Key
+id,detector_id,severity,redacted,source,file_path,line,commit,verification_status,remediation
+447b5d2846d08ce25dd3d638cfe911ad,github-token,critical,ghp_****Xk9R,,scripts/deploy.sh,14,7d3e1f2,verified_active,Revoke GitHub Token
+e6fa909746d7d5242309b64c33209fa9,aws-access-key-id,high,AKIA****K7NP,,config/aws.yml,3,7d3e1f2,unverified,Rotate AWS Access Key
 ```
 
 ## Tablo
 
-`table` formatı, insan tarafından okunabilir sekme hizalı bir tablo yazar; sonuçların hızlı görsel taramasını istediğiniz etkileşimli terminal oturumları için en uygun formattır.
+`table` formatı; CJK, birleşen işaretler ve emoji için doğru görüntü genişliği dahil, terminal hücrelerine göre hizalanmış insan tarafından okunabilir bir tablo yazar. Sonuçların hızlı görsel taramasını istediğiniz etkileşimli terminal oturumları için en uygun formattır.
 
 **Sütunlar:**
 
 ```text
-SEVERITY | DETECTOR | FILE | REDACTED | STATUS | REMEDIATION
+SEVERITY | DETECTOR | FILE | LINE | REDACTED | STATUS | REMEDIATION
 ```
 
-`--show-raw` ayarlandığında, sona bir `RAW` sütunu eklenir. Tablonun altına bir özet satırı yazdırılır (örn. `Found 3 secrets (1 critical, 2 high).`).
+`LINE` sütunu, satır numarası mevcut olmadığında (örneğin bir Slack veya konteyner imajı bulgusu için) `-` gösterir. `REMEDIATION` sütunu her zaman bulunur ve `--remediation` ayarlanmadıkça `-` gösterir. `--show-raw` ayarlandığında da, sona bir `RAW` sütunu eklenir. Yalnızca tablo çıktısında bu değer geri çevrilebilir, Go-tırnaklı bir dize olarak gösterilir: `\\n`, `\\t` ve `\\x1b` gibi kaçışlar terminal kontrol baytlarını etkisiz tutarken `strconv.Unquote` özgün baytları eksiksiz geri yükleyebilir. JSON ve CSV ham değerleri mevcut makine-okunur gösterimlerini korur. Tablonun altına bir özet satırı yazdırılır (örn. `Found 3 secrets (1 critical, 2 high).`).
+
+Saldırgan tarafından etkilenebilecek alanlar (dedektör ID'si, dosya yolu, maskelenmiş değer), terminale yazılmadan önce kontrol karakterlerinden ve ANSI kaçış dizilerinden arındırılır. Unicode çift yönlü metin (bidi) kontrol karakterleri görünür `\\uXXXX` kod noktaları olarak yazılır; böylece varlıkları gizlenmeden görsel sıralama saldırıları önlenir. CJK, birleşen işaretler ve emoji ZWJ dizileri dahil olağan uluslararası metin korunur.
 
 **ANSI rengi**, `SEVERITY` sütununa otomatik olarak uygulanır, ancak yalnızca dört koşulun tamamı sağlandığında:
 
@@ -139,10 +149,10 @@ leakwatch scan fs . --format table --min-severity high
 ### Örnek çıktı
 
 ```text
-SEVERITY   DETECTOR          FILE                  REDACTED               STATUS            REMEDIATION
---------   --------          ----                  --------               ------            -----------
-CRITICAL   github-token      scripts/deploy.sh     ghp_****Xk9R           verified_active   Revoke GitHub Token
-HIGH       aws-access-key-id config/aws.yml        AKIA****K7NP           unverified        Rotate AWS Access Key
+SEVERITY  DETECTOR           FILE                LINE  REDACTED      STATUS           REMEDIATION
+--------  --------           ----                ----  --------      ------           -----------
+CRITICAL  github-token       scripts/deploy.sh   14    ghp_****Xk9R  verified_active  Revoke GitHub Token
+HIGH      aws-access-key-id  config/aws.yml      3     AKIA****K7NP  unverified       Rotate AWS Access Key
 
 Found 2 secrets (1 critical, 1 high).
 ```
@@ -153,7 +163,7 @@ Found 2 secrets (1 critical, 1 high).
 
 Önem derecesi ek açıklama seviyesine eşlenir: `critical` → `error`, `high` → `warning`, `medium`/`low` → `notice`. Dosya yolu olan bir bulgu o dosya ve satıra bağlanır; dosya yolu olmayan bir bulgu çalışma düzeyinde (run-level) bir ek açıklama olur.
 
-Güvenlik için bu format ham sırrı **asla** yazdırmaz — `--show-raw` ile bile yalnızca redakte edilmiş değer gösterilir; çünkü ek açıklamalar (çoğu zaman herkese açık olan) PR arayüzünde ve günlüklerde görüntülenir.
+Güvenlik için bu format ham sırrı **asla** yazdırmaz — `--show-raw` ile bile yalnızca maskelenmiş değer gösterilir; çünkü ek açıklamalar (çoğu zaman herkese açık olan) PR arayüzünde ve günlüklerde görüntülenir.
 
 ### Örnek çağrı
 

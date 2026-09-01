@@ -2,9 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
@@ -14,20 +12,27 @@ import (
 )
 
 // flagIncludeFiles is the slack-only flag that requests scanning of uploaded
-// file content. Defined as a constant so the registration, deprecation, and
-// read sites reference a single literal.
+// file content. Defined as a constant so registration and read sites reference
+// a single literal.
 const flagIncludeFiles = "include-files"
+
+// A zero CLI value retains the source package's safe operation-specific
+// defaults. A positive value explicitly overrides every limiter bucket.
+const defaultSlackRateLimit = 0
 
 var scanSlackCmd = &cobra.Command{
 	Use:   "slack",
 	Short: "Scans a Slack workspace",
 	Long: `Scans messages across channels in a Slack workspace to detect leaked secrets
-such as API keys, passwords, and certificates. Scanning of uploaded file
-content is planned but not yet implemented; only message text is scanned.
+such as API keys, passwords, and certificates. Text-like uploaded files can be
+scanned with --include-files; downloads are size-bounded and restricted to
+Slack-owned HTTPS endpoints.
 
-Requires a Slack Bot Token with appropriate scopes (channels:history,
-groups:history, im:history, mpim:history). The token can be provided via the
---token flag or the LEAKWATCH_SLACK_TOKEN environment variable.`,
+Requires a Slack Bot Token with channels:read, channels:history, groups:read,
+and groups:history. --include-dms additionally requires im:read, im:history,
+mpim:read, and mpim:history; file scanning additionally requires files:read.
+The token can be provided via the --token flag or the LEAKWATCH_SLACK_TOKEN
+environment variable.`,
 	Example: `  # Scan all channels using environment variable for token
   export LEAKWATCH_SLACK_TOKEN=xoxb-your-token
   leakwatch scan slack
@@ -44,8 +49,11 @@ groups:history, im:history, mpim:history). The token can be provided via the
   # Include direct messages
   leakwatch scan slack --include-dms
 
-  # Reduce API rate to avoid throttling
-  leakwatch scan slack --rate-limit 10`,
+  # Include text-like file attachments (requires files:read)
+  leakwatch scan slack --include-files --max-file-size 5242880
+
+  # Use a higher rate for a Marketplace/internal app with Tier 3 history access
+  leakwatch scan slack --rate-limit 0.8`,
 	Args: cobra.NoArgs,
 	RunE: runScanSlack,
 }
@@ -59,20 +67,9 @@ func init() {
 	flags.String("exclude-channels", "", "comma-separated channel names to exclude")
 	flags.String("since", "", "scan messages after this date (YYYY-MM-DD)")
 	flags.Bool("include-dms", false, "include direct messages")
-	// Slack file scanning is not yet implemented (only message text is scanned).
-	// The flag is kept for forward-compatibility but defaults to false, is hidden,
-	// and is marked deprecated so the CLI does not advertise a working feature.
-	flags.Bool(flagIncludeFiles, false, "(not yet implemented; planned) scan uploaded file content")
-	if err := flags.MarkDeprecated(flagIncludeFiles, "Slack file scanning is not yet implemented; this flag has no effect"); err != nil {
-		slog.Warn("failed to mark include-files deprecated", "error", err)
-	}
-	flags.Float64("rate-limit", 20, "max Slack API requests per second")
-	flags.StringP("format", "f", "json", "output format (json, sarif, csv, table, github)")
-	flags.StringP("output", "o", "", "output file (default: stdout)")
-	flags.IntP("concurrency", "c", runtime.NumCPU(), "number of concurrent workers")
-	flags.Int64("max-file-size", 10*1024*1024, "maximum file size in bytes")
-	flags.Bool(flagShowRaw, false, "show raw secret content in output")
-
+	flags.Bool(flagIncludeFiles, false, "scan text-like uploaded files (requires files:read)")
+	flags.Float64("rate-limit", defaultSlackRateLimit, "per-operation Slack request cap per second (0 uses safe operation-specific defaults)")
+	addCommonScanFlags(flags)
 	addVerifyFlags(flags)
 }
 
@@ -83,7 +80,7 @@ func runScanSlack(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Resolve token from flag, falling back to environment variable.
-	token, _ := cmd.Flags().GetString("token")
+	token := flagString(cmd, "token")
 	if token == "" {
 		token = os.Getenv("LEAKWATCH_SLACK_TOKEN")
 	}
@@ -91,17 +88,17 @@ func runScanSlack(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("slack bot token is required: use --token or set LEAKWATCH_SLACK_TOKEN")
 	}
 
-	var opts []slacksource.Option
+	opts := []slacksource.Option{slacksource.WithMaxFileSize(cfg.MaxFileSize)}
 
-	if channels, _ := cmd.Flags().GetString("channels"); channels != "" {
+	if channels := flagString(cmd, "channels"); channels != "" {
 		opts = append(opts, slacksource.WithChannels(splitComma(channels)))
 	}
 
-	if excludeChannels, _ := cmd.Flags().GetString("exclude-channels"); excludeChannels != "" {
+	if excludeChannels := flagString(cmd, "exclude-channels"); excludeChannels != "" {
 		opts = append(opts, slacksource.WithExcludeChannels(splitComma(excludeChannels)))
 	}
 
-	if sinceStr, _ := cmd.Flags().GetString("since"); sinceStr != "" {
+	if sinceStr := flagString(cmd, "since"); sinceStr != "" {
 		since, err := time.Parse("2006-01-02", sinceStr)
 		if err != nil {
 			return fmt.Errorf("invalid --since date format, expected YYYY-MM-DD: %w", err)
@@ -109,22 +106,26 @@ func runScanSlack(cmd *cobra.Command, _ []string) error {
 		opts = append(opts, slacksource.WithSince(since))
 	}
 
-	if includeDMs, _ := cmd.Flags().GetBool("include-dms"); includeDMs {
+	if flagBool(cmd, "include-dms") {
 		opts = append(opts, slacksource.WithIncludeDMs(true))
 	}
 
-	if includeFiles, _ := cmd.Flags().GetBool(flagIncludeFiles); includeFiles {
+	if flagBool(cmd, flagIncludeFiles) {
 		opts = append(opts, slacksource.WithIncludeFiles(true))
 	}
 
-	if rateLimit, _ := cmd.Flags().GetFloat64("rate-limit"); rateLimit > 0 {
+	rateLimit := flagFloat64(cmd, "rate-limit")
+	if rateLimit < 0 {
+		return fmt.Errorf("--rate-limit must be zero or greater")
+	}
+	if rateLimit > 0 {
 		opts = append(opts, slacksource.WithRateLimit(rateLimit))
 	}
 
-	cfg.scanTarget = "slack workspace"
+	cfg.ScanTarget = "slack workspace"
 	src := slacksource.New(token, opts...)
 
-	return executeScan(cmd.Context(), cfg, src, nil)
+	return runScan(cmd, cfg, src, nil)
 }
 
 // splitComma splits a comma-separated string into trimmed, non-empty parts.
